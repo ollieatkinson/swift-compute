@@ -8,3 +8,4 @@ workspace	1824.206	keep	switch harness to ordo-one package-benchmark p50 score
 workspace	1250.049	keep	direct compute hot item comparison and yes keywords
 workspace	1254.743	discard	avoid rebuilding computer function dictionary when merging empty functions
 workspace	1192.620	keep	remove unused state copy during route evaluation
+workspace	1142.580	keep	return resolved root document without scanning route state

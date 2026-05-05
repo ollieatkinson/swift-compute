@@ -562,6 +562,11 @@ public actor ComputeRuntime: Sendable {
         from state: ComputeBrain.State,
         excluding excluded: ComputeRoute? = nil
     ) throws -> JSON {
+        if excluded == nil,
+           case .value(let rootValue)? = state[.route(.root)],
+           !rootValue.isComputeInvocation {
+            return rootValue
+        }
         var output = document
         var finalAncestors: [ComputeRoute] = []
         let routeValues = state.compactMap { entry -> (ComputeRoute, JSON)? in
