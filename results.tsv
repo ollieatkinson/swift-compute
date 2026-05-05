@@ -82,3 +82,4 @@ workspace	930.569	discard	reserve brain observer table capacity
 workspace	902.338	discard	sort computed object entries instead of keys
 workspace	651.013	keep	scan compute invocations with explicit loops
 workspace	933.669	discard	split invocation existence check from parsing
+workspace	1118.805	discard	use direct array bounds in core route traversal
