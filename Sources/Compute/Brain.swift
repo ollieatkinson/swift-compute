@@ -69,7 +69,9 @@ public actor Brain<Lemma, Signal>: Sendable where Lemma: Hashable & Sendable, Si
     private var latestThoughts: State = [:]
     private var remaining: Int
     private var conceptOrder: [Lemma]
-    private var observers: [Lemma: [Lemma]]
+    private var observers: [Lemma: [Int]]
+    private var affectedMarks: [Int]
+    private var affectedGeneration = 0
     private var stateContinuations: [UUID: AsyncStream<State>.Continuation] = [:]
 
     public init(
@@ -85,6 +87,7 @@ public actor Brain<Lemma, Signal>: Sendable where Lemma: Hashable & Sendable, Si
         self.remaining = countThoughts(state)
         self.conceptOrder = concepts.map(\.lemma)
         self.observers = Self.observers(for: concepts)
+        self.affectedMarks = Array(repeating: 0, count: concepts.count)
     }
 
     public var value: State {
@@ -287,23 +290,51 @@ public actor Brain<Lemma, Signal>: Sendable where Lemma: Hashable & Sendable, Si
     private func setConcepts(_ concepts: [Concept]) {
         conceptOrder = concepts.map(\.lemma)
         observers = Self.observers(for: concepts)
+        affectedMarks = Array(repeating: 0, count: concepts.count)
+        affectedGeneration = 0
     }
 
     private func affected(by changes: State) -> [Lemma] {
         if changes.count == 1,
-           let lemma = changes.keys.first {
-            return observers[lemma] ?? []
+           let lemma = changes.keys.first,
+           let indexes = observers[lemma] {
+            return indexes.map { conceptOrder[$0] }
         }
-        let affected = changes.keys.reduce(into: Set<Lemma>()) { affected, lemma in
-            affected.formUnion(observers[lemma] ?? [])
+
+        affectedGeneration &+= 1
+        if affectedGeneration == 0 {
+            affectedMarks = Array(repeating: 0, count: conceptOrder.count)
+            affectedGeneration = 1
         }
-        return conceptOrder.filter { affected.contains($0) }
+        let generation = affectedGeneration
+        var lowerBound = conceptOrder.count
+        var upperBound = -1
+
+        for lemma in changes.keys {
+            guard let indexes = observers[lemma] else { continue }
+            for index in indexes where affectedMarks[index] != generation {
+                affectedMarks[index] = generation
+                lowerBound = min(lowerBound, index)
+                upperBound = max(upperBound, index)
+            }
+        }
+
+        guard upperBound >= 0 else {
+            return []
+        }
+        var affected: [Lemma] = []
+        affected.reserveCapacity(upperBound - lowerBound + 1)
+        for index in lowerBound...upperBound where affectedMarks[index] == generation {
+            affected.append(conceptOrder[index])
+        }
+        return affected
     }
 
-    private static func observers(for concepts: [Concept]) -> [Lemma: [Lemma]] {
-        concepts.reduce(into: [:]) { observers, concept in
+    private static func observers(for concepts: [Concept]) -> [Lemma: [Int]] {
+        concepts.enumerated().reduce(into: [:]) { observers, entry in
+            let (index, concept) = entry
             for input in concept.inputs {
-                observers[input, default: []].append(concept.lemma)
+                observers[input, default: []].append(index)
             }
         }
     }
