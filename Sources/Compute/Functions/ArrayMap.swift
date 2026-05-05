@@ -84,6 +84,14 @@ extension ArrayMap: CustomComputeKeyword {
             route: route.appending(.key("flattened")),
             depth: depth + 1
         ).decode(Bool.self) ?? false
-        return try ArrayMap(over: .array(mapped), flattened: .bool(shouldFlatten)).compute()
+        if shouldFlatten {
+            return .array(mapped.flatMap { value in
+                if case .array(let values) = value {
+                    return values
+                }
+                return [value]
+            })
+        }
+        return .array(mapped)
     }
 }
