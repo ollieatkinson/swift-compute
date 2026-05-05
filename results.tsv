@@ -58,3 +58,4 @@ workspace	617.647	keep	set projected child values from route component slices
 workspace	620.571	discard	drop brain commit change copy for runtime calls
 workspace	644.754	discard	thread child concept routes as optional
 workspace	765.436	discard	store brain concept inputs as arrays internally
+workspace	763.443	keep	collect resolved dependency results only for subscribed runtimes

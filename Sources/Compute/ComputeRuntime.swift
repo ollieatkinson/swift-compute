@@ -163,7 +163,7 @@ public actor ComputeRuntime: Sendable {
 
     @discardableResult
     public func step(_ count: Int = 1) async throws -> ComputeStep {
-        let runtime = functionRuntime()
+        let runtime = functionRuntime(collectResolvedResults: !observedRoutes.isEmpty)
         let profile = ComputeProfiling.start()
         let commit: BrainCommit<ComputeLemma, ComputeSignal>
         do {
@@ -248,7 +248,8 @@ public actor ComputeRuntime: Sendable {
         } else {
             graph = nil
         }
-        let runtime = functionRuntime()
+        let collectResolvedResults = subscribe || !observedRoutes.isEmpty
+        let runtime = functionRuntime(collectResolvedResults: collectResolvedResults)
         let commit: BrainCommit<ComputeLemma, ComputeSignal>
         do {
             let brainProfile = ComputeProfiling.start()
@@ -451,9 +452,13 @@ public actor ComputeRuntime: Sendable {
         routeContinuations[route] = continuations
     }
 
-    private func functionRuntime() -> ComputeFunctionRuntime {
+    private func functionRuntime(collectResolvedResults: Bool = false) -> ComputeFunctionRuntime {
         let routes = routeConcepts
-        return ComputeFunctionRuntime(functions: functions, results: functionResults) { route in
+        return ComputeFunctionRuntime(
+            functions: functions,
+            results: functionResults,
+            collectResolvedResults: collectResolvedResults
+        ) { route in
             route.nearestAncestor(in: routes) ?? route
         }
     }
@@ -756,6 +761,7 @@ public struct ComputeDependency: Sendable, Equatable, Hashable {
 final class ComputeFunctionRuntime: @unchecked Sendable {
     private let functions: [String: any AnyReturnsKeyword]
     private let results: [String: Result<JSON, JSONError>]
+    private let collectResolvedResults: Bool
     private let dependencyOwner: @Sendable (ComputeRoute) -> ComputeRoute
     private var tracked: [ComputeRoute: Set<ComputeDependency>] = [:]
     private var resolvedResults: [String: Result<JSON, JSONError>] = [:]
@@ -764,10 +770,12 @@ final class ComputeFunctionRuntime: @unchecked Sendable {
     init(
         functions: [String: any AnyReturnsKeyword],
         results: [String: Result<JSON, JSONError>],
+        collectResolvedResults: Bool,
         dependencyOwner: @escaping @Sendable (ComputeRoute) -> ComputeRoute
     ) {
         self.functions = functions
         self.results = results
+        self.collectResolvedResults = collectResolvedResults
         self.dependencyOwner = dependencyOwner
     }
 
@@ -889,10 +897,14 @@ final class ComputeFunctionRuntime: @unchecked Sendable {
             }
             do {
                 let value = try await function.value(for: argument)
-                resolvedResults[dependency.key] = .success(value)
+                if collectResolvedResults {
+                    resolvedResults[dependency.key] = .success(value)
+                }
                 return value
             } catch {
-                resolvedResults[dependency.key] = .failure(JSONError(error))
+                if collectResolvedResults {
+                    resolvedResults[dependency.key] = .failure(JSONError(error))
+                }
                 throw error
             }
         }
