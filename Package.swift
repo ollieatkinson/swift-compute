@@ -35,6 +35,11 @@ let package = Package(
                 .plugin(name: "BenchmarkPlugin", package: "package-benchmark"),
             ]
         ),
+        .executableTarget(
+            name: "ComputeProfile",
+            dependencies: ["Compute"],
+            path: "Benchmarks/ComputeProfile"
+        ),
         .testTarget(name: "ComputeTests", dependencies: ["Compute"]),
     ]
 )

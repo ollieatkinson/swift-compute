@@ -223,7 +223,9 @@ public actor Brain<Lemma, Signal>: Sendable where Lemma: Hashable & Sendable, Si
         var waves = 0
         var remainingLimit = limit ?? .max
         while maxThoughts.map({ waves < $0 }) ?? true {
+            let affectedProfile = ComputeProfiling.start()
             let affected = affected(by: writes)
+            ComputeProfiling.record("brain.affected", since: affectedProfile)
             guard !affected.isEmpty else { break }
             guard remainingLimit > 0 else {
                 self.change = writes
@@ -232,22 +234,35 @@ public actor Brain<Lemma, Signal>: Sendable where Lemma: Hashable & Sendable, Si
             remainingLimit -= 1
 
             var thoughts: State = [:]
-            for lemma in affected {
-                guard let signal = try await thinking(lemma, state) else { continue }
-                guard state[lemma] != signal else { continue }
-                thoughts[lemma] = signal
+            let evaluateProfile = ComputeProfiling.start()
+            do {
+                for lemma in affected {
+                    guard let signal = try await thinking(lemma, state) else { continue }
+                    guard state[lemma] != signal else { continue }
+                    thoughts[lemma] = signal
+                }
+                ComputeProfiling.record("brain.evaluateAffected", since: evaluateProfile)
+            } catch {
+                ComputeProfiling.record("brain.evaluateAffected", since: evaluateProfile)
+                throw error
             }
             guard !thoughts.isEmpty else { break }
 
+            let mergeProfile = ComputeProfiling.start()
             state.merge(thoughts) { _, new in new }
             latestThoughts.merge(thoughts) { _, new in new }
+            ComputeProfiling.record("brain.mergeThoughts", since: mergeProfile)
             writes = thoughts
             waves += 1
+            let countProfile = ComputeProfiling.start()
             remaining = countThoughts(state)
+            ComputeProfiling.record("brain.countRemaining", since: countProfile)
             publish(state)
         }
 
+        let countProfile = ComputeProfiling.start()
         remaining = countThoughts(state)
+        ComputeProfiling.record("brain.countRemaining", since: countProfile)
         change = remaining > 0 ? writes : [:]
         return BrainCommit(
             state: state,

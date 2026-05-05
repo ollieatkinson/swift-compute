@@ -104,11 +104,13 @@ public actor ComputeRuntime: Sendable {
         computer: Computer = .default
     ) {
         let computer = computer.merging(functions)
-        let graph = Self.graph(
-            document: document,
-            functions: computer.functions,
-            routeDependencies: [:]
-        )
+        let graph = ComputeProfiling.measure("runtime.init.graph") {
+            Self.graph(
+                document: document,
+                functions: computer.functions,
+                routeDependencies: [:]
+            )
+        }
         self.document = document
         self.context = context
         self.functions = computer.functions
@@ -130,7 +132,15 @@ public actor ComputeRuntime: Sendable {
     }
 
     public func value() async throws -> JSON {
-        (try await settle(subscribe: false)).state
+        let profile = ComputeProfiling.start()
+        do {
+            let value = (try await settle(subscribe: false)).state
+            ComputeProfiling.record("runtime.value", since: profile)
+            return value
+        } catch {
+            ComputeProfiling.record("runtime.value", since: profile)
+            throw error
+        }
     }
 
     public func decode<Value: Decodable>(_ type: Value.Type = Value.self) async throws -> Value {
@@ -151,8 +161,22 @@ public actor ComputeRuntime: Sendable {
     @discardableResult
     public func step(_ count: Int = 1) async throws -> ComputeStep {
         let runtime = functionRuntime()
-        let commit = try await brain.commit(thoughts: count, thinking: thinking(with: runtime))
-        return try await finish(commit, runtime: runtime, subscribe: false, publishWhenSettled: true)
+        let profile = ComputeProfiling.start()
+        let commit: BrainCommit<ComputeLemma, ComputeSignal>
+        do {
+            commit = try await brain.commit(thoughts: count, thinking: thinking(with: runtime))
+            ComputeProfiling.record("runtime.brain.commit", since: profile)
+        } catch {
+            ComputeProfiling.record("runtime.brain.commit", since: profile)
+            throw error
+        }
+        return try await finish(
+            commit,
+            runtime: runtime,
+            subscribe: false,
+            publishWhenSettled: true,
+            sortThoughts: true
+        )
     }
 
     public nonisolated func run(at route: ComputeRoute = .root) -> AsyncStream<Result<JSON, JSONError>> {
@@ -208,11 +232,13 @@ public actor ComputeRuntime: Sendable {
     private func settle(subscribe: Bool, reset: Bool = false) async throws -> ComputeStep {
         let graph: Graph?
         if reset {
+            let profile = ComputeProfiling.start()
             let resetGraph = Self.graph(
                 document: document,
                 functions: functions,
                 routeDependencies: routeDependencies
             )
+            ComputeProfiling.record("runtime.settle.resetGraph", since: profile)
             routeConcepts = resetGraph.routeConcepts
             graph = resetGraph
         } else {
@@ -221,6 +247,7 @@ public actor ComputeRuntime: Sendable {
         let runtime = functionRuntime()
         let commit: BrainCommit<ComputeLemma, ComputeSignal>
         do {
+            let brainProfile = ComputeProfiling.start()
             if let graph {
                 commit = try await brain.settle(
                     resetTo: graph.state,
@@ -231,6 +258,7 @@ public actor ComputeRuntime: Sendable {
             } else {
                 commit = try await brain.settle(thinking: thinking(with: runtime))
             }
+            ComputeProfiling.record("runtime.brain.settle", since: brainProfile)
         } catch BrainError.thoughtLimitExceeded {
             throw ComputeError.recursionLimitExceeded
         } catch {
@@ -240,41 +268,66 @@ public actor ComputeRuntime: Sendable {
             }
             throw jsonError
         }
-        return try await finish(commit, runtime: runtime, subscribe: subscribe, publishWhenSettled: true)
+        let finishProfile = ComputeProfiling.start()
+        do {
+            let step = try await finish(commit, runtime: runtime, subscribe: subscribe, publishWhenSettled: true)
+            ComputeProfiling.record("runtime.finish", since: finishProfile)
+            return step
+        } catch {
+            ComputeProfiling.record("runtime.finish", since: finishProfile)
+            throw error
+        }
     }
 
     public var thoughts: [ComputeThought] {
-        latestThoughts
+        latestThoughts.sortedByRoute()
     }
 
     private func finish(
         _ commit: BrainCommit<ComputeLemma, ComputeSignal>,
         runtime: ComputeFunctionRuntime,
         subscribe: Bool,
-        publishWhenSettled: Bool
+        publishWhenSettled: Bool,
+        sortThoughts: Bool = false
     ) async throws -> ComputeStep {
+        let takeThoughtsProfile = ComputeProfiling.start()
         latestThoughts = await runtime.takeThoughts()
+        ComputeProfiling.record("runtime.finish.takeThoughts", since: takeThoughtsProfile)
         if let error = latestThoughts.compactMap(\.error).first {
             throw error
         }
+        let stepThoughts = sortThoughts ? latestThoughts.sortedByRoute() : latestThoughts
 
+        let documentProfile = ComputeProfiling.start()
         let state = try document(from: commit.state)
-        let step = ComputeStep(state: state, thoughts: latestThoughts, remainingThoughts: commit.remainingThoughts)
+        ComputeProfiling.record("runtime.finish.document", since: documentProfile)
+        let step = ComputeStep(state: state, thoughts: stepThoughts, remainingThoughts: commit.remainingThoughts)
+        let dependenciesProfile = ComputeProfiling.start()
         let tracked = await runtime.dependenciesByRoute()
-        if merge(tracked) {
+        ComputeProfiling.record("runtime.finish.dependencies", since: dependenciesProfile)
+        let mergeProfile = ComputeProfiling.start()
+        let didMerge = merge(tracked)
+        ComputeProfiling.record("runtime.finish.mergeDependencies", since: mergeProfile)
+        if didMerge {
+            let updateGraphProfile = ComputeProfiling.start()
             let graph = Self.graph(
                 document: document,
                 functions: functions,
                 routeDependencies: routeDependencies
             )
+            ComputeProfiling.record("runtime.finish.updateGraph", since: updateGraphProfile)
             routeConcepts = graph.routeConcepts
             await brain.update(concepts: graph.concepts)
         }
         if subscribe || !observedRoutes.isEmpty {
+            let resubscribeProfile = ComputeProfiling.start()
             resubscribe(to: Array(routeDependencies.values.flatMap { $0 }))
+            ComputeProfiling.record("runtime.finish.resubscribe", since: resubscribeProfile)
         }
         if publishWhenSettled, !step.isThinking {
+            let publishProfile = ComputeProfiling.start()
             publish(step.state)
+            ComputeProfiling.record("runtime.finish.publish", since: publishProfile)
         }
         return step
     }
@@ -404,47 +457,65 @@ public actor ComputeRuntime: Sendable {
         state: ComputeBrain.State,
         runtime: ComputeFunctionRuntime
     ) async throws -> ComputeSignal? {
-        guard case .object(let object)? = try value(at: route, from: state) else {
-            return nil
+        let profile = ComputeProfiling.start()
+        do {
+            guard case .object(let object)? = try value(at: route, from: state) else {
+                ComputeProfiling.record("runtime.evaluateRoute", since: profile)
+                return nil
+            }
+            let step = try await Self.evaluate(object, at: route, runtime: runtime)
+            await runtime.record(ComputeThought(
+                route: route,
+                depth: route.components.count,
+                keyword: step.keyword,
+                kind: step.kind,
+                input: step.input,
+                output: step.output
+            ))
+            ComputeProfiling.record("runtime.evaluateRoute", since: profile)
+            return .value(step.output)
+        } catch {
+            ComputeProfiling.record("runtime.evaluateRoute", since: profile)
+            throw error
         }
-        let step = try await Self.evaluate(object, at: route, runtime: runtime)
-        await runtime.record(ComputeThought(
-            route: route,
-            depth: route.components.count,
-            keyword: step.keyword,
-            kind: step.kind,
-            input: step.input,
-            output: step.output
-        ))
-        return .value(step.output)
     }
 
     private func value(
         at route: ComputeRoute,
         from state: ComputeBrain.State
     ) throws -> JSON? {
-        guard var output = document.routeValue(at: route) else { return nil }
-        var finalAncestors: [ComputeRoute] = []
-        let baseDepth = route.components.count
-        let routeValues = state.compactMap { entry -> (ComputeRoute, JSON)? in
-            guard case .route(let candidate) = entry.key else { return nil }
-            guard route.isPrefix(of: candidate), candidate != route else { return nil }
-            guard case .value(let value) = entry.value else { return nil }
-            return (ComputeRoute(Array(candidate.components.dropFirst(baseDepth))), value)
-        }.sorted { lhs, rhs in
-            if lhs.0.components.count != rhs.0.components.count {
-                return lhs.0.components.count < rhs.0.components.count
+        let profile = ComputeProfiling.start()
+        do {
+            guard var output = document.routeValue(at: route) else {
+                ComputeProfiling.record("runtime.valueAtState", since: profile)
+                return nil
             }
-            return lhs.0.pathLexicographicallyPrecedes(rhs.0)
-        }
-        for (relativeRoute, value) in routeValues {
-            guard !finalAncestors.contains(where: { $0.isPrefix(of: relativeRoute) }) else { continue }
-            try output.set(value, at: relativeRoute)
-            if !value.isComputeInvocation {
-                finalAncestors.append(relativeRoute)
+            var finalAncestors: [ComputeRoute] = []
+            let baseDepth = route.components.count
+            let routeValues = state.compactMap { entry -> (ComputeRoute, JSON)? in
+                guard case .route(let candidate) = entry.key else { return nil }
+                guard route.isPrefix(of: candidate), candidate != route else { return nil }
+                guard case .value(let value) = entry.value else { return nil }
+                return (ComputeRoute(Array(candidate.components.dropFirst(baseDepth))), value)
+            }.sorted { lhs, rhs in
+                if lhs.0.components.count != rhs.0.components.count {
+                    return lhs.0.components.count < rhs.0.components.count
+                }
+                return lhs.0.pathLexicographicallyPrecedes(rhs.0)
             }
+            for (relativeRoute, value) in routeValues {
+                guard !finalAncestors.contains(where: { $0.isPrefix(of: relativeRoute) }) else { continue }
+                try output.set(value, at: relativeRoute)
+                if !value.isComputeInvocation {
+                    finalAncestors.append(relativeRoute)
+                }
+            }
+            ComputeProfiling.record("runtime.valueAtState", since: profile)
+            return output
+        } catch {
+            ComputeProfiling.record("runtime.valueAtState", since: profile)
+            throw error
         }
-        return output
     }
 
     private static func evaluate(
@@ -452,44 +523,56 @@ public actor ComputeRuntime: Sendable {
         at route: ComputeRoute,
         runtime: ComputeFunctionRuntime
     ) async throws -> (keyword: String, kind: ComputeThoughtKind, input: JSON, output: JSON) {
-        let context = ComputeTaskLocal.context
-        if let invocation = Compute.Invocation(object: object) {
-            let functionRoute = route.appending(.key("{returns}")).appending(.key(invocation.keyword))
-            do {
-                if let output = try await runtime.compute(
-                    keyword: invocation.keyword,
-                    argument: invocation.argument,
-                    context: context,
-                    route: functionRoute,
-                    depth: route.components.count + 1,
-                    recordThought: false
-                ) {
-                    return (invocation.keyword, await runtime.kind(for: invocation.keyword), invocation.returnsJSON, output)
+        let profile = ComputeProfiling.start()
+        do {
+            let context = ComputeTaskLocal.context
+            if let invocation = Compute.Invocation(object: object) {
+                let functionRoute = route.appending(.key("{returns}")).appending(.key(invocation.keyword))
+                do {
+                    if let output = try await runtime.compute(
+                        keyword: invocation.keyword,
+                        argument: invocation.argument,
+                        context: context,
+                        route: functionRoute,
+                        depth: route.components.count + 1,
+                        recordThought: false
+                    ) {
+                        let result = (invocation.keyword, await runtime.kind(for: invocation.keyword), invocation.returnsJSON, output)
+                        ComputeProfiling.record("runtime.evaluateInvocation", since: profile)
+                        return result
+                    }
+                    guard let fallback = invocation.fallback else {
+                        let result = (invocation.keyword, await runtime.kind(for: invocation.keyword), invocation.returnsJSON, JSON.null)
+                        ComputeProfiling.record("runtime.evaluateInvocation", since: profile)
+                        return result
+                    }
+                    let output = try await fallback.compute(
+                        context: context,
+                        runtime: runtime,
+                        route: route.appending(.key("default")),
+                        depth: route.components.count + 1
+                    )
+                    ComputeProfiling.record("runtime.evaluateInvocation", since: profile)
+                    return ("default", .defaultValue, fallback, output)
+                } catch {
+                    guard let fallback = invocation.fallback else {
+                        throw error
+                    }
+                    let output = try await fallback.compute(
+                        context: context,
+                        runtime: runtime,
+                        route: route.appending(.key("default")),
+                        depth: route.components.count + 1
+                    )
+                    ComputeProfiling.record("runtime.evaluateInvocation", since: profile)
+                    return ("default", .defaultValue, fallback, output)
                 }
-                guard let fallback = invocation.fallback else {
-                    return (invocation.keyword, await runtime.kind(for: invocation.keyword), invocation.returnsJSON, .null)
-                }
-                let output = try await fallback.compute(
-                    context: context,
-                    runtime: runtime,
-                    route: route.appending(.key("default")),
-                    depth: route.components.count + 1
-                )
-                return ("default", .defaultValue, fallback, output)
-            } catch {
-                guard let fallback = invocation.fallback else {
-                    throw error
-                }
-                let output = try await fallback.compute(
-                    context: context,
-                    runtime: runtime,
-                    route: route.appending(.key("default")),
-                    depth: route.components.count + 1
-                )
-                return ("default", .defaultValue, fallback, output)
             }
+            throw JSONError("Unsupported compute object", path: route.path)
+        } catch {
+            ComputeProfiling.record("runtime.evaluateInvocation", since: profile)
+            throw error
         }
-        throw JSONError("Unsupported compute object", path: route.path)
     }
 
     private static func graph(
@@ -497,28 +580,34 @@ public actor ComputeRuntime: Sendable {
         functions: [String: any AnyReturnsKeyword],
         routeDependencies: [ComputeRoute: Set<ComputeDependency>]
     ) -> Graph {
-        let routes = document.conceptRoutes(functions: functions)
-            .sortedForComputeEvaluation()
+        let conceptRoutes = ComputeProfiling.measure("graph.conceptRoutes") {
+            document.conceptRoutes(functions: functions)
+        }
+        let routes = ComputeProfiling.measure("graph.sortRoutes") {
+            conceptRoutes.sortedForComputeEvaluation()
+        }
         let routeConcepts = Set(routes)
         var state: ComputeBrain.State = [:]
         var change: ComputeBrain.State = [:]
         var concepts: [ComputeBrain.Concept] = []
 
-        for route in routes {
-            guard let value = document.routeValue(at: route) else { continue }
-            state[.route(route)] = .value(value)
-            state[.source(route)] = .value(value)
-            change[.source(route)] = .value(value)
-            concepts.append(ComputeBrain.Concept(
-                .route(route),
-                inputs: inputs(
-                    for: route,
-                    value: value,
-                    functions: functions,
-                    routeConcepts: routeConcepts,
-                    routeDependencies: routeDependencies
-                )
-            ))
+        ComputeProfiling.measure("graph.buildConcepts") {
+            for route in routes {
+                guard let value = document.routeValue(at: route) else { continue }
+                state[.route(route)] = .value(value)
+                state[.source(route)] = .value(value)
+                change[.source(route)] = .value(value)
+                concepts.append(ComputeBrain.Concept(
+                    .route(route),
+                    inputs: inputs(
+                        for: route,
+                        value: value,
+                        functions: functions,
+                        routeConcepts: routeConcepts,
+                        routeDependencies: routeDependencies
+                    )
+                ))
+            }
         }
         return Graph(concepts: concepts, state: state, change: change, routeConcepts: routeConcepts)
     }
@@ -704,7 +793,7 @@ actor ComputeFunctionRuntime {
 
     func takeThoughts() -> [ComputeThought] {
         defer { thoughts.removeAll(keepingCapacity: true) }
-        return thoughts.sortedByRoute()
+        return thoughts
     }
 }
 

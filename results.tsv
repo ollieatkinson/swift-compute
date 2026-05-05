@@ -12,3 +12,4 @@ workspace	1142.580	keep	return resolved root document without scanning route sta
 workspace	1167.015	discard	avoid sorted object traversal during local document compute
 workspace	1169.676	discard	replace per-settle compute function runtime actor with a class
 workspace	1052.932	keep	compare compute routes without allocating path arrays
+workspace	1022.805	keep	add runtime profiling and defer sorting thoughts on value paths

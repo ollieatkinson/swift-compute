@@ -35,6 +35,14 @@ swift package benchmark --target ComputeBenchmarks --metric wallClock --metric t
 
 The benchmark executable also validates scenario outputs before timing them. A correctness failure should crash the run and the experiment must be discarded.
 
+Use the profile runner before optimizing a suspected bottleneck:
+
+```sh
+swift run -c release ComputeProfile --iterations 100
+```
+
+It runs the benchmark scenarios with `ComputeProfiling` enabled and prints aggregate phase timings. Use this to identify repeated sorting, reconstruction, graph, or brain-wave costs before making changes.
+
 ## Experiment Loop
 
 1. Read the current score from `swift package benchmark --target ComputeBenchmarks --metric wallClock --metric throughput --no-progress --time-units microseconds`.
