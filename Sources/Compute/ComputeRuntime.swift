@@ -719,7 +719,7 @@ public struct ComputeDependency: Sendable, Equatable, Hashable {
     }
 }
 
-actor ComputeFunctionRuntime {
+final class ComputeFunctionRuntime: @unchecked Sendable {
     private let functions: [String: any AnyReturnsKeyword]
     private let results: [String: Result<JSON, JSONError>]
     private let dependencyOwner: @Sendable (ComputeRoute) -> ComputeRoute
@@ -869,15 +869,15 @@ actor ComputeFunctionRuntime {
         return function is any ReturnsKeyword ? .returns : .compute
     }
 
-    func dependenciesByRoute() -> [ComputeRoute: Set<ComputeDependency>] {
+    func dependenciesByRoute() async -> [ComputeRoute: Set<ComputeDependency>] {
         tracked
     }
 
-    func record(_ thought: ComputeThought) {
+    func record(_ thought: ComputeThought) async {
         thoughts.append(thought)
     }
 
-    func takeThoughts() -> [ComputeThought] {
+    func takeThoughts() async -> [ComputeThought] {
         defer { thoughts.removeAll(keepingCapacity: true) }
         return thoughts
     }
