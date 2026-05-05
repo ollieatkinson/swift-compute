@@ -228,6 +228,7 @@ extension JSON {
                         argument: invocation.argument,
                         context: context,
                         route: functionRoute,
+                        outputRoute: route,
                         depth: depth + 1
                     ) {
                         return value

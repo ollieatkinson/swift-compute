@@ -534,6 +534,7 @@ public actor ComputeRuntime: Sendable {
                         argument: invocation.argument,
                         context: context,
                         route: functionRoute,
+                        outputRoute: route,
                         depth: route.components.count + 1,
                         recordThought: false
                     ) {
@@ -733,10 +734,12 @@ actor ComputeFunctionRuntime {
         argument: JSON,
         context: Compute.Context,
         route: ComputeRoute,
+        outputRoute: ComputeRoute? = nil,
         depth: Int,
         recordThought: Bool = true
     ) async throws -> JSON? {
         guard let function = functions[keyword] else { return nil }
+        let computeRoute = outputRoute ?? route.computeObjectRoute(for: keyword)
         let rawOutput: JSON?
         if let custom = function as? any CustomComputeFunction {
             rawOutput = try await custom.compute(
@@ -753,19 +756,18 @@ actor ComputeFunctionRuntime {
                 route: route,
                 depth: depth + 1
             )
-            rawOutput = try await value(keyword: keyword, argument: computed, route: route)
+            rawOutput = try await value(keyword: keyword, argument: computed, route: route, ownerRoute: computeRoute)
         }
         let output = try await rawOutput?.compute(
             context: context,
             runtime: self,
-            route: route.computeObjectRoute(for: keyword),
+            route: computeRoute,
             depth: depth + 1
         )
         if recordThought, let output {
-            let thoughtRoute = route.computeObjectRoute(for: keyword)
             thoughts.append(ComputeThought(
-                route: thoughtRoute,
-                depth: thoughtRoute.components.count,
+                route: computeRoute,
+                depth: computeRoute.components.count,
                 keyword: keyword,
                 kind: kind(for: keyword),
                 input: .object([keyword: argument]),
@@ -775,11 +777,11 @@ actor ComputeFunctionRuntime {
         return output
     }
 
-    func value(keyword: String, argument: JSON, route: ComputeRoute) async throws -> JSON? {
+    func value(keyword: String, argument: JSON, route: ComputeRoute, ownerRoute: ComputeRoute? = nil) async throws -> JSON? {
         guard let function = functions[keyword] else { return nil }
         if function is any ReturnsKeyword {
             let dependency = ComputeDependency(keyword: keyword, argument: argument)
-            let route = dependencyOwner(route.computeObjectRoute(for: keyword))
+            let route = dependencyOwner(ownerRoute ?? route.computeObjectRoute(for: keyword))
             tracked[route, default: []].insert(dependency)
             if let result = results[dependency.key] {
                 return try result.get()
