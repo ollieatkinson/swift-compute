@@ -674,6 +674,7 @@ public actor ComputeRuntime: Sendable {
         routeDependencies: [ComputeRoute: Set<ComputeDependency>]
     ) -> Set<ComputeLemma> {
         var inputs: Set<ComputeLemma> = []
+        inputs.reserveCapacity(max(1, childConcepts.count + (routeDependencies[route]?.count ?? 0)))
         if case .object(let object) = value, let invocation = Compute.Invocation(object: object) {
             let function = functions[invocation.keyword]
             if let custom = function as? any CustomComputeFunction, custom.evaluatesChildrenInternally {
@@ -682,13 +683,19 @@ public actor ComputeRuntime: Sendable {
                 if childConcepts.isEmpty {
                     inputs.insert(.source(route))
                 } else {
-                    inputs.formUnion(childConcepts.map { .route($0) })
+                    for childConcept in childConcepts {
+                        inputs.insert(.route(childConcept))
+                    }
                 }
             }
         } else {
             inputs.insert(.source(route))
         }
-        inputs.formUnion((routeDependencies[route] ?? []).map { .dependency($0.key) })
+        if let dependencies = routeDependencies[route] {
+            for dependency in dependencies {
+                inputs.insert(.dependency(dependency.key))
+            }
+        }
         return inputs
     }
 
