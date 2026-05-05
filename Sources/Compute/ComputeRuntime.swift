@@ -909,7 +909,7 @@ final class ComputeFunctionRuntime: @unchecked Sendable {
         route: ComputeRoute,
         ownerRoute: ComputeRoute? = nil
     ) async throws -> JSON? {
-        if function is any ReturnsKeyword, trackDependencies {
+        if trackDependencies, function is any ReturnsKeyword {
             let dependency = ComputeDependency(keyword: keyword, argument: argument)
             let route = dependencyOwner(ownerRoute ?? route.computeObjectRoute(for: keyword))
             tracked[route, default: []].insert(dependency)
