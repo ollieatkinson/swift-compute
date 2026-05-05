@@ -529,21 +529,21 @@ public actor ComputeRuntime: Sendable {
             if let invocation = Compute.Invocation(object: object) {
                 let functionRoute = route.appending(.key("{returns}"), .key(invocation.keyword))
                 do {
-                    if let output = try await runtime.compute(
+                    let evaluation = try await runtime.computeForEvaluation(
                         keyword: invocation.keyword,
                         argument: invocation.argument,
                         context: context,
                         route: functionRoute,
                         outputRoute: route,
-                        depth: route.components.count + 1,
-                        recordThought: false
-                    ) {
-                        let result = (invocation.keyword, await runtime.kind(for: invocation.keyword), invocation.returnsJSON, output)
+                        depth: route.components.count + 1
+                    )
+                    if let evaluation, let output = evaluation.output {
+                        let result = (invocation.keyword, evaluation.kind, invocation.returnsJSON, output)
                         ComputeProfiling.record("runtime.evaluateInvocation", since: profile)
                         return result
                     }
                     guard let fallback = invocation.fallback else {
-                        let result = (invocation.keyword, await runtime.kind(for: invocation.keyword), invocation.returnsJSON, JSON.null)
+                        let result = (invocation.keyword, evaluation?.kind ?? .compute, invocation.returnsJSON, JSON.null)
                         ComputeProfiling.record("runtime.evaluateInvocation", since: profile)
                         return result
                     }
@@ -746,6 +746,55 @@ actor ComputeFunctionRuntime {
         recordThought: Bool = true
     ) async throws -> JSON? {
         guard let function = functions[keyword] else { return nil }
+        let kind = kind(for: function)
+        return try await compute(
+            function: function,
+            keyword: keyword,
+            kind: kind,
+            argument: argument,
+            context: context,
+            route: route,
+            outputRoute: outputRoute,
+            depth: depth,
+            recordThought: recordThought
+        )
+    }
+
+    func computeForEvaluation(
+        keyword: String,
+        argument: JSON,
+        context: Compute.Context,
+        route: ComputeRoute,
+        outputRoute: ComputeRoute,
+        depth: Int
+    ) async throws -> (kind: ComputeThoughtKind, output: JSON?)? {
+        guard let function = functions[keyword] else { return nil }
+        let kind = kind(for: function)
+        let output = try await compute(
+            function: function,
+            keyword: keyword,
+            kind: kind,
+            argument: argument,
+            context: context,
+            route: route,
+            outputRoute: outputRoute,
+            depth: depth,
+            recordThought: false
+        )
+        return (kind, output)
+    }
+
+    private func compute(
+        function: any AnyReturnsKeyword,
+        keyword: String,
+        kind: ComputeThoughtKind,
+        argument: JSON,
+        context: Compute.Context,
+        route: ComputeRoute,
+        outputRoute: ComputeRoute? = nil,
+        depth: Int,
+        recordThought: Bool = true
+    ) async throws -> JSON? {
         let computeRoute = outputRoute ?? route.computeObjectRoute(for: keyword)
         let rawOutput: JSON?
         if let custom = function as? any CustomComputeFunction {
@@ -763,7 +812,7 @@ actor ComputeFunctionRuntime {
                 route: route,
                 depth: depth + 1
             )
-            rawOutput = try await value(keyword: keyword, argument: computed, route: route, ownerRoute: computeRoute)
+            rawOutput = try await value(function: function, keyword: keyword, argument: computed, route: route, ownerRoute: computeRoute)
         }
         let output = try await rawOutput?.compute(
             context: context,
@@ -776,7 +825,7 @@ actor ComputeFunctionRuntime {
                 route: computeRoute,
                 depth: computeRoute.components.count,
                 keyword: keyword,
-                kind: kind(for: keyword),
+                kind: kind,
                 input: .object([keyword: argument]),
                 output: output
             ))
@@ -786,6 +835,16 @@ actor ComputeFunctionRuntime {
 
     func value(keyword: String, argument: JSON, route: ComputeRoute, ownerRoute: ComputeRoute? = nil) async throws -> JSON? {
         guard let function = functions[keyword] else { return nil }
+        return try await value(function: function, keyword: keyword, argument: argument, route: route, ownerRoute: ownerRoute)
+    }
+
+    private func value(
+        function: any AnyReturnsKeyword,
+        keyword: String,
+        argument: JSON,
+        route: ComputeRoute,
+        ownerRoute: ComputeRoute? = nil
+    ) async throws -> JSON? {
         if function is any ReturnsKeyword {
             let dependency = ComputeDependency(keyword: keyword, argument: argument)
             let route = dependencyOwner(ownerRoute ?? route.computeObjectRoute(for: keyword))
@@ -803,6 +862,10 @@ actor ComputeFunctionRuntime {
 
     func kind(for keyword: String) -> ComputeThoughtKind {
         guard let function = functions[keyword] else { return .compute }
+        return kind(for: function)
+    }
+
+    private func kind(for function: any AnyReturnsKeyword) -> ComputeThoughtKind {
         return function is any ReturnsKeyword ? .returns : .compute
     }
 
