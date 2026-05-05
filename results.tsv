@@ -17,3 +17,4 @@ workspace	1014.173	keep	precompute direct child concepts during graph build
 workspace	1014.260	discard	fast path leaf route state evaluation
 workspace	993.812	keep	fast path single-change affected concepts
 workspace	994.632	discard	avoid sorted object traversal during graph route discovery
+workspace	983.779	keep	append two route components in one copy

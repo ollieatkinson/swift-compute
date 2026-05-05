@@ -68,7 +68,7 @@ extension JSON {
         switch self {
         case .object(let object):
             if let invocation = Compute.Invocation(object: object) {
-                let argumentRoute = route.appending(.key("{returns}")).appending(.key(invocation.keyword))
+                let argumentRoute = route.appending(.key("{returns}"), .key(invocation.keyword))
                 guard let function = functions[invocation.keyword] else {
                     return invocation.argument.computableRoutes(functions: functions, from: argumentRoute)
                 }
@@ -117,7 +117,7 @@ extension JSON {
         switch self {
         case .object(let object):
             if let invocation = Compute.Invocation(object: object) {
-                let argumentRoute = route.appending(.key("{returns}")).appending(.key(invocation.keyword))
+                let argumentRoute = route.appending(.key("{returns}"), .key(invocation.keyword))
                 guard let function = functions[invocation.keyword] else {
                     return invocation.argument.conceptRoutes(functions: functions, from: argumentRoute)
                 }
@@ -221,7 +221,7 @@ extension JSON {
         switch self {
         case .object(let object):
             if let invocation = Compute.Invocation(object: object) {
-                let functionRoute = route.appending(.key("{returns}")).appending(.key(invocation.keyword))
+                let functionRoute = route.appending(.key("{returns}"), .key(invocation.keyword))
                 do {
                     if let value = try await runtime.compute(
                         keyword: invocation.keyword,

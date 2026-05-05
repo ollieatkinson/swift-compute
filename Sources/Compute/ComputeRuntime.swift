@@ -527,7 +527,7 @@ public actor ComputeRuntime: Sendable {
         do {
             let context = ComputeTaskLocal.context
             if let invocation = Compute.Invocation(object: object) {
-                let functionRoute = route.appending(.key("{returns}")).appending(.key(invocation.keyword))
+                let functionRoute = route.appending(.key("{returns}"), .key(invocation.keyword))
                 do {
                     if let output = try await runtime.compute(
                         keyword: invocation.keyword,
