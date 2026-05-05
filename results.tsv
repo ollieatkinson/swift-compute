@@ -39,3 +39,4 @@ workspace	628.486	discard	parse array_map inputs without codable decode
 workspace	629.869	discard	precompute array_map copy destination routes
 workspace	578.868	keep	skip recursive output walk when function output has no computes
 workspace	999999.000	crash	pass item context explicitly through direct compute dispatch
+workspace	999999.000	crash	fast local item comparison evaluator for array functions
