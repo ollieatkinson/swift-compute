@@ -449,6 +449,12 @@ public actor ComputeRuntime: Sendable {
 
     private func thinking(with runtime: ComputeFunctionRuntime) -> ComputeBrain.Thinking {
         let context = context ?? ComputeTaskLocal.context
+        if context == Compute.Context() {
+            return { lemma, state in
+                guard case .route(let route) = lemma else { return nil }
+                return try await self.evaluate(route, state: state, runtime: runtime)
+            }
+        }
         return { lemma, state in
             guard case .route(let route) = lemma else { return nil }
             return try await ComputeTaskLocal.$context.withValue(context) {
