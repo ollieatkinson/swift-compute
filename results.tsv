@@ -20,3 +20,4 @@ workspace	994.632	discard	avoid sorted object traversal during graph route disco
 workspace	983.779	keep	append two route components in one copy
 workspace	952.785	keep	reuse known output route during function evaluation
 workspace	928.282	keep	cache compute dependency stable keys
+workspace	931.739	discard	carry concept route values through graph discovery
