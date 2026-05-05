@@ -435,7 +435,7 @@ public actor ComputeRuntime: Sendable {
             if lhs.0.components.count != rhs.0.components.count {
                 return lhs.0.components.count < rhs.0.components.count
             }
-            return lhs.0.path.lexicographicallyPrecedes(rhs.0.path)
+            return lhs.0.pathLexicographicallyPrecedes(rhs.0)
         }
         for (relativeRoute, value) in routeValues {
             guard !finalAncestors.contains(where: { $0.isPrefix(of: relativeRoute) }) else { continue }
@@ -578,7 +578,7 @@ public actor ComputeRuntime: Sendable {
             if lhs.0.components.count != rhs.0.components.count {
                 return lhs.0.components.count < rhs.0.components.count
             }
-            return lhs.0.path.lexicographicallyPrecedes(rhs.0.path)
+            return lhs.0.pathLexicographicallyPrecedes(rhs.0)
         }
         for (route, value) in routeValues {
             guard !finalAncestors.contains(where: { $0.isPrefix(of: route) }) else { continue }
@@ -759,6 +759,29 @@ private extension ComputeRoute {
         guard components.count < route.components.count else { return false }
         return zip(components, route.components).allSatisfy(==)
     }
+
+    func pathLexicographicallyPrecedes(_ route: ComputeRoute) -> Bool {
+        for (lhs, rhs) in zip(components, route.components) {
+            let lhsPath = lhs.pathComponent
+            let rhsPath = rhs.pathComponent
+            if lhsPath == rhsPath {
+                continue
+            }
+            return lhsPath < rhsPath
+        }
+        return components.count < route.components.count
+    }
+}
+
+private extension ComputeRoute.Component {
+    var pathComponent: String {
+        switch self {
+        case .key(let key):
+            return key
+        case .index(let index):
+            return String(index)
+        }
+    }
 }
 
 private extension Array where Element == ComputeRoute {
@@ -767,7 +790,7 @@ private extension Array where Element == ComputeRoute {
             if lhs.components.count != rhs.components.count {
                 return lhs.components.count > rhs.components.count
             }
-            return lhs.path.lexicographicallyPrecedes(rhs.path)
+            return lhs.pathLexicographicallyPrecedes(rhs)
         }
     }
 }
@@ -778,7 +801,7 @@ private extension Array where Element == ComputeThought {
             if lhs.route.components.count != rhs.route.components.count {
                 return lhs.route.components.count > rhs.route.components.count
             }
-            return lhs.route.path.lexicographicallyPrecedes(rhs.route.path)
+            return lhs.route.pathLexicographicallyPrecedes(rhs.route)
         }
     }
 }
