@@ -42,3 +42,4 @@ workspace	999999.000	crash	pass item context explicitly through direct compute d
 workspace	999999.000	crash	fast local item comparison evaluator for array functions
 workspace	581.206	discard	skip state scan for routes without child concepts
 workspace	617.224	discard	sort affected brain concepts by precomputed rank
+workspace	584.223	discard	check route self before nearest ancestor scan
