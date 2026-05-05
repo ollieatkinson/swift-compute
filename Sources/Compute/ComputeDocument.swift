@@ -169,20 +169,43 @@ extension JSON {
         routes: inout [ComputeRoute],
         children: inout [ComputeRoute: [ComputeRoute]]
     ) {
+        var components = route.components
+        collectConceptRoutes(
+            functions: functions,
+            components: &components,
+            parentConcept: parentConcept,
+            routes: &routes,
+            children: &children
+        )
+    }
+
+    private func collectConceptRoutes(
+        functions: [String: any AnyReturnsKeyword],
+        components: inout [ComputeRoute.Component],
+        parentConcept: ComputeRoute?,
+        routes: inout [ComputeRoute],
+        children: inout [ComputeRoute: [ComputeRoute]]
+    ) {
         switch self {
         case .object(let object):
             if let invocation = Compute.Invocation(object: object) {
-                let argumentRoute = route.appending(.key("{returns}"), .key(invocation.keyword))
                 guard let function = functions[invocation.keyword] else {
+                    components.append(.key("{returns}"))
+                    components.append(.key(invocation.keyword))
+                    defer {
+                        components.removeLast()
+                        components.removeLast()
+                    }
                     invocation.argument.collectConceptRoutes(
                         functions: functions,
-                        from: argumentRoute,
+                        components: &components,
                         parentConcept: parentConcept,
                         routes: &routes,
                         children: &children
                     )
                     return
                 }
+                let route = ComputeRoute(components)
                 routes.append(route)
                 if let parentConcept {
                     children[parentConcept, default: []].append(route)
@@ -190,18 +213,26 @@ extension JSON {
                 if let custom = function as? any CustomComputeFunction, custom.evaluatesChildrenInternally {
                     return
                 }
+                components.append(.key("{returns}"))
+                components.append(.key(invocation.keyword))
+                defer {
+                    components.removeLast()
+                    components.removeLast()
+                }
                 invocation.argument.collectConceptRoutes(
                     functions: functions,
-                    from: argumentRoute,
+                    components: &components,
                     parentConcept: route,
                     routes: &routes,
                     children: &children
                 )
             } else {
                 for (key, value) in object {
+                    components.append(.key(key))
+                    defer { components.removeLast() }
                     value.collectConceptRoutes(
                         functions: functions,
-                        from: route.appending(.key(key)),
+                        components: &components,
                         parentConcept: parentConcept,
                         routes: &routes,
                         children: &children
@@ -210,9 +241,11 @@ extension JSON {
             }
         case .array(let values):
             for (index, value) in values.enumerated() {
+                components.append(.index(index))
+                defer { components.removeLast() }
                 value.collectConceptRoutes(
                     functions: functions,
-                    from: route.appending(.index(index)),
+                    components: &components,
                     parentConcept: parentConcept,
                     routes: &routes,
                     children: &children
