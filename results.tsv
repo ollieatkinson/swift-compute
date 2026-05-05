@@ -67,3 +67,4 @@ workspace	662.090	discard	make function runtime bookkeeping synchronous
 workspace	660.342	discard	compare key route components without string conversion
 workspace	666.496	discard	inline brain gate state into brain actor
 workspace	655.742	keep	collect concept routes with a path stack
+workspace	643.843	keep	pop concept route path stack manually

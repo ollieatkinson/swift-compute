@@ -192,10 +192,6 @@ extension JSON {
                 guard let function = functions[invocation.keyword] else {
                     components.append(.key("{returns}"))
                     components.append(.key(invocation.keyword))
-                    defer {
-                        components.removeLast()
-                        components.removeLast()
-                    }
                     invocation.argument.collectConceptRoutes(
                         functions: functions,
                         components: &components,
@@ -203,6 +199,8 @@ extension JSON {
                         routes: &routes,
                         children: &children
                     )
+                    components.removeLast()
+                    components.removeLast()
                     return
                 }
                 let route = ComputeRoute(components)
@@ -215,10 +213,6 @@ extension JSON {
                 }
                 components.append(.key("{returns}"))
                 components.append(.key(invocation.keyword))
-                defer {
-                    components.removeLast()
-                    components.removeLast()
-                }
                 invocation.argument.collectConceptRoutes(
                     functions: functions,
                     components: &components,
@@ -226,10 +220,11 @@ extension JSON {
                     routes: &routes,
                     children: &children
                 )
+                components.removeLast()
+                components.removeLast()
             } else {
                 for (key, value) in object {
                     components.append(.key(key))
-                    defer { components.removeLast() }
                     value.collectConceptRoutes(
                         functions: functions,
                         components: &components,
@@ -237,12 +232,12 @@ extension JSON {
                         routes: &routes,
                         children: &children
                     )
+                    components.removeLast()
                 }
             }
         case .array(let values):
             for (index, value) in values.enumerated() {
                 components.append(.index(index))
-                defer { components.removeLast() }
                 value.collectConceptRoutes(
                     functions: functions,
                     components: &components,
@@ -250,6 +245,7 @@ extension JSON {
                     routes: &routes,
                     children: &children
                 )
+                components.removeLast()
             }
         case .null, .bool, .int, .double, .string:
             return
