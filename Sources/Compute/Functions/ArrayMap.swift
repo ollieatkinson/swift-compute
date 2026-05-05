@@ -39,7 +39,7 @@ extension ArrayMap: CustomComputeKeyword {
         route: ComputeRoute,
         depth: Int
     ) async throws -> JSON? {
-        let source = try await over.compute(
+        let source = try await over.computeIfNeeded(
             context: context,
             runtime: runtime,
             route: route.appending(.key("over")),

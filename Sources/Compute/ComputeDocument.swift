@@ -110,6 +110,20 @@ extension JSON {
         return Compute.Invocation(object: object) != nil
     }
 
+    var containsComputeInvocation: Bool {
+        switch self {
+        case .object(let object):
+            if Compute.Invocation(object: object) != nil {
+                return true
+            }
+            return object.values.contains { $0.containsComputeInvocation }
+        case .array(let values):
+            return values.contains { $0.containsComputeInvocation }
+        case .null, .bool, .int, .double, .string:
+            return false
+        }
+    }
+
     func conceptRoutes(
         functions: [String: any AnyReturnsKeyword],
         from route: ComputeRoute = .root
@@ -299,6 +313,16 @@ extension JSON {
         case .null, .bool, .int, .double, .string:
             return self
         }
+    }
+
+    func computeIfNeeded(
+        context: Compute.Context,
+        runtime: ComputeFunctionRuntime,
+        route: ComputeRoute = .root,
+        depth: Int
+    ) async throws -> JSON {
+        guard containsComputeInvocation else { return self }
+        return try await compute(context: context, runtime: runtime, route: route, depth: depth)
     }
 
 }

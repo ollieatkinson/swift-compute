@@ -41,7 +41,7 @@ extension ArrayFilter: CustomComputeKeyword {
         route: ComputeRoute,
         depth: Int
     ) async throws -> JSON? {
-        let source = try await array.compute(
+        let source = try await array.computeIfNeeded(
             context: context,
             runtime: runtime,
             route: route.appending(.key("array")),
