@@ -10,6 +10,7 @@ public struct ArrayFilter: Codable, Equatable, Sendable {
 
 extension ArrayFilter: ComputeKeyword {
     public static let keyword = "array_filter"
+    public static let function = ArrayFilterFunction()
 
     public func compute() throws -> JSON {
         guard case .array(let values) = array else {
@@ -31,6 +32,55 @@ extension ArrayFilter: ComputeKeyword {
             filtered.append(value)
         }
         return .array(filtered)
+    }
+}
+
+public struct ArrayFilterFunction: AnyReturnsKeyword {
+    public let keyword = ArrayFilter.keyword
+
+    public init() {}
+
+    public func value(for input: JSON) async throws -> JSON {
+        try JSON.decoded(ArrayFilter.self, from: input).compute()
+    }
+}
+
+extension ArrayFilterFunction: CustomComputeFunction {
+    var evaluatesChildrenInternally: Bool {
+        true
+    }
+
+    func computableRoutes(
+        argument: JSON,
+        functions: [String: any AnyReturnsKeyword],
+        route: ComputeRoute,
+        argumentRoute: ComputeRoute
+    ) -> [ComputeRoute] {
+        [route]
+    }
+
+    func remainingThoughtCount(
+        argument: JSON,
+        functions: [String: any AnyReturnsKeyword]
+    ) -> Int {
+        1
+    }
+
+    func compute(
+        argument: JSON,
+        context: Compute.Context,
+        runtime: ComputeFunctionRuntime,
+        route: ComputeRoute,
+        depth: Int
+    ) async throws -> JSON? {
+        guard case .object(let object) = argument,
+              let array = object["array"],
+              let predicate = object["predicate"] else {
+            let filter = try JSON.decoded(ArrayFilter.self, from: argument)
+            return try await filter.compute(context: context, runtime: runtime, route: route, depth: depth)
+        }
+        return try await ArrayFilter(array: array, predicate: predicate)
+            .compute(context: context, runtime: runtime, route: route, depth: depth)
     }
 }
 
