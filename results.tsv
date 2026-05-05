@@ -72,3 +72,4 @@ workspace	647.083	discard	project child concept values with known-path setter
 workspace	653.908	discard	skip route concept capture when dependencies are not tracked
 workspace	803.084	discard	use computeIfNeeded for non-custom function arguments
 workspace	818.975	discard	iterate computed object keys without sorting
+workspace	916.121	discard	read invocation keyword from dictionary entry
