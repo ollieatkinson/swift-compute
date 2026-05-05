@@ -302,6 +302,10 @@ public actor ComputeRuntime: Sendable {
         }
         let stepThoughts = sortThoughts ? latestThoughts.sortedByRoute() : latestThoughts
 
+        if subscribe || !observedRoutes.isEmpty {
+            seedFunctionResults(runtime.resolvedDependencyResults())
+        }
+
         let documentProfile = ComputeProfiling.start()
         let state = try document(from: commit.state)
         ComputeProfiling.record("runtime.finish.document", since: documentProfile)
@@ -335,6 +339,12 @@ public actor ComputeRuntime: Sendable {
             ComputeProfiling.record("runtime.finish.publish", since: publishProfile)
         }
         return step
+    }
+
+    private func seedFunctionResults(_ results: [String: Result<JSON, JSONError>]) {
+        for (key, result) in results {
+            functionResults[key] = result
+        }
     }
 
     private func merge(_ tracked: [ComputeRoute: Set<ComputeDependency>]) -> Bool {
@@ -377,6 +387,7 @@ public actor ComputeRuntime: Sendable {
     }
 
     private func apply(_ result: Result<JSON, JSONError>, to dependency: ComputeDependency) async {
+        guard functionResults[dependency.key] != result else { return }
         functionResults[dependency.key] = result
         let signal: ComputeSignal
         switch result {
@@ -748,6 +759,7 @@ final class ComputeFunctionRuntime: @unchecked Sendable {
     private let results: [String: Result<JSON, JSONError>]
     private let dependencyOwner: @Sendable (ComputeRoute) -> ComputeRoute
     private var tracked: [ComputeRoute: Set<ComputeDependency>] = [:]
+    private var resolvedResults: [String: Result<JSON, JSONError>] = [:]
     private var thoughts: [ComputeThought] = []
 
     init(
@@ -876,6 +888,14 @@ final class ComputeFunctionRuntime: @unchecked Sendable {
             if let result = results[dependency.key] {
                 return try result.get()
             }
+            do {
+                let value = try await function.value(for: argument)
+                resolvedResults[dependency.key] = .success(value)
+                return value
+            } catch {
+                resolvedResults[dependency.key] = .failure(JSONError(error))
+                throw error
+            }
         }
         return try await function.value(for: argument)
     }
@@ -891,6 +911,10 @@ final class ComputeFunctionRuntime: @unchecked Sendable {
 
     private func kind(for function: any AnyReturnsKeyword) -> ComputeThoughtKind {
         return function is any ReturnsKeyword ? .returns : .compute
+    }
+
+    func resolvedDependencyResults() -> [String: Result<JSON, JSONError>] {
+        resolvedResults
     }
 
     func dependenciesByRoute() async -> [ComputeRoute: Set<ComputeDependency>] {

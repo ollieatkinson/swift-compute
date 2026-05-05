@@ -52,3 +52,5 @@ workspace	544.204	keep	skip task local context wrapper for default runtime conte
 workspace	543.763	keep	read route source values from brain state during evaluation
 workspace	533.640	keep	collect concept routes and child links in one traversal
 workspace	538.295	discard	collect route source values during concept discovery
+workspace	579.514	discard	reserve brain wave thoughts capacity
+workspace	625.786	keep	seed subscribed dependency results to ignore replayed stream values
