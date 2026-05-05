@@ -408,8 +408,6 @@ public actor ComputeRuntime: Sendable {
             return nil
         }
         let step = try await Self.evaluate(object, at: route, runtime: runtime)
-        var nextState = state
-        nextState[.route(route)] = .value(step.output)
         await runtime.record(ComputeThought(
             route: route,
             depth: route.components.count,
