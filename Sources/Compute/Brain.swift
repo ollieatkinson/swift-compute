@@ -69,7 +69,7 @@ public actor Brain<Lemma, Signal>: Sendable where Lemma: Hashable & Sendable, Si
     private var latestThoughts: State = [:]
     private var remaining: Int
     private var conceptOrder: [Lemma]
-    private var observers: [Lemma: Set<Lemma>]
+    private var observers: [Lemma: [Lemma]]
     private var stateContinuations: [UUID: AsyncStream<State>.Continuation] = [:]
 
     public init(
@@ -290,16 +290,20 @@ public actor Brain<Lemma, Signal>: Sendable where Lemma: Hashable & Sendable, Si
     }
 
     private func affected(by changes: State) -> [Lemma] {
+        if changes.count == 1,
+           let lemma = changes.keys.first {
+            return observers[lemma] ?? []
+        }
         let affected = changes.keys.reduce(into: Set<Lemma>()) { affected, lemma in
             affected.formUnion(observers[lemma] ?? [])
         }
         return conceptOrder.filter { affected.contains($0) }
     }
 
-    private static func observers(for concepts: [Concept]) -> [Lemma: Set<Lemma>] {
+    private static func observers(for concepts: [Concept]) -> [Lemma: [Lemma]] {
         concepts.reduce(into: [:]) { observers, concept in
             for input in concept.inputs {
-                observers[input, default: []].insert(concept.lemma)
+                observers[input, default: []].append(concept.lemma)
             }
         }
     }
