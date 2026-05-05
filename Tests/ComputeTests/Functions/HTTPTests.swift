@@ -1,0 +1,139 @@
+import Foundation
+import Compute
+import Testing
+
+@Suite(.serialized)
+struct HTTPTests {
+
+    @Test func performsResolvedRequestsAsAnAsyncReturnsKeyword() async throws {
+        let json: JSON = [
+            "{returns}": [
+                "http": [
+                    "request": [
+                        "url": ["{returns}": ["item": ["url"]]],
+                        "method": "post",
+                        "headers": [
+                            "Authorization": ["{returns}": ["item": ["token"]]],
+                            "Content-Type": "application/json",
+                        ],
+                        "body": [
+                            "name": ["{returns}": ["item": ["name"]]],
+                        ],
+                        "timeout": 5,
+                    ],
+                ],
+            ],
+        ]
+        let context = Compute.Context(item: [
+            "name": "Oliver",
+            "token": "Bearer abc",
+            "url": "https://example.com/users",
+        ])
+        let function = HTTP.Function { request in
+            #expect(request.url?.absoluteString == "https://example.com/users")
+            #expect(request.httpMethod == "POST")
+            #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer abc")
+            #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
+            #expect(request.timeoutInterval == 5)
+            #expect(request.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: String] } == ["name": "Oliver"])
+
+            return HTTP.Response(
+                data: Data(#"{"created":true}"#.utf8),
+                url: request.url?.absoluteString,
+                status: 201,
+                headers: ["Content-Type": "application/json"]
+            )
+        }
+
+        #expect(try await value(json, in: context, functions: [function]) == [
+            "body": ["created": true],
+            "headers": ["Content-Type": "application/json"],
+            "status": 201,
+            "url": "https://example.com/users",
+        ])
+    }
+
+    @Test func recomputesRequestURLWhenReferencedURLChanges() async throws {
+        let references = TestReferences()
+        await references.set("users_url", to: "https://example.com/users")
+        let requests = HTTPRequestProbe()
+        let http = HTTP.Function { request in
+            await requests.response(for: request)
+        }
+        let json: JSON = [
+            "{returns}": [
+                "http": [
+                    "request": [
+                        "url": ["{returns}": ["from": ["reference": "users_url"]]],
+                    ],
+                ],
+            ],
+        ]
+        let runtime = try runtime(json, functions: [From.Function(references: references), http])
+        var stream = runtime.run().makeAsyncIterator()
+
+        await expectNext(&stream, equals: .success([
+            "body": ["ok": true],
+            "headers": [:],
+            "status": 200,
+            "url": "https://example.com/users",
+        ]))
+
+        await references.set("users_url", to: "https://example.com/people")
+        await expectNext(&stream, equals: .success([
+            "body": ["ok": true],
+            "headers": [:],
+            "status": 200,
+            "url": "https://example.com/people",
+        ]))
+
+        let urls = await requests.urls
+        #expect(urls.first == "https://example.com/users")
+        #expect(urls.contains("https://example.com/people"))
+        #expect(urls.last == "https://example.com/people")
+
+        await references.finish()
+        await runtime.cancel()
+    }
+
+    @Test func returnsPlainTextBodiesWhenResponseIsNotJSON() async throws {
+        let function = HTTP.Function { _ in
+            HTTP.Response(data: Data("accepted".utf8), status: 202)
+        }
+
+        #expect(try await value(
+            [
+                "{returns}": [
+                    "http": [
+                        "request": [
+                            "url": "https://example.com",
+                        ],
+                    ],
+                ],
+            ],
+            functions: [function]
+        ) == [
+            "body": "accepted",
+            "headers": [:],
+            "status": 202,
+        ])
+    }
+}
+
+private actor HTTPRequestProbe {
+    private var requestedURLs: [String] = []
+
+    var urls: [String] {
+        requestedURLs
+    }
+
+    func response(for request: URLRequest) -> HTTP.Response {
+        let url = request.url?.absoluteString ?? ""
+        requestedURLs.append(url)
+        return HTTP.Response(
+            data: Data(#"{"ok":true}"#.utf8),
+            url: url,
+            status: 200
+        )
+    }
+}
