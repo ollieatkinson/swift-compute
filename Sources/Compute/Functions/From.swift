@@ -22,8 +22,24 @@ extension From {
         }
 
         public func value(for input: JSON) async throws -> JSON {
-            let from = try JSON.decoded(From.self, from: input)
+            let from = try Self.parse(input)
             return try await references.value(for: from.reference, context: from.context)
+        }
+
+        private static func parse(_ input: JSON) throws -> From {
+            guard case .object(let object) = input, let reference = object["reference"] else {
+                return try JSON.decoded(From.self, from: input)
+            }
+            let context: [String: JSON]?
+            if let value = object["context"] {
+                guard case .object(let object) = value else {
+                    return try JSON.decoded(From.self, from: input)
+                }
+                context = object
+            } else {
+                context = nil
+            }
+            return From(reference: reference, context: context)
         }
     }
 }
@@ -35,7 +51,7 @@ public protocol AsyncComputeReferences: ComputeReferences {
 extension From.Function: ReturnsKeyword where References: AsyncComputeReferences {
     public func values(for input: JSON) -> AsyncStream<Result<JSON, JSONError>> {
         do {
-            let from = try JSON.decoded(From.self, from: input)
+            let from = try Self.parse(input)
             return references.values(for: from.reference, context: from.context)
         } catch {
             return AsyncStream { continuation in
