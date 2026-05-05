@@ -32,3 +32,4 @@ workspace	775.005	keep	walk item paths without route allocation
 workspace	773.360	keep	return custom array_map output directly
 workspace	769.295	keep	hoist array function child routes
 workspace	760.654	keep	use hand-written comparison function wrapper
+workspace	751.452	keep	use hand-written yes function wrapper

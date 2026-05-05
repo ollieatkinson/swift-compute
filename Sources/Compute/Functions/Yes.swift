@@ -10,6 +10,7 @@ public struct Yes: Codable, Equatable, Sendable {
 
 extension Yes: ComputeKeyword {
     public static let keyword = "yes"
+    public static let function = YesFunction()
 
     public func compute() throws -> JSON {
         let conditions = `if`?.conditionList ?? []
@@ -17,6 +18,55 @@ extension Yes: ComputeKeyword {
         let satisfied = try conditions.allSatisfy { try $0.decode(Bool.self) }
         let blocked = try exceptions.contains { try $0.decode(Bool.self) }
         return .bool(satisfied && !blocked)
+    }
+}
+
+public struct YesFunction: AnyReturnsKeyword {
+    public let keyword = Yes.keyword
+
+    public init() {}
+
+    public func value(for input: JSON) async throws -> JSON {
+        try Yes.computeDirectly(from: input)
+    }
+}
+
+extension YesFunction: CustomComputeFunction {
+    var evaluatesChildrenInternally: Bool {
+        false
+    }
+
+    func computableRoutes(
+        argument: JSON,
+        functions: [String: any AnyReturnsKeyword],
+        route: ComputeRoute,
+        argumentRoute: ComputeRoute
+    ) -> [ComputeRoute] {
+        let childRoutes = argument.computableRoutes(functions: functions, from: argumentRoute)
+        return childRoutes.isEmpty ? [route] : childRoutes
+    }
+
+    func remainingThoughtCount(
+        argument: JSON,
+        functions: [String: any AnyReturnsKeyword]
+    ) -> Int {
+        argument.remainingThoughtCount(functions: functions) + 1
+    }
+
+    func compute(
+        argument: JSON,
+        context: Compute.Context,
+        runtime: ComputeFunctionRuntime,
+        route: ComputeRoute,
+        depth: Int
+    ) async throws -> JSON? {
+        let computed = try await argument.computeIfNeeded(
+            context: context,
+            runtime: runtime,
+            route: route,
+            depth: depth + 1
+        )
+        return try await value(for: computed)
     }
 }
 
