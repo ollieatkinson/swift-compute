@@ -63,3 +63,4 @@ workspace	672.585	keep	track dependencies only for subscribed runtimes
 workspace	841.355	discard	skip finish dependency merge when tracking is disabled
 workspace	665.062	keep	mark affected brain observer indexes by generation
 workspace	649.919	keep	build brain inputs without temporary arrays
+workspace	662.090	discard	make function runtime bookkeeping synchronous
