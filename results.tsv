@@ -92,3 +92,4 @@ workspace	993.283	keep	merge brain state dictionaries with explicit loops
 workspace	1029.105	discard	make thought recording synchronous
 workspace	909.547	discard	skip unobserved finish dependency work
 workspace	869.054	keep	gate returns dependency type check by tracking
+workspace	875.959	discard	make dependency owner optional when untracked
