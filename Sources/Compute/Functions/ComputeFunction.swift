@@ -65,7 +65,7 @@ public struct ComputeKeywordFunction<Keyword: ComputeKeyword>: AnyReturnsKeyword
                 argument.remainingThoughtCount(functions: functions) + 1
             }
             self.compute = { argument, context, runtime, route, depth in
-                let computed = try await argument.compute(
+                let computed = try await argument.computeIfNeeded(
                     context: context,
                     runtime: runtime,
                     route: route,

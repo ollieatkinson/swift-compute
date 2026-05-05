@@ -27,3 +27,4 @@ workspace	919.195	keep	remove function runtime actor isolation
 workspace	905.881	keep	filter arrays directly during custom compute
 workspace	850.202	keep	inline per-element array_map copy evaluation
 workspace	804.781	keep	skip recursive compute for literal array sources
+workspace	777.368	keep	skip recursive compute for literal keyword arguments
