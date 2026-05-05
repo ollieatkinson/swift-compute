@@ -404,24 +404,49 @@ public actor ComputeRuntime: Sendable {
         state: ComputeBrain.State,
         runtime: ComputeFunctionRuntime
     ) async throws -> ComputeSignal? {
-        let current = try document(from: state, excluding: route)
-        guard case .object(let object) = current.routeValue(at: route) else {
+        guard case .object(let object)? = try value(at: route, from: state) else {
             return nil
         }
         let step = try await Self.evaluate(object, at: route, runtime: runtime)
         var nextState = state
         nextState[.route(route)] = .value(step.output)
-        let nextDocument = try document(from: nextState)
         await runtime.record(ComputeThought(
             route: route,
             depth: route.components.count,
             keyword: step.keyword,
             kind: step.kind,
             input: step.input,
-            output: step.output,
-            state: nextDocument
+            output: step.output
         ))
         return .value(step.output)
+    }
+
+    private func value(
+        at route: ComputeRoute,
+        from state: ComputeBrain.State
+    ) throws -> JSON? {
+        guard var output = document.routeValue(at: route) else { return nil }
+        var finalAncestors: [ComputeRoute] = []
+        let baseDepth = route.components.count
+        let routeValues = state.compactMap { entry -> (ComputeRoute, JSON)? in
+            guard case .route(let candidate) = entry.key else { return nil }
+            guard route.isPrefix(of: candidate), candidate != route else { return nil }
+            guard case .value(let value) = entry.value else { return nil }
+            return (ComputeRoute(Array(candidate.components.dropFirst(baseDepth))), value)
+        }.sorted { lhs, rhs in
+            if lhs.0.components.count != rhs.0.components.count {
+                return lhs.0.components.count < rhs.0.components.count
+            }
+            return lhs.0.path.lexicographicallyPrecedes(rhs.0.path)
+        }
+        for (relativeRoute, value) in routeValues {
+            guard !finalAncestors.contains(where: { $0.isPrefix(of: relativeRoute) }) else { continue }
+            try output.set(value, at: relativeRoute)
+            if !value.isComputeInvocation {
+                finalAncestors.append(relativeRoute)
+            }
+        }
+        return output
     }
 
     private static func evaluate(

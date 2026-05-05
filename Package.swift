@@ -9,6 +9,7 @@ let package = Package(
     ],
     products: [
         .library(name: "Compute", targets: ["Compute"]),
+        .executable(name: "ComputeBenchmarks", targets: ["ComputeBenchmarks"]),
     ],
     dependencies: [
         .package(url: "https://github.com/thousandyears/AnyCoding.git", from: "0.1.0"),
@@ -22,6 +23,7 @@ let package = Package(
                 .product(name: "CustomDump", package: "swift-custom-dump"),
             ]
         ),
+        .executableTarget(name: "ComputeBenchmarks", dependencies: ["Compute"]),
         .testTarget(name: "ComputeTests", dependencies: ["Compute"]),
     ]
 )

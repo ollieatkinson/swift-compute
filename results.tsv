@@ -1,0 +1,6 @@
+commit	score_us	status	description
+workspace	3710.326	keep	baseline benchmark harness
+workspace	3202.280	keep	reconstruct only evaluated route subtree
+workspace	1702.866	keep	stop materializing per-thought document snapshots
+workspace	1713.140	discard	avoid array_filter and array_map intermediate arrays
+workspace	1670.024	keep	append route components through local copy
