@@ -49,6 +49,7 @@ extension ArrayMap: CustomComputeKeyword {
             throw JSONError("array_map expected an array")
         }
         var mapped: [JSON] = []
+        mapped.reserveCapacity(values.count)
         let intoSelf = try await into_self?.compute(
             context: context,
             runtime: runtime,
@@ -57,15 +58,22 @@ extension ArrayMap: CustomComputeKeyword {
         ).decode(Bool.self) ?? false
         for (index, value) in values.enumerated() {
             if let copy {
-                let map = Map(src: value, dst: intoSelf ? value : .object([:]), copy: copy)
-                mapped.append(try await ComputeTaskLocal.$context.withValue(context.with(item: value)) {
-                    try await map.compute(
-                        context: ComputeTaskLocal.context,
-                        runtime: runtime,
-                        route: route.appending(.key("over")).appending(.index(index)),
-                        depth: depth + 1
-                    ) ?? .null
-                })
+                let itemRoute = route.appending(.key("over"), .index(index))
+                let output = try await ComputeTaskLocal.$context.withValue(context.with(item: value)) {
+                    var destination = intoSelf ? value : JSON.object([:])
+                    for (copyIndex, copy) in copy.enumerated() {
+                        let copyRoute = itemRoute.appending(.key("copy"), .index(copyIndex)).appending(.key("value"))
+                        let copied = try await copy.value.compute(
+                            context: ComputeTaskLocal.context,
+                            runtime: runtime,
+                            route: copyRoute,
+                            depth: depth + 1
+                        )
+                        try destination.set(copied, at: ComputeRoute(copy.to))
+                    }
+                    return destination
+                }
+                mapped.append(output)
             } else {
                 mapped.append(value)
             }
