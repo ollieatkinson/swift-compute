@@ -254,6 +254,10 @@ extension JSON {
         try set(value, at: ArraySlice(route.components), path: route.path)
     }
 
+    mutating func set(_ value: JSON, at components: ArraySlice<ComputeRoute.Component>) throws {
+        try set(value, at: components, path: [])
+    }
+
     private mutating func set(
         _ value: JSON,
         at components: ArraySlice<ComputeRoute.Component>,

@@ -530,8 +530,7 @@ public actor ComputeRuntime: Sendable {
             let baseDepth = route.components.count
             for childRoute in childConcepts {
                 guard case .value(let value)? = state[.route(childRoute)] else { continue }
-                let relativeRoute = ComputeRoute(Array(childRoute.components.dropFirst(baseDepth)))
-                try output.set(value, at: relativeRoute)
+                try output.set(value, at: childRoute.components.dropFirst(baseDepth))
             }
             ComputeProfiling.record("runtime.valueAtState", since: profile)
             return output
