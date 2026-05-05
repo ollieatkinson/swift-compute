@@ -51,6 +51,7 @@ public struct Comparison: Codable, Equatable, Sendable {
 
 extension Comparison: ComputeKeyword {
     public static let keyword = "comparison"
+    public static let function = ComparisonFunction()
 
     public func compute() throws -> JSON {
         if let match {
@@ -72,6 +73,87 @@ extension Comparison: ComputeKeyword {
             return try greater_or_equal.compute()
         }
         return .bool(false)
+    }
+}
+
+public struct ComparisonFunction: AnyReturnsKeyword {
+    public let keyword = Comparison.keyword
+
+    public init() {}
+
+    public func value(for input: JSON) async throws -> JSON {
+        try Comparison.computeDirectly(from: input)
+    }
+}
+
+extension ComparisonFunction: CustomComputeFunction {
+    var evaluatesChildrenInternally: Bool {
+        false
+    }
+
+    func computableRoutes(
+        argument: JSON,
+        functions: [String: any AnyReturnsKeyword],
+        route: ComputeRoute,
+        argumentRoute: ComputeRoute
+    ) -> [ComputeRoute] {
+        let childRoutes = argument.computableRoutes(functions: functions, from: argumentRoute)
+        return childRoutes.isEmpty ? [route] : childRoutes
+    }
+
+    func remainingThoughtCount(
+        argument: JSON,
+        functions: [String: any AnyReturnsKeyword]
+    ) -> Int {
+        argument.remainingThoughtCount(functions: functions) + 1
+    }
+
+    func compute(
+        argument: JSON,
+        context: Compute.Context,
+        runtime: ComputeFunctionRuntime,
+        route: ComputeRoute,
+        depth: Int
+    ) async throws -> JSON? {
+        guard case .object(let object) = argument else {
+            return try await value(for: argument)
+        }
+        if let operands = object["match"] {
+            return try await compute("match", operands: operands, context: context, runtime: runtime, route: route, depth: depth)
+        }
+        if let operands = object["equal"] {
+            return try await compute("equal", operands: operands, context: context, runtime: runtime, route: route, depth: depth)
+        }
+        if let operands = object["less"] {
+            return try await compute("less", operands: operands, context: context, runtime: runtime, route: route, depth: depth)
+        }
+        if let operands = object["greater"] {
+            return try await compute("greater", operands: operands, context: context, runtime: runtime, route: route, depth: depth)
+        }
+        if let operands = object["less_or_equal"] {
+            return try await compute("less_or_equal", operands: operands, context: context, runtime: runtime, route: route, depth: depth)
+        }
+        if let operands = object["greater_or_equal"] {
+            return try await compute("greater_or_equal", operands: operands, context: context, runtime: runtime, route: route, depth: depth)
+        }
+        return .bool(false)
+    }
+
+    private func compute(
+        _ keyword: String,
+        operands: JSON,
+        context: Compute.Context,
+        runtime: ComputeFunctionRuntime,
+        route: ComputeRoute,
+        depth: Int
+    ) async throws -> JSON {
+        let computed = try await operands.computeIfNeeded(
+            context: context,
+            runtime: runtime,
+            route: route.appending(.key(keyword)),
+            depth: depth + 1
+        )
+        return try await value(for: .object([keyword: computed]))
     }
 }
 
