@@ -37,3 +37,4 @@ workspace	690.475	keep	parse from inputs without codable decode on hot path
 workspace	623.522	keep	parse array_filter inputs without codable decode
 workspace	628.486	discard	parse array_map inputs without codable decode
 workspace	629.869	discard	precompute array_map copy destination routes
+workspace	578.868	keep	skip recursive output walk when function output has no computes

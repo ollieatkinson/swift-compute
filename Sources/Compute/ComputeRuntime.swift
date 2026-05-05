@@ -814,7 +814,7 @@ final class ComputeFunctionRuntime: @unchecked Sendable {
             )
             rawOutput = try await value(function: function, keyword: keyword, argument: computed, route: route, ownerRoute: computeRoute)
         }
-        let output = try await rawOutput?.compute(
+        let output = try await rawOutput?.computeIfNeeded(
             context: context,
             runtime: self,
             route: computeRoute,
