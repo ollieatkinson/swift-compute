@@ -68,3 +68,4 @@ workspace	660.342	discard	compare key route components without string conversion
 workspace	666.496	discard	inline brain gate state into brain actor
 workspace	655.742	keep	collect concept routes with a path stack
 workspace	643.843	keep	pop concept route path stack manually
+workspace	647.083	discard	project child concept values with known-path setter
