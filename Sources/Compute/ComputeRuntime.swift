@@ -593,16 +593,19 @@ public actor ComputeRuntime: Sendable {
         functions: [String: any AnyReturnsKeyword],
         routeDependencies: [ComputeRoute: Set<ComputeDependency>]
     ) -> Graph {
-        let conceptRoutes = ComputeProfiling.measure("graph.conceptRoutes") {
-            document.conceptRoutes(functions: functions)
+        var conceptRoutes: [ComputeRoute] = []
+        var routeChildren: [ComputeRoute: [ComputeRoute]] = [:]
+        ComputeProfiling.measure("graph.conceptRoutes") {
+            document.collectConceptRoutes(
+                functions: functions,
+                routes: &conceptRoutes,
+                children: &routeChildren
+            )
         }
         let routes = ComputeProfiling.measure("graph.sortRoutes") {
             conceptRoutes.sortedForComputeEvaluation()
         }
         let routeConcepts = Set(routes)
-        let directChildProfile = ComputeProfiling.start()
-        let routeChildren = directChildConcepts(for: routes, in: routeConcepts)
-        ComputeProfiling.record("graph.directChildConcepts", since: directChildProfile)
         var state: ComputeBrain.State = [:]
         var change: ComputeBrain.State = [:]
         var concepts: [ComputeBrain.Concept] = []

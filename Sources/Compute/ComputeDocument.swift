@@ -162,6 +162,67 @@ extension JSON {
         }
     }
 
+    func collectConceptRoutes(
+        functions: [String: any AnyReturnsKeyword],
+        from route: ComputeRoute = .root,
+        parentConcept: ComputeRoute? = nil,
+        routes: inout [ComputeRoute],
+        children: inout [ComputeRoute: [ComputeRoute]]
+    ) {
+        switch self {
+        case .object(let object):
+            if let invocation = Compute.Invocation(object: object) {
+                let argumentRoute = route.appending(.key("{returns}"), .key(invocation.keyword))
+                guard let function = functions[invocation.keyword] else {
+                    invocation.argument.collectConceptRoutes(
+                        functions: functions,
+                        from: argumentRoute,
+                        parentConcept: parentConcept,
+                        routes: &routes,
+                        children: &children
+                    )
+                    return
+                }
+                routes.append(route)
+                if let parentConcept {
+                    children[parentConcept, default: []].append(route)
+                }
+                if let custom = function as? any CustomComputeFunction, custom.evaluatesChildrenInternally {
+                    return
+                }
+                invocation.argument.collectConceptRoutes(
+                    functions: functions,
+                    from: argumentRoute,
+                    parentConcept: route,
+                    routes: &routes,
+                    children: &children
+                )
+            } else {
+                for (key, value) in object {
+                    value.collectConceptRoutes(
+                        functions: functions,
+                        from: route.appending(.key(key)),
+                        parentConcept: parentConcept,
+                        routes: &routes,
+                        children: &children
+                    )
+                }
+            }
+        case .array(let values):
+            for (index, value) in values.enumerated() {
+                value.collectConceptRoutes(
+                    functions: functions,
+                    from: route.appending(.index(index)),
+                    parentConcept: parentConcept,
+                    routes: &routes,
+                    children: &children
+                )
+            }
+        case .null, .bool, .int, .double, .string:
+            return
+        }
+    }
+
     func remainingThoughtCount(
         functions: [String: any AnyReturnsKeyword]
     ) -> Int {
