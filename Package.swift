@@ -5,15 +5,16 @@ import PackageDescription
 let package = Package(
     name: "Compute",
     platforms: [
-        .macOS(.v10_15),
+        .macOS(.v26),
+        .iOS(.v26),
     ],
     products: [
         .library(name: "Compute", targets: ["Compute"]),
-        .executable(name: "ComputeBenchmarks", targets: ["ComputeBenchmarks"]),
     ],
     dependencies: [
         .package(url: "https://github.com/thousandyears/AnyCoding.git", from: "0.1.0"),
         .package(url: "https://github.com/pointfreeco/swift-custom-dump.git", from: "1.5.0"),
+        .package(url: "https://github.com/ordo-one/package-benchmark.git", from: "1.31.0", traits: []),
     ],
     targets: [
         .target(
@@ -23,7 +24,17 @@ let package = Package(
                 .product(name: "CustomDump", package: "swift-custom-dump"),
             ]
         ),
-        .executableTarget(name: "ComputeBenchmarks", dependencies: ["Compute"]),
+        .executableTarget(
+            name: "ComputeBenchmarks",
+            dependencies: [
+                "Compute",
+                .product(name: "Benchmark", package: "package-benchmark"),
+            ],
+            path: "Benchmarks/ComputeBenchmarks",
+            plugins: [
+                .plugin(name: "BenchmarkPlugin", package: "package-benchmark"),
+            ]
+        ),
         .testTarget(name: "ComputeTests", dependencies: ["Compute"]),
     ]
 )

@@ -4,3 +4,4 @@ workspace	3202.280	keep	reconstruct only evaluated route subtree
 workspace	1702.866	keep	stop materializing per-thought document snapshots
 workspace	1713.140	discard	avoid array_filter and array_map intermediate arrays
 workspace	1670.024	keep	append route components through local copy
+workspace	1824.206	keep	switch harness to ordo-one package-benchmark p50 score
