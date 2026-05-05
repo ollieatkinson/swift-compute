@@ -41,10 +41,12 @@ extension ArrayFilter: CustomComputeKeyword {
         route: ComputeRoute,
         depth: Int
     ) async throws -> JSON? {
+        let arrayRoute = route.appending(.key("array"))
+        let predicateRoute = route.appending(.key("predicate"))
         let source = try await array.computeIfNeeded(
             context: context,
             runtime: runtime,
-            route: route.appending(.key("array")),
+            route: arrayRoute,
             depth: depth
         )
         guard case .array(let values) = source else {
@@ -57,7 +59,7 @@ extension ArrayFilter: CustomComputeKeyword {
                 try await predicate.compute(
                     context: ComputeTaskLocal.context,
                     runtime: runtime,
-                    route: route.appending(.key("predicate")).appending(.index(index)),
+                    route: predicateRoute.appending(.index(index)),
                     depth: depth + 1
                 )
             }

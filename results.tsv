@@ -30,3 +30,4 @@ workspace	804.781	keep	skip recursive compute for literal array sources
 workspace	777.368	keep	skip recursive compute for literal keyword arguments
 workspace	775.005	keep	walk item paths without route allocation
 workspace	773.360	keep	return custom array_map output directly
+workspace	769.295	keep	hoist array function child routes

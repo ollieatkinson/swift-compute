@@ -39,10 +39,11 @@ extension ArrayMap: CustomComputeKeyword {
         route: ComputeRoute,
         depth: Int
     ) async throws -> JSON? {
+        let overRoute = route.appending(.key("over"))
         let source = try await over.computeIfNeeded(
             context: context,
             runtime: runtime,
-            route: route.appending(.key("over")),
+            route: overRoute,
             depth: depth
         )
         guard case .array(let values) = source else {
@@ -58,7 +59,7 @@ extension ArrayMap: CustomComputeKeyword {
         ).decode(Bool.self) ?? false
         for (index, value) in values.enumerated() {
             if let copy {
-                let itemRoute = route.appending(.key("over"), .index(index))
+                let itemRoute = overRoute.appending(.index(index))
                 let output = try await ComputeTaskLocal.$context.withValue(context.with(item: value)) {
                     var destination = intoSelf ? value : JSON.object([:])
                     for (copyIndex, copy) in copy.enumerated() {
