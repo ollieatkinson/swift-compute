@@ -116,9 +116,15 @@ extension JSON {
             if Compute.Invocation(object: object) != nil {
                 return true
             }
-            return object.values.contains { $0.containsComputeInvocation }
+            for value in object.values where value.containsComputeInvocation {
+                return true
+            }
+            return false
         case .array(let values):
-            return values.contains { $0.containsComputeInvocation }
+            for value in values where value.containsComputeInvocation {
+                return true
+            }
+            return false
         case .null, .bool, .int, .double, .string:
             return false
         }
