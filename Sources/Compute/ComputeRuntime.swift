@@ -502,7 +502,13 @@ public actor ComputeRuntime: Sendable {
     ) throws -> JSON? {
         let profile = ComputeProfiling.start()
         do {
-            guard var output = document.routeValue(at: route) else {
+            let source: JSON?
+            if case .value(let value)? = state[.source(route)] {
+                source = value
+            } else {
+                source = document.routeValue(at: route)
+            }
+            guard var output = source else {
                 ComputeProfiling.record("runtime.valueAtState", since: profile)
                 return nil
             }
