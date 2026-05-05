@@ -50,7 +50,8 @@ extension ArrayFilter: CustomComputeKeyword {
         guard case .array(let values) = source else {
             throw JSONError("array_filter expected an array")
         }
-        var predicates: [JSON] = []
+        var filtered: [JSON] = []
+        filtered.reserveCapacity(values.count)
         for (index, value) in values.enumerated() {
             let keep = try await ComputeTaskLocal.$context.withValue(context.with(item: value)) {
                 try await predicate.compute(
@@ -60,8 +61,10 @@ extension ArrayFilter: CustomComputeKeyword {
                     depth: depth + 1
                 )
             }
-            predicates.append(.bool(try keep.decode(Bool.self)))
+            if try keep.decode(Bool.self) {
+                filtered.append(value)
+            }
         }
-        return try ArrayFilter(array: source, predicate: .array(predicates)).compute()
+        return .array(filtered)
     }
 }

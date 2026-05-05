@@ -24,3 +24,4 @@ workspace	931.739	discard	carry concept route values through graph discovery
 workspace	922.302	keep	return keyword kind with function evaluation
 workspace	927.702	discard	track leaf routes with child concept set
 workspace	919.195	keep	remove function runtime actor isolation
+workspace	905.881	keep	filter arrays directly during custom compute
