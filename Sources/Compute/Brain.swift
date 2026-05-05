@@ -108,7 +108,9 @@ public actor Brain<Lemma, Signal>: Sendable where Lemma: Hashable & Sendable, Si
 
     public func stage(_ changes: State) async {
         await gate.lock()
-        change.merge(changes) { _, new in new }
+        for (lemma, signal) in changes {
+            change[lemma] = signal
+        }
         await gate.unlock()
     }
 
@@ -212,7 +214,9 @@ public actor Brain<Lemma, Signal>: Sendable where Lemma: Hashable & Sendable, Si
         if let resetState, let resetConcepts {
             resetUnlocked(to: resetState, concepts: resetConcepts, staging: stagedChanges)
         } else if !stagedChanges.isEmpty {
-            change.merge(stagedChanges) { _, new in new }
+            for (lemma, signal) in stagedChanges {
+                change[lemma] = signal
+            }
         }
 
         latestThoughts.removeAll(keepingCapacity: true)
@@ -220,7 +224,9 @@ public actor Brain<Lemma, Signal>: Sendable where Lemma: Hashable & Sendable, Si
         var writes = change
         change.removeAll(keepingCapacity: true)
         if !writes.isEmpty {
-            state.merge(writes) { _, new in new }
+            for (lemma, signal) in writes {
+                state[lemma] = signal
+            }
         }
 
         var waves = 0
@@ -252,8 +258,10 @@ public actor Brain<Lemma, Signal>: Sendable where Lemma: Hashable & Sendable, Si
             guard !thoughts.isEmpty else { break }
 
             let mergeProfile = ComputeProfiling.start()
-            state.merge(thoughts) { _, new in new }
-            latestThoughts.merge(thoughts) { _, new in new }
+            for (lemma, signal) in thoughts {
+                state[lemma] = signal
+                latestThoughts[lemma] = signal
+            }
             ComputeProfiling.record("brain.mergeThoughts", since: mergeProfile)
             writes = thoughts
             waves += 1
