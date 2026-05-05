@@ -45,3 +45,4 @@ workspace	617.224	discard	sort affected brain concepts by precomputed rank
 workspace	584.223	discard	check route self before nearest ancestor scan
 workspace	581.800	discard	inline disabled profiling helpers
 workspace	593.130	discard	carry concept route values through graph build
+workspace	566.572	keep	project route values from direct child concepts

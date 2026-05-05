@@ -83,6 +83,7 @@ public actor ComputeRuntime: Sendable {
         let state: ComputeBrain.State
         let change: ComputeBrain.State
         let routeConcepts: Set<ComputeRoute>
+        let routeChildren: [ComputeRoute: [ComputeRoute]]
     }
 
     private let document: JSON
@@ -90,6 +91,7 @@ public actor ComputeRuntime: Sendable {
     private let functions: [String: any AnyReturnsKeyword]
     private let brain: ComputeBrain
     private var routeConcepts: Set<ComputeRoute>
+    private var routeChildren: [ComputeRoute: [ComputeRoute]]
     private var routeDependencies: [ComputeRoute: Set<ComputeDependency>] = [:]
     private var latestThoughts: [ComputeThought] = []
     private var functionResults: [String: Result<JSON, JSONError>] = [:]
@@ -115,6 +117,7 @@ public actor ComputeRuntime: Sendable {
         self.context = context
         self.functions = computer.functions
         self.routeConcepts = graph.routeConcepts
+        self.routeChildren = graph.routeChildren
         self.brain = ComputeBrain(
             graph.concepts,
             state: graph.state,
@@ -240,6 +243,7 @@ public actor ComputeRuntime: Sendable {
             )
             ComputeProfiling.record("runtime.settle.resetGraph", since: profile)
             routeConcepts = resetGraph.routeConcepts
+            routeChildren = resetGraph.routeChildren
             graph = resetGraph
         } else {
             graph = nil
@@ -317,6 +321,7 @@ public actor ComputeRuntime: Sendable {
             )
             ComputeProfiling.record("runtime.finish.updateGraph", since: updateGraphProfile)
             routeConcepts = graph.routeConcepts
+            routeChildren = graph.routeChildren
             await brain.update(concepts: graph.concepts)
         }
         if subscribe || !observedRoutes.isEmpty {
@@ -459,7 +464,11 @@ public actor ComputeRuntime: Sendable {
     ) async throws -> ComputeSignal? {
         let profile = ComputeProfiling.start()
         do {
-            guard case .object(let object)? = try value(at: route, from: state) else {
+            guard case .object(let object)? = try value(
+                at: route,
+                from: state,
+                childConcepts: routeChildren[route] ?? []
+            ) else {
                 ComputeProfiling.record("runtime.evaluateRoute", since: profile)
                 return nil
             }
@@ -482,7 +491,8 @@ public actor ComputeRuntime: Sendable {
 
     private func value(
         at route: ComputeRoute,
-        from state: ComputeBrain.State
+        from state: ComputeBrain.State,
+        childConcepts: [ComputeRoute]
     ) throws -> JSON? {
         let profile = ComputeProfiling.start()
         do {
@@ -490,25 +500,15 @@ public actor ComputeRuntime: Sendable {
                 ComputeProfiling.record("runtime.valueAtState", since: profile)
                 return nil
             }
-            var finalAncestors: [ComputeRoute] = []
-            let baseDepth = route.components.count
-            let routeValues = state.compactMap { entry -> (ComputeRoute, JSON)? in
-                guard case .route(let candidate) = entry.key else { return nil }
-                guard route.isPrefix(of: candidate), candidate != route else { return nil }
-                guard case .value(let value) = entry.value else { return nil }
-                return (ComputeRoute(Array(candidate.components.dropFirst(baseDepth))), value)
-            }.sorted { lhs, rhs in
-                if lhs.0.components.count != rhs.0.components.count {
-                    return lhs.0.components.count < rhs.0.components.count
-                }
-                return lhs.0.pathLexicographicallyPrecedes(rhs.0)
+            guard !childConcepts.isEmpty else {
+                ComputeProfiling.record("runtime.valueAtState", since: profile)
+                return output
             }
-            for (relativeRoute, value) in routeValues {
-                guard !finalAncestors.contains(where: { $0.isPrefix(of: relativeRoute) }) else { continue }
+            let baseDepth = route.components.count
+            for childRoute in childConcepts {
+                guard case .value(let value)? = state[.route(childRoute)] else { continue }
+                let relativeRoute = ComputeRoute(Array(childRoute.components.dropFirst(baseDepth)))
                 try output.set(value, at: relativeRoute)
-                if !value.isComputeInvocation {
-                    finalAncestors.append(relativeRoute)
-                }
             }
             ComputeProfiling.record("runtime.valueAtState", since: profile)
             return output
@@ -613,7 +613,13 @@ public actor ComputeRuntime: Sendable {
                 ))
             }
         }
-        return Graph(concepts: concepts, state: state, change: change, routeConcepts: routeConcepts)
+        return Graph(
+            concepts: concepts,
+            state: state,
+            change: change,
+            routeConcepts: routeConcepts,
+            routeChildren: routeChildren
+        )
     }
 
     private static func inputs(
