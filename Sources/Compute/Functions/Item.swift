@@ -37,3 +37,23 @@ extension Item: ComputeKeyword {
         return source.routeValue(at: ComputeRoute(path)) ?? .null
     }
 }
+
+extension Item: DirectComputeKeyword {
+    static func computeDirectly(from input: JSON) throws -> JSON {
+        guard case .array(let components) = input else {
+            return try JSON.decoded(Item.self, from: input).compute()
+        }
+        let path = try components.map { component -> ComputeRoute.Component in
+            switch component {
+            case .string(let key):
+                return .key(key)
+            case .int(let index):
+                return .index(index)
+            default:
+                return try component.decode(ComputeRoute.Component.self)
+            }
+        }
+        let source = ComputeTaskLocal.context.item ?? .null
+        return source.routeValue(at: ComputeRoute(path)) ?? .null
+    }
+}

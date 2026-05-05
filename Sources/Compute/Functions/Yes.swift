@@ -19,3 +19,29 @@ extension Yes: ComputeKeyword {
         return .bool(satisfied && !blocked)
     }
 }
+
+extension Yes: DirectComputeKeyword {
+    static func computeDirectly(from input: JSON) throws -> JSON {
+        guard case .object(let object) = input else {
+            return try JSON.decoded(Yes.self, from: input).compute()
+        }
+        let conditions = object["if"]?.conditionList ?? []
+        for condition in conditions where try !condition.boolValue() {
+            return .bool(false)
+        }
+        let exceptions = object["unless"]?.conditionList ?? []
+        for exception in exceptions where try exception.boolValue() {
+            return .bool(false)
+        }
+        return .bool(true)
+    }
+}
+
+private extension JSON {
+    func boolValue() throws -> Bool {
+        if case .bool(let value) = self {
+            return value
+        }
+        return try decode(Bool.self)
+    }
+}

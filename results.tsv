@@ -5,3 +5,4 @@ workspace	1702.866	keep	stop materializing per-thought document snapshots
 workspace	1713.140	discard	avoid array_filter and array_map intermediate arrays
 workspace	1670.024	keep	append route components through local copy
 workspace	1824.206	keep	switch harness to ordo-one package-benchmark p50 score
+workspace	1250.049	keep	direct compute hot item comparison and yes keywords

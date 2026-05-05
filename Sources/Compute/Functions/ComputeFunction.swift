@@ -8,6 +8,10 @@ public protocol ComputeKeyword: Codable, Equatable, Sendable {
     func compute() throws -> JSON
 }
 
+protocol DirectComputeKeyword {
+    static func computeDirectly(from input: JSON) throws -> JSON
+}
+
 public struct ComputeKeywordFunction<Keyword: ComputeKeyword>: AnyReturnsKeyword {
     private let computableRoutes: @Sendable (
         _ json: JSON,
@@ -73,7 +77,10 @@ public struct ComputeKeywordFunction<Keyword: ComputeKeyword>: AnyReturnsKeyword
     }
 
     public func value(for input: JSON) async throws -> JSON {
-        try JSON.decoded(Keyword.self, from: input).compute()
+        if let keyword = Keyword.self as? any DirectComputeKeyword.Type {
+            return try keyword.computeDirectly(from: input)
+        }
+        return try JSON.decoded(Keyword.self, from: input).compute()
     }
 }
 

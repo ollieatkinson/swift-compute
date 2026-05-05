@@ -75,6 +75,114 @@ extension Comparison: ComputeKeyword {
     }
 }
 
+extension Comparison: DirectComputeKeyword {
+    static func computeDirectly(from input: JSON) throws -> JSON {
+        guard case .object(let object) = input else {
+            return try JSON.decoded(Comparison.self, from: input).compute()
+        }
+        if let operands = object["match"] {
+            return try compare(operands, string: { lhs, rhs in
+                lhs.range(of: rhs, options: NSString.CompareOptions.regularExpression) != nil
+            })
+        }
+        if let operands = object["equal"] {
+            return try equal(operands)
+        }
+        if let operands = object["less"] {
+            return try ordered(operands, string: <, number: <)
+        }
+        if let operands = object["greater"] {
+            return try ordered(operands, string: >, number: >)
+        }
+        if let operands = object["less_or_equal"] {
+            return try ordered(operands, string: <=, number: <=)
+        }
+        if let operands = object["greater_or_equal"] {
+            return try ordered(operands, string: >=, number: >=)
+        }
+        return .bool(false)
+    }
+
+    private static func compare(
+        _ operands: JSON,
+        _ predicate: (JSON, JSON) -> Bool
+    ) throws -> JSON {
+        guard let pair = operandPair(from: operands) else {
+            return try JSON.decoded(Comparison.self, from: ["equal": operands]).compute()
+        }
+        return .bool(predicate(pair.lhs, pair.rhs))
+    }
+
+    private static func equal(_ operands: JSON) throws -> JSON {
+        guard let pair = operandPair(from: operands) else {
+            return try JSON.decoded(Equal.self, from: operands).compute()
+        }
+        switch (pair.lhs, pair.rhs) {
+        case (.null, .null),
+             (.bool, .bool),
+             (.int, .int),
+             (.double, .double),
+             (.string, .string):
+            return .bool(pair.lhs == pair.rhs)
+        case (.array, _), (.object, _), (_, .array), (_, .object):
+            return try JSON.decoded(Equal.self, from: operands).compute()
+        default:
+            return .bool(false)
+        }
+    }
+
+    private static func compare(
+        _ operands: JSON,
+        string predicate: (String, String) -> Bool
+    ) throws -> JSON {
+        guard let pair = operandPair(from: operands) else {
+            return try JSON.decoded(Comparison.self, from: ["match": operands]).compute()
+        }
+        guard case .string(let lhs) = pair.lhs, case .string(let rhs) = pair.rhs else {
+            return try JSON.decoded(Match.self, from: operands).compute()
+        }
+        return .bool(predicate(lhs, rhs))
+    }
+
+    private static func ordered(
+        _ operands: JSON,
+        string stringPredicate: (String, String) -> Bool,
+        number numberPredicate: (Double, Double) -> Bool
+    ) throws -> JSON {
+        guard let pair = operandPair(from: operands) else {
+            return try JSON.decoded(Operands.self, from: operands)
+                .orderedComparison(string: stringPredicate, number: numberPredicate)
+        }
+        if case .string(let lhs) = pair.lhs, case .string(let rhs) = pair.rhs {
+            return .bool(stringPredicate(lhs, rhs))
+        }
+        if let lhs = pair.lhs.numberValue, let rhs = pair.rhs.numberValue {
+            return .bool(numberPredicate(lhs, rhs))
+        }
+        return try Operands(lhs: pair.lhs, rhs: pair.rhs)
+            .orderedComparison(string: stringPredicate, number: numberPredicate)
+    }
+
+    private static func operandPair(from input: JSON) -> (lhs: JSON, rhs: JSON)? {
+        guard case .object(let object) = input else { return nil }
+        guard let lhs = object["lhs"], let rhs = object["rhs"] else { return nil }
+        return (lhs, rhs)
+    }
+}
+
+private extension JSON {
+    var numberValue: Double? {
+        switch self {
+        case .int(let value):
+            return Double(value)
+        case .double(let value):
+            return value
+        case .null, .bool, .string, .array, .object:
+            return nil
+        }
+    }
+}
+
 public struct Match: Codable, Equatable, Sendable, OperandPair {
     public let lhs: JSON
     public let rhs: JSON
