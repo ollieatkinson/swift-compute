@@ -587,6 +587,9 @@ public actor ComputeRuntime: Sendable {
             conceptRoutes.sortedForComputeEvaluation()
         }
         let routeConcepts = Set(routes)
+        let directChildProfile = ComputeProfiling.start()
+        let routeChildren = directChildConcepts(for: routes, in: routeConcepts)
+        ComputeProfiling.record("graph.directChildConcepts", since: directChildProfile)
         var state: ComputeBrain.State = [:]
         var change: ComputeBrain.State = [:]
         var concepts: [ComputeBrain.Concept] = []
@@ -603,7 +606,7 @@ public actor ComputeRuntime: Sendable {
                         for: route,
                         value: value,
                         functions: functions,
-                        routeConcepts: routeConcepts,
+                        childConcepts: routeChildren[route] ?? [],
                         routeDependencies: routeDependencies
                     )
                 ))
@@ -616,7 +619,7 @@ public actor ComputeRuntime: Sendable {
         for route: ComputeRoute,
         value: JSON,
         functions: [String: any AnyReturnsKeyword],
-        routeConcepts: Set<ComputeRoute>,
+        childConcepts: [ComputeRoute],
         routeDependencies: [ComputeRoute: Set<ComputeDependency>]
     ) -> Set<ComputeLemma> {
         var inputs: Set<ComputeLemma> = []
@@ -625,11 +628,10 @@ public actor ComputeRuntime: Sendable {
             if let custom = function as? any CustomComputeFunction, custom.evaluatesChildrenInternally {
                 inputs.insert(.source(route))
             } else {
-                let children = route.directChildConcepts(in: routeConcepts)
-                if children.isEmpty {
+                if childConcepts.isEmpty {
                     inputs.insert(.source(route))
                 } else {
-                    inputs.formUnion(children.map { .route($0) })
+                    inputs.formUnion(childConcepts.map { .route($0) })
                 }
             }
         } else {
@@ -637,6 +639,18 @@ public actor ComputeRuntime: Sendable {
         }
         inputs.formUnion((routeDependencies[route] ?? []).map { .dependency($0.key) })
         return inputs
+    }
+
+    private static func directChildConcepts(
+        for routes: [ComputeRoute],
+        in routeConcepts: Set<ComputeRoute>
+    ) -> [ComputeRoute: [ComputeRoute]] {
+        var children: [ComputeRoute: [ComputeRoute]] = [:]
+        for route in routes {
+            guard let ancestor = route.nearestStrictAncestor(in: routeConcepts) else { continue }
+            children[ancestor, default: []].append(route)
+        }
+        return children
     }
 
     private static func remainingThoughtCount(in state: ComputeBrain.State) -> Int {
@@ -827,26 +841,16 @@ private extension ComputeRoute {
         }
     }
 
-    func directChildConcepts(in routes: Set<ComputeRoute>) -> [ComputeRoute] {
-        routes.filter { candidate in
-            guard routeContains(candidate), candidate != self else { return false }
-            var components = candidate.components
-            while !components.isEmpty {
-                components.removeLast()
-                let ancestor = ComputeRoute(components)
-                guard ancestor != self else { return true }
-                if routes.contains(ancestor) {
-                    return false
-                }
+    func nearestStrictAncestor(in routes: Set<ComputeRoute>) -> ComputeRoute? {
+        var components = components
+        while !components.isEmpty {
+            components.removeLast()
+            let route = ComputeRoute(components)
+            if routes.contains(route) {
+                return route
             }
-            return false
         }
-        .sortedForComputeEvaluation()
-    }
-
-    private func routeContains(_ route: ComputeRoute) -> Bool {
-        guard components.count < route.components.count else { return false }
-        return zip(components, route.components).allSatisfy(==)
+        return nil
     }
 
     func pathLexicographicallyPrecedes(_ route: ComputeRoute) -> Bool {
