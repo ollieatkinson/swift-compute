@@ -43,17 +43,32 @@ extension Item: DirectComputeKeyword {
         guard case .array(let components) = input else {
             return try JSON.decoded(Item.self, from: input).compute()
         }
-        let path = try components.map { component -> ComputeRoute.Component in
-            switch component {
-            case .string(let key):
-                return .key(key)
-            case .int(let index):
-                return .index(index)
+        return try (ComputeTaskLocal.context.item ?? .null).routeValue(atPathComponents: components) ?? .null
+    }
+}
+
+private extension JSON {
+    func routeValue(atPathComponents components: [JSON]) throws -> JSON? {
+        var current = self
+        for component in components {
+            switch (component, current) {
+            case (.string(let key), .object(let object)):
+                guard let value = object[key] else { return nil }
+                current = value
+            case (.int(let index), .array(let array)):
+                guard array.indices.contains(index) else { return nil }
+                current = array[index]
             default:
-                return try component.decode(ComputeRoute.Component.self)
+                switch try component.decode(ComputeRoute.Component.self) {
+                case .key(let key):
+                    guard case .object(let object) = current, let value = object[key] else { return nil }
+                    current = value
+                case .index(let index):
+                    guard case .array(let array) = current, array.indices.contains(index) else { return nil }
+                    current = array[index]
+                }
             }
         }
-        let source = ComputeTaskLocal.context.item ?? .null
-        return source.routeValue(at: ComputeRoute(path)) ?? .null
+        return current
     }
 }

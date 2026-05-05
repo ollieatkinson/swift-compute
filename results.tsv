@@ -28,3 +28,4 @@ workspace	905.881	keep	filter arrays directly during custom compute
 workspace	850.202	keep	inline per-element array_map copy evaluation
 workspace	804.781	keep	skip recursive compute for literal array sources
 workspace	777.368	keep	skip recursive compute for literal keyword arguments
+workspace	775.005	keep	walk item paths without route allocation
