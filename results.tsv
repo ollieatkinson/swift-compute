@@ -10,3 +10,4 @@ workspace	1254.743	discard	avoid rebuilding computer function dictionary when me
 workspace	1192.620	keep	remove unused state copy during route evaluation
 workspace	1142.580	keep	return resolved root document without scanning route state
 workspace	1167.015	discard	avoid sorted object traversal during local document compute
+workspace	1169.676	discard	replace per-settle compute function runtime actor with a class
