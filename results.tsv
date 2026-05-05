@@ -19,3 +19,4 @@ workspace	993.812	keep	fast path single-change affected concepts
 workspace	994.632	discard	avoid sorted object traversal during graph route discovery
 workspace	983.779	keep	append two route components in one copy
 workspace	952.785	keep	reuse known output route during function evaluation
+workspace	928.282	keep	cache compute dependency stable keys

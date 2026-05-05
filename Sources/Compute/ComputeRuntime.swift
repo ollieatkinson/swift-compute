@@ -698,9 +698,16 @@ public actor ComputeRuntime: Sendable {
 public struct ComputeDependency: Sendable, Equatable, Hashable {
     public let keyword: String
     public let argument: JSON
+    private let cachedKey: String
+
+    init(keyword: String, argument: JSON) {
+        self.keyword = keyword
+        self.argument = argument
+        self.cachedKey = "\(keyword):\(argument.stableDescription)"
+    }
 
     fileprivate var key: String {
-        "\(keyword):\(argument.stableDescription)"
+        cachedKey
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
