@@ -141,11 +141,11 @@ extension JSON {
                 return [route] + invocation.argument.conceptRoutes(functions: functions, from: argumentRoute)
             }
             var routes: [ComputeRoute] = []
-            for key in object.keys.sorted() {
-                routes.append(contentsOf: object[key]?.conceptRoutes(
+            for (key, value) in object {
+                routes.append(contentsOf: value.conceptRoutes(
                     functions: functions,
                     from: route.appending(.key(key))
-                ) ?? [])
+                ))
             }
             return routes
         case .array(let values):
