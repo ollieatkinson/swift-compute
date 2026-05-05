@@ -594,6 +594,9 @@ public actor ComputeRuntime: Sendable {
         var state: ComputeBrain.State = [:]
         var change: ComputeBrain.State = [:]
         var concepts: [ComputeBrain.Concept] = []
+        state.reserveCapacity(routes.count * 2)
+        change.reserveCapacity(routes.count)
+        concepts.reserveCapacity(routes.count)
 
         ComputeProfiling.measure("graph.buildConcepts") {
             for route in routes {
