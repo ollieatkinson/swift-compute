@@ -51,3 +51,4 @@ workspace	554.796	keep	reserve graph build collection capacity
 workspace	544.204	keep	skip task local context wrapper for default runtime context
 workspace	543.763	keep	read route source values from brain state during evaluation
 workspace	533.640	keep	collect concept routes and child links in one traversal
+workspace	538.295	discard	collect route source values during concept discovery
