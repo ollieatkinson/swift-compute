@@ -79,3 +79,4 @@ workspace	971.762	discard	expand single-change affected map manually
 workspace	1015.000	discard	cache route invocation metadata
 workspace	968.657	discard	reserve JSON compute output containers
 workspace	930.569	discard	reserve brain observer table capacity
+workspace	902.338	discard	sort computed object entries instead of keys
