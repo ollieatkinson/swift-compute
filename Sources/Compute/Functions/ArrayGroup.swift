@@ -1,3 +1,5 @@
+import Algorithms
+
 extension Keyword {
     public struct ArrayGroup: Codable, Equatable, Sendable {
         public static let name = "array_group"
@@ -52,13 +54,11 @@ extension Keyword.ArrayGroup: ComputeKeyword {
         guard case .array(let values) = array else {
             throw JSONError("array_group expected an array")
         }
-        switch (into, by) {
-        case let (.some(into), .none):
-            return try Self.group(values, into: into)
-        case (.none, .some):
+        switch try GroupingMode(into: into, by: by) {
+        case .into(let into):
+            return .array(try IntoPlan(into).groups(from: values).map(JSON.array))
+        case .by:
             throw JSONError("array_group by requires runtime item context")
-        case (.none, .none), (.some, .some):
-            throw JSONError("array_group expected exactly one of into or by")
         }
     }
 }
@@ -79,8 +79,88 @@ extension Keyword.ArrayGroup: CustomComputeKeyword {
         guard case .array(let values) = source else {
             throw JSONError("array_group expected an array")
         }
-        switch (into, by) {
-        case let (.some(into), .none):
+        switch try GroupingMode(into: into, by: by) {
+        case .into(let into):
+            let plan = try await IntoPlan(
+                into,
+                context: context,
+                runtime: runtime,
+                route: route,
+                depth: depth
+            )
+            return .array(plan.groups(from: values).map(JSON.array))
+        case .by(let by):
+            return try await group(values, by: by, context: context, runtime: runtime, route: route, depth: depth)
+        }
+    }
+
+    private func group(
+        _ values: [JSON],
+        by: By,
+        context: Compute.Context,
+        runtime: ComputeFunctionRuntime,
+        route: ComputeRoute,
+        depth: Int
+    ) async throws -> JSON {
+        var groups = ItemGroups()
+        for (index, value) in values.indexed() {
+            let key = try await ComputeTaskLocal.$context.withValue(context.with(item: value)) {
+                try await by.value.compute(
+                    context: ComputeTaskLocal.context,
+                    runtime: runtime,
+                    route: route.appending(.key("by")).appending(.key("value")).appending(.index(index)),
+                    depth: depth + 1
+                )
+            }
+            groups.append(value, key: key)
+        }
+        let orderValue = try await by.order?.compute(
+            context: context,
+            runtime: runtime,
+            route: route.appending(.key("by")).appending(.key("order")),
+            depth: depth + 1
+        )
+        let order = try orderValue?.decode(Keyword.ArraySort.Order.self) ?? .ascending
+        return .array(try groups.elements(ordered: order).map(JSON.array))
+    }
+}
+
+extension Keyword.ArrayGroup {
+    fileprivate enum GroupingMode {
+        case into(Into)
+        case by(By)
+
+        init(into: Into?, by: By?) throws {
+            switch (into, by) {
+            case let (.some(into), .none):
+                self = .into(into)
+            case let (.none, .some(by)):
+                self = .by(by)
+            case (.none, .none), (.some, .some):
+                throw JSONError("array_group expected exactly one of into or by")
+            }
+        }
+    }
+
+    fileprivate struct IntoPlan {
+        let counts: [Int]
+        let overflow: Overflow
+        let remainder: Remainder
+
+        init(_ into: Into) throws {
+            self.counts = try into.counts.decode([Int].self)
+            self.overflow = try into.overflow?.decode(Overflow.self) ?? .trimmed
+            self.remainder = try into.remainder?.decode(Remainder.self) ?? .trimmed
+            try validate()
+        }
+
+        init(
+            _ into: Into,
+            context: Compute.Context,
+            runtime: ComputeFunctionRuntime,
+            route: ComputeRoute,
+            depth: Int
+        ) async throws {
             let counts = try await into.counts.compute(
                 context: context,
                 runtime: runtime,
@@ -99,123 +179,117 @@ extension Keyword.ArrayGroup: CustomComputeKeyword {
                 route: route.appending(.key("into")).appending(.key("remainder")),
                 depth: depth + 1
             )
-            return try Self.group(
-                values,
-                into: Into(counts: counts, overflow: overflow, remainder: remainder)
-            )
-        case let (.none, .some(by)):
-            return try await group(values, by: by, context: context, runtime: runtime, route: route, depth: depth)
-        case (.none, .none), (.some, .some):
-            throw JSONError("array_group expected exactly one of into or by")
+            self.counts = try counts.decode([Int].self)
+            self.overflow = try overflow?.decode(Overflow.self) ?? .trimmed
+            self.remainder = try remainder?.decode(Remainder.self) ?? .trimmed
+            try validate()
+        }
+
+        func groups(from values: [JSON]) -> [[JSON]] {
+            guard !counts.isEmpty else {
+                return []
+            }
+            var cursor = GroupCursor(values)
+            let firstPass = consume(counts, from: &cursor)
+            var result = firstPass.groups
+            guard firstPass.completed, cursor.hasRemaining else {
+                return result
+            }
+            switch overflow {
+            case .trimmed:
+                return result
+            case .grouped:
+                if let remaining = cursor.takeRemaining() {
+                    result.append(remaining)
+                }
+                return result
+            case .patterned:
+                result += consume(counts.cycled(), from: &cursor).groups
+                return result
+            }
+        }
+
+        private func validate() throws {
+            guard counts.allSatisfy({ $0 > 0 }) else {
+                throw JSONError("array_group counts must be greater than zero")
+            }
+        }
+
+        private func consume<Counts: Sequence>(
+            _ counts: Counts,
+            from cursor: inout GroupCursor
+        ) -> (groups: [[JSON]], completed: Bool) where Counts.Element == Int {
+            var groups: [[JSON]] = []
+            for count in counts {
+                guard let group = cursor.take(count, remainder: remainder) else {
+                    return (groups, false)
+                }
+                groups.append(group)
+                guard cursor.hasRemaining else {
+                    return (groups, true)
+                }
+            }
+            return (groups, true)
         }
     }
 
-    private func group(
-        _ values: [JSON],
-        by: By,
-        context: Compute.Context,
-        runtime: ComputeFunctionRuntime,
-        route: ComputeRoute,
-        depth: Int
-    ) async throws -> JSON {
-        var groups: [(key: JSON, elements: [JSON], offset: Int)] = []
-        for (index, value) in values.enumerated() {
-            let key = try await ComputeTaskLocal.$context.withValue(context.with(item: value)) {
-                try await by.value.compute(
-                    context: ComputeTaskLocal.context,
-                    runtime: runtime,
-                    route: route.appending(.key("by")).appending(.key("value")).appending(.index(index)),
-                    depth: depth + 1
-                )
-            }
-            if let existing = groups.firstIndex(where: { $0.key == key }) {
-                groups[existing].elements.append(value)
-            } else {
-                groups.append((key: key, elements: [value], offset: groups.count))
-            }
-        }
-        let order = try await by.order?.compute(
-            context: context,
-            runtime: runtime,
-            route: route.appending(.key("by")).appending(.key("order")),
-            depth: depth + 1
-        ).decode(Keyword.ArraySort.Order.self) ?? .ascending
-        let predicate = Keyword.ArraySort.Predicate(order: order)
-        let sorted = try groups.sorted { lhs, rhs in
-            (try predicate.areInIncreasingOrder(lhs.key, rhs.key)) ?? (lhs.offset < rhs.offset)
-        }
-        return .array(sorted.map { JSON.array($0.elements) })
-    }
-}
-
-extension Keyword.ArrayGroup {
-    private static func group(_ values: [JSON], into: Into) throws -> JSON {
-        let counts = try into.counts.decode([Int].self)
-        guard !counts.isEmpty else {
-            return .array([])
-        }
-        guard counts.allSatisfy({ $0 > 0 }) else {
-            throw JSONError("array_group counts must be greater than zero")
-        }
-        let overflow = try into.overflow?.decode(Overflow.self) ?? .trimmed
-        let remainder = try into.remainder?.decode(Remainder.self) ?? .trimmed
-        var groups: [[JSON]] = []
+    fileprivate struct GroupCursor {
+        let values: [JSON]
         var index = 0
 
-        for count in counts {
-            guard appendGroup(from: values, index: &index, count: count, remainder: remainder, to: &groups) else {
-                return .array(groups.map(JSON.array))
-            }
+        init(_ values: [JSON]) {
+            self.values = values
         }
 
-        switch overflow {
-        case .trimmed:
-            break
-        case .grouped:
-            if index < values.count {
-                groups.append(Array(values[index..<values.count]))
-            }
-        case .patterned:
-            while index < values.count {
-                var appendedInPattern = false
-                for count in counts {
-                    let previousIndex = index
-                    if appendGroup(from: values, index: &index, count: count, remainder: remainder, to: &groups) {
-                        appendedInPattern = true
-                    }
-                    if previousIndex == index {
-                        return .array(groups.map(JSON.array))
-                    }
-                    guard index < values.count else {
-                        break
-                    }
-                }
-                guard appendedInPattern else {
-                    break
-                }
-            }
+        var hasRemaining: Bool {
+            index < values.count
         }
-        return .array(groups.map(JSON.array))
+
+        mutating func take(_ count: Int, remainder: Remainder) -> [JSON]? {
+            let end = index + count
+            guard end <= values.count else {
+                guard remainder == .grouped else {
+                    return nil
+                }
+                return takeRemaining()
+            }
+            let group = Array(values[index..<end])
+            index = end
+            return group
+        }
+
+        mutating func takeRemaining() -> [JSON]? {
+            guard hasRemaining else {
+                return nil
+            }
+            let group = Array(values[index..<values.count])
+            index = values.count
+            return group
+        }
     }
 
-    private static func appendGroup(
-        from values: [JSON],
-        index: inout Int,
-        count: Int,
-        remainder: Remainder,
-        to groups: inout [[JSON]]
-    ) -> Bool {
-        let end = index + count
-        guard end <= values.count else {
-            if remainder == .grouped, index < values.count {
-                groups.append(Array(values[index..<values.count]))
-                index = values.count
-                return true
+    fileprivate struct ItemGroups {
+        var groups: [ItemGroup] = []
+
+        mutating func append(_ value: JSON, key: JSON) {
+            if let index = groups.firstIndex(where: { $0.key == key }) {
+                groups[index].elements.append(value)
+            } else {
+                groups.append(ItemGroup(key: key, elements: [value], offset: groups.count))
             }
-            return false
         }
-        groups.append(Array(values[index..<end]))
-        index = end
-        return true
+
+        func elements(ordered order: Keyword.ArraySort.Order) throws -> [[JSON]] {
+            let predicate = Keyword.ArraySort.Predicate(order: order)
+            return try groups.sorted { lhs, rhs in
+                (try predicate.areInIncreasingOrder(lhs.key, rhs.key)) ?? (lhs.offset < rhs.offset)
+            }.map(\.elements)
+        }
+    }
+
+    fileprivate struct ItemGroup {
+        let key: JSON
+        var elements: [JSON]
+        let offset: Int
     }
 }

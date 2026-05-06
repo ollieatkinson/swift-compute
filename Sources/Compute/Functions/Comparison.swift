@@ -24,30 +24,6 @@ extension Keyword {
             self.less_or_equal = less_or_equal
             self.greater_or_equal = greater_or_equal
         }
-
-        public static func match(lhs: JSON, rhs: JSON) -> Comparison {
-            Comparison(match: Match(lhs: lhs, rhs: rhs))
-        }
-
-        public static func equal(lhs: JSON, rhs: JSON) -> Comparison {
-            Comparison(equal: Equal(lhs: lhs, rhs: rhs))
-        }
-
-        public static func less(lhs: JSON, rhs: JSON) -> Comparison {
-            Comparison(less: Less(lhs: lhs, rhs: rhs))
-        }
-
-        public static func greater(lhs: JSON, rhs: JSON) -> Comparison {
-            Comparison(greater: Greater(lhs: lhs, rhs: rhs))
-        }
-
-        public static func lessOrEqual(lhs: JSON, rhs: JSON) -> Comparison {
-            Comparison(less_or_equal: LessOrEqual(lhs: lhs, rhs: rhs))
-        }
-
-        public static func greaterOrEqual(lhs: JSON, rhs: JSON) -> Comparison {
-            Comparison(greater_or_equal: GreaterOrEqual(lhs: lhs, rhs: rhs))
-        }
     }
 
     public struct Match: Codable, Equatable, Sendable, OperandPair {

@@ -11,6 +11,7 @@ let package = Package(
         .library(name: "Compute", targets: ["Compute"]),
     ],
     dependencies: [
+        .package(url: "https://github.com/apple/swift-algorithms.git", from: "1.2.0"),
         .package(url: "https://github.com/thousandyears/AnyCoding.git", from: "0.1.0"),
         .package(url: "https://github.com/pointfreeco/swift-custom-dump.git", from: "1.5.0"),
     ],
@@ -18,6 +19,7 @@ let package = Package(
         .target(
             name: "Compute",
             dependencies: [
+                .product(name: "Algorithms", package: "swift-algorithms"),
                 .product(name: "AnyCoding", package: "AnyCoding"),
                 .product(name: "CustomDump", package: "swift-custom-dump"),
             ]

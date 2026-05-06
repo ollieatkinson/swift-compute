@@ -1,3 +1,5 @@
+import Algorithms
+
 extension Keyword {
     public struct ArrayZip: Codable, Equatable, Sendable {
         public static let name = "array_zip"
@@ -26,13 +28,10 @@ extension Keyword.ArrayZip: ComputeKeyword {
         guard let count = arrays.map(\.count).min(), count > 0 else {
             return .array([])
         }
-        var rows: [[JSON]] = []
-        for index in 0..<count {
-            rows.append(arrays.map { $0[index] })
-        }
+        let zipped = (0..<count).flatMap { index in arrays.map { $0[index] } }
         if try flattened?.decode(Bool.self) ?? false {
-            return .array(rows.flatMap { $0 })
+            return .array(zipped)
         }
-        return .array(rows.map(JSON.array))
+        return .array(zipped.chunks(ofCount: arrays.count).map { JSON.array(Array($0)) })
     }
 }
