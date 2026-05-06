@@ -159,7 +159,7 @@ actor TestReferences: AsyncComputeReferences {
 }
 
 struct Echo: ComputeKeyword {
-    static let keyword = "echo"
+    static let name = "echo"
     let payload: JSON
 
     init(_ payload: JSON) {
@@ -192,7 +192,7 @@ func runtime(
     in context: Compute.Context = Compute.Context(),
     references: TestReferences
 ) throws -> ComputeRuntime {
-    try runtime(json, in: context, functions: [From.Function(references: references)])
+    try runtime(json, in: context, functions: [Keyword.From.Function(references: references)])
 }
 
 func value(
@@ -242,5 +242,20 @@ func expectNext(
     let actual = await iterator.next()
     if actual != expected {
         Issue.record("Expected \(expected), got \(String(describing: actual))", sourceLocation: sourceLocation)
+    }
+}
+
+func expectJSONError(
+    containing fragment: String,
+    sourceLocation: SourceLocation = #_sourceLocation,
+    _ operation: () async throws -> Void
+) async {
+    do {
+        try await operation()
+        Issue.record("Expected JSONError containing \(fragment)", sourceLocation: sourceLocation)
+    } catch let error as JSONError {
+        #expect(error.description.contains(fragment), sourceLocation: sourceLocation)
+    } catch {
+        Issue.record("Expected JSONError, got \(error)", sourceLocation: sourceLocation)
     }
 }

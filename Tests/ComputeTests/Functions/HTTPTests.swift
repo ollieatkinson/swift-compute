@@ -29,7 +29,7 @@ struct HTTPTests {
             "token": "Bearer abc",
             "url": "https://example.com/users",
         ])
-        let function = HTTP.Function { request in
+        let function = Keyword.HTTP.Function { request in
             #expect(request.url?.absoluteString == "https://example.com/users")
             #expect(request.httpMethod == "POST")
             #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer abc")
@@ -37,7 +37,7 @@ struct HTTPTests {
             #expect(request.timeoutInterval == 5)
             #expect(request.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: String] } == ["name": "Oliver"])
 
-            return HTTP.Response(
+            return Keyword.HTTP.Response(
                 data: Data(#"{"created":true}"#.utf8),
                 url: request.url?.absoluteString,
                 status: 201,
@@ -57,7 +57,7 @@ struct HTTPTests {
         let references = TestReferences()
         await references.set("users_url", to: "https://example.com/users")
         let requests = HTTPRequestProbe()
-        let http = HTTP.Function { request in
+        let http = Keyword.HTTP.Function { request in
             await requests.response(for: request)
         }
         let json: JSON = [
@@ -69,7 +69,7 @@ struct HTTPTests {
                 ],
             ],
         ]
-        let runtime = try runtime(json, functions: [From.Function(references: references), http])
+        let runtime = try runtime(json, functions: [Keyword.From.Function(references: references), http])
         var stream = runtime.run().makeAsyncIterator()
 
         await expectNext(&stream, equals: .success([
@@ -97,8 +97,8 @@ struct HTTPTests {
     }
 
     @Test func returnsPlainTextBodiesWhenResponseIsNotJSON() async throws {
-        let function = HTTP.Function { _ in
-            HTTP.Response(data: Data("accepted".utf8), status: 202)
+        let function = Keyword.HTTP.Function { _ in
+            Keyword.HTTP.Response(data: Data("accepted".utf8), status: 202)
         }
 
         #expect(try await value(
@@ -127,10 +127,10 @@ private actor HTTPRequestProbe {
         requestedURLs
     }
 
-    func response(for request: URLRequest) -> HTTP.Response {
+    func response(for request: URLRequest) -> Keyword.HTTP.Response {
         let url = request.url?.absoluteString ?? ""
         requestedURLs.append(url)
-        return HTTP.Response(
+        return Keyword.HTTP.Response(
             data: Data(#"{"ok":true}"#.utf8),
             url: url,
             status: 200

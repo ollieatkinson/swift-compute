@@ -1,85 +1,87 @@
 import Foundation
 
-public struct HTTP: Codable, Equatable, Sendable {
-    public static let keyword = "http"
+extension Keyword {
+    public struct HTTP: Codable, Equatable, Sendable {
+        public static let name = "http"
 
-    public let request: Request
+        public let request: Request
 
-    public init(request: Request) {
-        self.request = request
-    }
-
-    public struct Request: Codable, Equatable, Sendable {
-        public let url: JSON
-        public let method: JSON?
-        public let headers: JSON?
-        public let body: JSON?
-        public let timeout: JSON?
-
-        public init(
-            url: JSON,
-            method: JSON? = nil,
-            headers: JSON? = nil,
-            body: JSON? = nil,
-            timeout: JSON? = nil
-        ) {
-            self.url = url
-            self.method = method
-            self.headers = headers
-            self.body = body
-            self.timeout = timeout
-        }
-    }
-
-    public struct Response: Equatable, Sendable {
-        public let data: Data
-        public let url: String?
-        public let status: Int?
-        public let headers: [String: String]
-
-        public init(
-            data: Data = Data(),
-            url: String? = nil,
-            status: Int? = nil,
-            headers: [String: String] = [:]
-        ) {
-            self.data = data
-            self.url = url
-            self.status = status
-            self.headers = headers
+        public init(request: Request) {
+            self.request = request
         }
 
-        init(data: Data, response: URLResponse) {
-            let http = response as? HTTPURLResponse
-            self.init(
-                data: data,
-                url: response.url?.absoluteString,
-                status: http?.statusCode,
-                headers: http?.allHeaderFields.reduce(into: [:]) { headers, field in
-                    headers[String(describing: field.key)] = String(describing: field.value)
-                } ?? [:]
-            )
-        }
+        public struct Request: Codable, Equatable, Sendable {
+            public let url: JSON
+            public let method: JSON?
+            public let headers: JSON?
+            public let body: JSON?
+            public let timeout: JSON?
 
-        var json: JSON {
-            var object: [String: JSON] = [
-                "body": HTTP.bodyJSON(from: data),
-                "headers": .object(headers.mapValues(JSON.string)),
-            ]
-            if let url {
-                object["url"] = .string(url)
+            public init(
+                url: JSON,
+                method: JSON? = nil,
+                headers: JSON? = nil,
+                body: JSON? = nil,
+                timeout: JSON? = nil
+            ) {
+                self.url = url
+                self.method = method
+                self.headers = headers
+                self.body = body
+                self.timeout = timeout
             }
-            if let status {
-                object["status"] = .int(status)
+        }
+
+        public struct Response: Equatable, Sendable {
+            public let data: Data
+            public let url: String?
+            public let status: Int?
+            public let headers: [String: String]
+
+            public init(
+                data: Data = Data(),
+                url: String? = nil,
+                status: Int? = nil,
+                headers: [String: String] = [:]
+            ) {
+                self.data = data
+                self.url = url
+                self.status = status
+                self.headers = headers
             }
-            return .object(object)
+
+            init(data: Data, response: URLResponse) {
+                let http = response as? HTTPURLResponse
+                self.init(
+                    data: data,
+                    url: response.url?.absoluteString,
+                    status: http?.statusCode,
+                    headers: http?.allHeaderFields.reduce(into: [:]) { headers, field in
+                        headers[String(describing: field.key)] = String(describing: field.value)
+                    } ?? [:]
+                )
+            }
+
+            var json: JSON {
+                var object: [String: JSON] = [
+                    "body": Keyword.HTTP.bodyJSON(from: data),
+                    "headers": .object(headers.mapValues(JSON.string)),
+                ]
+                if let url {
+                    object["url"] = .string(url)
+                }
+                if let status {
+                    object["status"] = .int(status)
+                }
+                return .object(object)
+            }
         }
     }
 }
 
-extension HTTP {
+extension Keyword.HTTP {
     public struct Function: ReturnsKeyword {
-        public let keyword = HTTP.keyword
+        public let name = Keyword.HTTP.name
 
         private let perform: @Sendable (URLRequest) async throws -> Response
 
@@ -95,13 +97,13 @@ extension HTTP {
         }
 
         public func value(for input: JSON) async throws -> JSON {
-            let http = try JSON.decoded(HTTP.self, from: input)
+            let http = try JSON.decoded(Keyword.HTTP.self, from: input)
             let request = try http.request.urlRequest()
             return try await perform(request).json
         }
     }
 }
-extension HTTP.Request {
+extension Keyword.HTTP.Request {
     func urlRequest() throws -> URLRequest {
         let urlString = try url.decode(String.self)
         guard let url = URL(string: urlString) else {
@@ -145,7 +147,7 @@ extension HTTP.Request {
     }
 }
 
-extension HTTP {
+extension Keyword.HTTP {
     static func bodyJSON(from data: Data) -> JSON {
         guard !data.isEmpty else { return .null }
         if let value = try? JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed) {

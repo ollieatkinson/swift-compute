@@ -90,7 +90,7 @@ struct ComputeRuntimeEdgeCaseTests {
                     ],
                 ],
             ],
-            functions: [flag.function(keyword: "flag")]
+            functions: [flag.function(name: "flag")]
         )
         var stream = runtime.run().makeAsyncIterator()
 
@@ -127,9 +127,9 @@ private actor AsyncReturnsProbe {
         continuations.removeAll()
     }
 
-    nonisolated func function(keyword: String) -> AnyReturnsFunction {
+    nonisolated func function(name: String) -> AnyReturnsFunction {
         AnyReturnsFunction(
-            keyword: keyword,
+            name: name,
             value: { [self] _ in await self.value() },
             values: { [self] _ in self.values() }
         )
@@ -164,20 +164,5 @@ private actor AsyncReturnsProbe {
 
     private func remove(id: UUID) {
         continuations[id] = nil
-    }
-}
-
-private func expectJSONError(
-    containing fragment: String,
-    sourceLocation: SourceLocation = #_sourceLocation,
-    _ operation: () async throws -> Void
-) async {
-    do {
-        try await operation()
-        Issue.record("Expected JSONError containing \(fragment)", sourceLocation: sourceLocation)
-    } catch let error as JSONError {
-        #expect(error.description.contains(fragment), sourceLocation: sourceLocation)
-    } catch {
-        Issue.record("Expected JSONError, got \(error)", sourceLocation: sourceLocation)
     }
 }

@@ -1,19 +1,21 @@
-public struct ArrayMap: Codable, Equatable, Sendable {
-    public let over: JSON
-    public let copy: [Map.Copy]?
-    public let into_self: JSON?
-    public let flattened: JSON?
+extension Keyword {
+    public struct ArrayMap: Codable, Equatable, Sendable {
+        public let over: JSON
+        public let copy: [Keyword.Map.Copy]?
+        public let into_self: JSON?
+        public let flattened: JSON?
 
-    public init(over: JSON, copy: [Map.Copy]? = nil, into_self: JSON? = nil, flattened: JSON? = nil) {
-        self.over = over
-        self.copy = copy
-        self.into_self = into_self
-        self.flattened = flattened
+        public init(over: JSON, copy: [Keyword.Map.Copy]? = nil, into_self: JSON? = nil, flattened: JSON? = nil) {
+            self.over = over
+            self.copy = copy
+            self.into_self = into_self
+            self.flattened = flattened
+        }
     }
 }
 
-extension ArrayMap: ComputeKeyword {
-    public static let keyword = "array_map"
+extension Keyword.ArrayMap: ComputeKeyword {
+    public static let name = "array_map"
 
     public func compute() throws -> JSON {
         guard case .array(let values) = over else {
@@ -32,7 +34,7 @@ extension ArrayMap: ComputeKeyword {
     }
 }
 
-extension ArrayMap: CustomComputeKeyword {
+extension Keyword.ArrayMap: CustomComputeKeyword {
     func compute(
         context: Compute.Context,
         runtime: ComputeFunctionRuntime,
@@ -57,7 +59,7 @@ extension ArrayMap: CustomComputeKeyword {
         ).decode(Bool.self) ?? false
         for (index, value) in values.enumerated() {
             if let copy {
-                let map = Map(src: value, dst: intoSelf ? value : .object([:]), copy: copy)
+                let map = Keyword.Map(src: value, dst: intoSelf ? value : .object([:]), copy: copy)
                 mapped.append(try await ComputeTaskLocal.$context.withValue(context.with(item: value)) {
                     try await map.compute(
                         context: ComputeTaskLocal.context,
@@ -76,6 +78,6 @@ extension ArrayMap: CustomComputeKeyword {
             route: route.appending(.key("flattened")),
             depth: depth + 1
         ).decode(Bool.self) ?? false
-        return try ArrayMap(over: .array(mapped), flattened: .bool(shouldFlatten)).compute()
+        return try Self(over: .array(mapped), flattened: .bool(shouldFlatten)).compute()
     }
 }

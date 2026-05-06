@@ -1,20 +1,22 @@
-public struct Exists: Codable, Equatable, Sendable {
-    public let value: JSON?
+extension Keyword {
+    public struct Exists: Codable, Equatable, Sendable {
+        public let value: JSON?
 
-    public init(value: JSON? = nil) {
-        self.value = value
+        public init(value: JSON? = nil) {
+            self.value = value
+        }
     }
 }
 
-extension Exists: ComputeKeyword {
-    public static let keyword = "exists"
+extension Keyword.Exists: ComputeKeyword {
+    public static let name = "exists"
 
     public func compute() throws -> JSON {
         .bool((value ?? .null) != .null)
     }
 }
 
-extension Exists: CustomComputeKeyword {
+extension Keyword.Exists: CustomComputeKeyword {
     func compute(
         context: Compute.Context,
         runtime: ComputeFunctionRuntime,
@@ -32,6 +34,6 @@ extension Exists: CustomComputeKeyword {
         } catch {
             computed = .null
         }
-        return try Exists(value: computed).compute()
+        return try Self(value: computed).compute()
     }
 }

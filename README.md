@@ -75,7 +75,7 @@ let document: JSON = [
 let runtime = ComputeRuntime(
     document: document,
     functions: [
-        From.Function(references: deviceReferences),
+        Keyword.From.Function(references: deviceReferences),
     ]
 )
 
@@ -92,12 +92,15 @@ The default computer includes keywords for:
 
 - boolean checks with `yes`, `not`, and `either`
 - comparisons with `comparison`
-- collection helpers like `count`, `contains`, `map`, `array_map`, and `array_filter`
+- explicit failures with `error`
+- collection helpers like `count`, `contains`, `map`, `array_map`, `array_filter`, `array_group`, `array_slice`, `array_sort`, `array_subscript`, and `array_zip`
 - item lookup with `item`
 - text formatting with `text`
-- external values with `from` and `http`
+- HTTP values with `http`
 
-Custom keywords can be added by conforming to `ComputeKeyword` or `AnyReturnsKeyword` and passing them into `ComputeRuntime`.
+Reference values can be added with `Keyword.From.Function(references:)`. JavaScript evaluation can be added explicitly with `Keyword.Eval.function`.
+
+Custom keywords can be added by conforming to `ComputeKeyword` or `AnyReturnsKeyword`, declaring a `name`, and passing them into `ComputeRuntime`.
 
 ## Philosophy
 
