@@ -1,7 +1,7 @@
 import Foundation
 import AnyCoding
 
-public enum JSON: Equatable, Sendable {
+public enum JSON: Equatable, Hashable, Sendable {
     case null
     case bool(Bool)
     case int(Int)

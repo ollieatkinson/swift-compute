@@ -28,11 +28,7 @@ extension Keyword.ArrayFilter: ComputeKeyword {
         guard predicates.count == values.count else {
             throw JSONError("array_filter predicate count did not match array count")
         }
-        var filtered: [JSON] = []
-        for (value, keep) in zip(values, predicates) where keep {
-            filtered.append(value)
-        }
-        return .array(filtered)
+        return .array(zip(values, predicates).filter(\.1).map(\.0))
     }
 }
 

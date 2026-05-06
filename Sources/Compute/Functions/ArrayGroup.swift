@@ -102,8 +102,8 @@ extension Keyword.ArrayGroup: CustomComputeKeyword {
         route: ComputeRoute,
         depth: Int
     ) async throws -> JSON {
-        var groups = ItemGroups()
-        for (index, value) in values.indexed() {
+        var keyedItems: [KeyedItem] = []
+        for (index, value) in values.enumerated() {
             let key = try await ComputeTaskLocal.$context.withValue(context.with(item: value)) {
                 try await by.value.compute(
                     context: ComputeTaskLocal.context,
@@ -112,7 +112,7 @@ extension Keyword.ArrayGroup: CustomComputeKeyword {
                     depth: depth + 1
                 )
             }
-            groups.append(value, key: key)
+            keyedItems.append(KeyedItem(index: index, key: key, value: value))
         }
         let orderValue = try await by.order?.compute(
             context: context,
@@ -121,7 +121,7 @@ extension Keyword.ArrayGroup: CustomComputeKeyword {
             depth: depth + 1
         )
         let order = try orderValue?.decode(Keyword.ArraySort.Order.self) ?? .ascending
-        return .array(try groups.elements(ordered: order).map(JSON.array))
+        return .array(try ItemGroup.groups(from: keyedItems).elements(ordered: order).map(JSON.array))
     }
 }
 
@@ -268,28 +268,30 @@ extension Keyword.ArrayGroup {
         }
     }
 
-    fileprivate struct ItemGroups {
-        var groups: [ItemGroup] = []
-
-        mutating func append(_ value: JSON, key: JSON) {
-            if let index = groups.firstIndex(where: { $0.key == key }) {
-                groups[index].elements.append(value)
-            } else {
-                groups.append(ItemGroup(key: key, elements: [value], offset: groups.count))
-            }
-        }
-
-        func elements(ordered order: Keyword.ArraySort.Order) throws -> [[JSON]] {
-            let predicate = Keyword.ArraySort.Predicate(order: order)
-            return try groups.sorted { lhs, rhs in
-                (try predicate.areInIncreasingOrder(lhs.key, rhs.key)) ?? (lhs.offset < rhs.offset)
-            }.map(\.elements)
-        }
+    fileprivate struct KeyedItem {
+        let index: Int
+        let key: JSON
+        let value: JSON
     }
 
     fileprivate struct ItemGroup {
         let key: JSON
-        var elements: [JSON]
+        let elements: [JSON]
         let offset: Int
+
+        static func groups(from items: [KeyedItem]) -> [ItemGroup] {
+            items.grouped { $0.key }.map { key, items in
+                ItemGroup(key: key, elements: items.map(\.value), offset: items[0].index)
+            }
+        }
+    }
+}
+
+private extension Array where Element == Keyword.ArrayGroup.ItemGroup {
+    func elements(ordered order: Keyword.ArraySort.Order) throws -> [[JSON]] {
+        let predicate = Keyword.ArraySort.Predicate(order: order)
+        return try sorted { lhs, rhs in
+            (try predicate.areInIncreasingOrder(lhs.key, rhs.key)) ?? (lhs.offset < rhs.offset)
+        }.map(\.elements)
     }
 }

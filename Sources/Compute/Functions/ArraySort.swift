@@ -1,3 +1,5 @@
+import Algorithms
+
 extension Keyword {
     public struct ArraySort: Codable, Equatable, Sendable {
         public static let name = "array_sort"
@@ -35,13 +37,13 @@ extension Keyword.ArraySort: ComputeKeyword {
         guard let predicates, !predicates.isEmpty else {
             return .array(values)
         }
-        let sorted = try values.enumerated().sorted { lhs, rhs in
+        let sorted = try values.indexed().sorted { lhs, rhs in
             for predicate in predicates {
                 if let ordered = try predicate.areInIncreasingOrder(lhs.element, rhs.element) {
                     return ordered
                 }
             }
-            return lhs.offset < rhs.offset
+            return lhs.index < rhs.index
         }.map(\.element)
         return .array(sorted)
     }
