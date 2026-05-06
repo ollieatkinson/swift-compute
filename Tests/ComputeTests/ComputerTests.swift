@@ -7,7 +7,7 @@ struct ComputerTests {
     @Test func classifiesKeywordsFromReturnsJSON() throws {
         let references = TestReferences()
         let computer = Computer.default.merging([
-            From.Function(references: references),
+            Keyword.From.Function(references: references),
             Echo.function,
         ])
 

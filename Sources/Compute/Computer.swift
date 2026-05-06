@@ -2,26 +2,32 @@ public struct Computer: Sendable {
     public let functions: [String: any AnyReturnsKeyword]
 
     public static let `default` = Computer([
-        This.function,
-        Yes.function,
-        Contains.function,
-        Membership.function,
-        ApproximatelyEqual.function,
-        Comparison.function,
-        Not.function,
-        Either.function,
-        HTTP.Function(),
-        Text.function,
-        Item.function,
-        Count.function,
-        Exists.function,
-        Map.function,
-        ArrayMap.function,
-        ArrayFilter.function,
+        Keyword.This.function,
+        Keyword.Yes.function,
+        Keyword.Contains.function,
+        Keyword.Membership.function,
+        Keyword.ApproximatelyEqual.function,
+        Keyword.Comparison.function,
+        Keyword.Not.function,
+        Keyword.Either.function,
+        Keyword.Error.function,
+        Keyword.HTTP.Function(),
+        Keyword.Text.function,
+        Keyword.Item.function,
+        Keyword.Count.function,
+        Keyword.Exists.function,
+        Keyword.Map.function,
+        Keyword.ArraySort.function,
+        Keyword.ArraySlice.function,
+        Keyword.ArraySubscript.function,
+        Keyword.ArrayZip.function,
+        Keyword.ArrayGroup.function,
+        Keyword.ArrayMap.function,
+        Keyword.ArrayFilter.function,
     ])
 
     public init(_ functions: [any AnyReturnsKeyword] = []) {
-        self.functions = Dictionary(functions.map { ($0.keyword, $0) }, uniquingKeysWith: { _, last in last })
+        self.functions = Dictionary(functions.map { ($0.name, $0) }, uniquingKeysWith: { _, last in last })
     }
 
     public subscript(keyword: String) -> Compute.Keyword? {

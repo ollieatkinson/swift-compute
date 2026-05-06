@@ -1,31 +1,33 @@
-public struct Map: Codable, Equatable, Sendable {
-    public let src: JSON
-    public let dst: JSON?
-    public let copy: [Copy]?
+extension Keyword {
+    public struct Map: Codable, Equatable, Sendable {
+        public let src: JSON
+        public let dst: JSON?
+        public let copy: [Copy]?
 
-    public init(src: JSON, dst: JSON? = nil, copy: [Copy]? = nil) {
-        self.src = src
-        self.dst = dst
-        self.copy = copy
-    }
-
-    public struct Copy: Codable, Equatable, Sendable {
-        public let value: JSON
-        public let to: [ComputeRoute.Component]
-
-        public init(value: JSON, to: [String]) {
-            self.init(value: value, to: to.map(ComputeRoute.Component.key))
+        public init(src: JSON, dst: JSON? = nil, copy: [Copy]? = nil) {
+            self.src = src
+            self.dst = dst
+            self.copy = copy
         }
 
-        public init(value: JSON, to: [ComputeRoute.Component]) {
-            self.value = value
-            self.to = to
+        public struct Copy: Codable, Equatable, Sendable {
+            public let value: JSON
+            public let to: [ComputeRoute.Component]
+
+            public init(value: JSON, to: [String]) {
+                self.init(value: value, to: to.map(ComputeRoute.Component.key))
+            }
+
+            public init(value: JSON, to: [ComputeRoute.Component]) {
+                self.value = value
+                self.to = to
+            }
         }
     }
 }
 
-extension Map: ComputeKeyword {
-    public static let keyword = "map"
+extension Keyword.Map: ComputeKeyword {
+    public static let name = "map"
 
     public func compute() throws -> JSON {
         var destination = dst ?? src
@@ -36,7 +38,7 @@ extension Map: ComputeKeyword {
     }
 }
 
-extension Map: CustomComputeKeyword {
+extension Keyword.Map: CustomComputeKeyword {
     func compute(
         context: Compute.Context,
         runtime: ComputeFunctionRuntime,
@@ -62,7 +64,7 @@ extension Map: CustomComputeKeyword {
         } else {
             destination = source
         }
-        var copies: [Map.Copy] = []
+        var copies: [Keyword.Map.Copy] = []
         for (index, copy) in (copy ?? []).enumerated() {
             let value = try await ComputeTaskLocal.$context.withValue(context.with(item: source)) {
                 try await copy.value.compute(
@@ -72,8 +74,8 @@ extension Map: CustomComputeKeyword {
                     depth: depth + 1
                 )
             }
-            copies.append(Map.Copy(value: value, to: copy.to))
+            copies.append(Keyword.Map.Copy(value: value, to: copy.to))
         }
-        return try Map(src: source, dst: destination, copy: copies).compute()
+        return try Self(src: source, dst: destination, copy: copies).compute()
     }
 }

@@ -1,15 +1,17 @@
-public struct ArrayFilter: Codable, Equatable, Sendable {
-    public let array: JSON
-    public let predicate: JSON
+extension Keyword {
+    public struct ArrayFilter: Codable, Equatable, Sendable {
+        public let array: JSON
+        public let predicate: JSON
 
-    public init(array: JSON, predicate: JSON) {
-        self.array = array
-        self.predicate = predicate
+        public init(array: JSON, predicate: JSON) {
+            self.array = array
+            self.predicate = predicate
+        }
     }
 }
 
-extension ArrayFilter: ComputeKeyword {
-    public static let keyword = "array_filter"
+extension Keyword.ArrayFilter: ComputeKeyword {
+    public static let name = "array_filter"
 
     public func compute() throws -> JSON {
         guard case .array(let values) = array else {
@@ -26,15 +28,11 @@ extension ArrayFilter: ComputeKeyword {
         guard predicates.count == values.count else {
             throw JSONError("array_filter predicate count did not match array count")
         }
-        var filtered: [JSON] = []
-        for (value, keep) in zip(values, predicates) where keep {
-            filtered.append(value)
-        }
-        return .array(filtered)
+        return .array(zip(values, predicates).filter(\.1).map(\.0))
     }
 }
 
-extension ArrayFilter: CustomComputeKeyword {
+extension Keyword.ArrayFilter: CustomComputeKeyword {
     func compute(
         context: Compute.Context,
         runtime: ComputeFunctionRuntime,
@@ -62,6 +60,6 @@ extension ArrayFilter: CustomComputeKeyword {
             }
             predicates.append(.bool(try keep.decode(Bool.self)))
         }
-        return try ArrayFilter(array: source, predicate: .array(predicates)).compute()
+        return try Self(array: source, predicate: .array(predicates)).compute()
     }
 }

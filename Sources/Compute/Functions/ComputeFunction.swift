@@ -1,14 +1,14 @@
 public protocol AnyReturnsKeyword: Sendable {
-    var keyword: String { get }
+    var name: String { get }
     func value(for input: JSON) async throws -> JSON
 }
 
 public protocol ComputeKeyword: Codable, Equatable, Sendable {
-    static var keyword: String { get }
+    static var name: String { get }
     func compute() throws -> JSON
 }
 
-public struct ComputeKeywordFunction<Keyword: ComputeKeyword>: AnyReturnsKeyword {
+public struct ComputeKeywordFunction<K: ComputeKeyword>: AnyReturnsKeyword {
     private let computableRoutes: @Sendable (
         _ json: JSON,
         _ functions: [String: any AnyReturnsKeyword],
@@ -29,12 +29,12 @@ public struct ComputeKeywordFunction<Keyword: ComputeKeyword>: AnyReturnsKeyword
         _ depth: Int
     ) async throws -> JSON?
 
-    public var keyword: String {
-        Keyword.keyword
+    public var name: String {
+        K.name
     }
 
     public init() {
-        if Keyword.self is any CustomComputeKeyword.Type {
+        if K.self is any CustomComputeKeyword.Type {
             self.computableRoutes = { _, _, route, _ in
                 [route]
             }
@@ -42,7 +42,7 @@ public struct ComputeKeywordFunction<Keyword: ComputeKeyword>: AnyReturnsKeyword
                 1
             }
             self.compute = { argument, context, runtime, route, depth in
-                guard let keyword = try JSON.decoded(Keyword.self, from: argument) as? any CustomComputeKeyword else {
+                guard let keyword = try JSON.decoded(K.self, from: argument) as? any CustomComputeKeyword else {
                     return nil
                 }
                 return try await keyword.compute(
@@ -67,13 +67,13 @@ public struct ComputeKeywordFunction<Keyword: ComputeKeyword>: AnyReturnsKeyword
                     route: route,
                     depth: depth + 1
                 )
-                return try await runtime.value(keyword: Keyword.keyword, argument: computed, route: route)
+                return try await runtime.value(keyword: K.name, argument: computed, route: route)
             }
         }
     }
 
     public func value(for input: JSON) async throws -> JSON {
-        try JSON.decoded(Keyword.self, from: input).compute()
+        try JSON.decoded(K.self, from: input).compute()
     }
 }
 
@@ -150,13 +150,13 @@ extension CustomComputeKeyword {
             route: route,
             depth: depth + 1
         )
-        return try await runtime.value(keyword: Self.keyword, argument: computed, route: route)
+        return try await runtime.value(keyword: Self.name, argument: computed, route: route)
     }
 }
 
 extension ComputeKeywordFunction: CustomComputeFunction {
     var evaluatesChildrenInternally: Bool {
-        Keyword.self is any CustomComputeKeyword.Type
+        K.self is any CustomComputeKeyword.Type
     }
 
     func computableRoutes(

@@ -1,14 +1,14 @@
 public struct AnyReturnsFunction: ReturnsKeyword {
-    public let keyword: String
+    public let name: String
     private let valueImplementation: @Sendable (JSON) async throws -> JSON
     private let valuesImplementation: @Sendable (JSON) -> AsyncStream<Result<JSON, JSONError>>
 
     public init(
-        keyword: String,
+        name: String,
         value: @escaping @Sendable (JSON) async throws -> JSON,
         values: @escaping @Sendable (JSON) -> AsyncStream<Result<JSON, JSONError>>
     ) {
-        self.keyword = keyword
+        self.name = name
         self.valueImplementation = value
         self.valuesImplementation = values
     }

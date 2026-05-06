@@ -1,20 +1,22 @@
-public struct Count: Codable, Equatable, Sendable {
-    public let of: JSON?
+extension Keyword {
+    public struct Count: Codable, Equatable, Sendable {
+        public let of: JSON?
 
-    public init(of: JSON? = nil) {
-        self.of = of
+        public init(of: JSON? = nil) {
+            self.of = of
+        }
     }
 }
 
-extension Count: ComputeKeyword {
-    public static let keyword = "count"
+extension Keyword.Count: ComputeKeyword {
+    public static let name = "count"
 
     public func compute() throws -> JSON {
         .int((of ?? .null).countValue)
     }
 }
 
-extension Count: CustomComputeKeyword {
+extension Keyword.Count: CustomComputeKeyword {
     func compute(
         context: Compute.Context,
         runtime: ComputeFunctionRuntime,
@@ -32,6 +34,6 @@ extension Count: CustomComputeKeyword {
         } catch {
             value = .null
         }
-        return try Count(of: value).compute()
+        return try Self(of: value).compute()
     }
 }

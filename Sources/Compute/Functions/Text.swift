@@ -1,34 +1,36 @@
-public struct Text: Codable, Equatable, Sendable {
-    public static let keyword = "text"
+extension Keyword {
+    public struct Text: Codable, Equatable, Sendable {
+        public static let name = "text"
 
-    public let from: From
+        public let from: From
 
-    public init(from: From) {
-        self.from = from
-    }
-
-    public struct From: Codable, Equatable, Sendable {
-        public let joining: Joining?
-
-        public init(joining: Joining? = nil) {
-            self.joining = joining
+        public init(from: From) {
+            self.from = from
         }
-    }
 
-    public struct Joining: Codable, Equatable, Sendable {
-        public let array: JSON
-        public let separator: JSON?
-        public let terminator: JSON?
+        public struct From: Codable, Equatable, Sendable {
+            public let joining: Joining?
 
-        public init(array: JSON, separator: JSON? = nil, terminator: JSON? = nil) {
-            self.array = array
-            self.separator = separator
-            self.terminator = terminator
+            public init(joining: Joining? = nil) {
+                self.joining = joining
+            }
+        }
+
+        public struct Joining: Codable, Equatable, Sendable {
+            public let array: JSON
+            public let separator: JSON?
+            public let terminator: JSON?
+
+            public init(array: JSON, separator: JSON? = nil, terminator: JSON? = nil) {
+                self.array = array
+                self.separator = separator
+                self.terminator = terminator
+            }
         }
     }
 }
 
-extension Text: ComputeKeyword {
+extension Keyword.Text: ComputeKeyword {
     public func compute() throws -> JSON {
         if let joining = from.joining {
             return try joining.compute()
@@ -36,7 +38,7 @@ extension Text: ComputeKeyword {
         throw JSONError("Expected text formatter")
     }
 }
-extension Text.Joining {
+extension Keyword.Text.Joining {
     func compute() throws -> JSON {
         guard case .array(let values) = array else {
             throw JSONError("text.joining expected an array")

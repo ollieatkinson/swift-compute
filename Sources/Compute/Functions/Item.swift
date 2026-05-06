@@ -1,12 +1,14 @@
-public struct Item: Equatable, Sendable {
-    public let path: [ComputeRoute.Component]
+extension Keyword {
+    public struct Item: Equatable, Sendable {
+        public let path: [ComputeRoute.Component]
 
-    public init(_ path: [ComputeRoute.Component]) {
-        self.path = path
+        public init(_ path: [ComputeRoute.Component]) {
+            self.path = path
+        }
     }
 }
 
-extension Item: Codable {
+extension Keyword.Item: Codable {
     public init(from decoder: Decoder) throws {
         var container = try decoder.unkeyedContainer()
         var path: [ComputeRoute.Component] = []
@@ -29,8 +31,8 @@ extension Item: Codable {
     }
 }
 
-extension Item: ComputeKeyword {
-    public static let keyword = "item"
+extension Keyword.Item: ComputeKeyword {
+    public static let name = "item"
 
     public func compute() throws -> JSON {
         let source = ComputeTaskLocal.context.item ?? .null

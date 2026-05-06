@@ -1,15 +1,17 @@
-public struct Yes: Codable, Equatable, Sendable {
-    public let `if`: JSON?
-    public let unless: JSON?
+extension Keyword {
+    public struct Yes: Codable, Equatable, Sendable {
+        public let `if`: JSON?
+        public let unless: JSON?
 
-    public init(if conditions: JSON? = nil, unless exceptions: JSON? = nil) {
-        self.if = conditions
-        self.unless = exceptions
+        public init(if conditions: JSON? = nil, unless exceptions: JSON? = nil) {
+            self.if = conditions
+            self.unless = exceptions
+        }
     }
 }
 
-extension Yes: ComputeKeyword {
-    public static let keyword = "yes"
+extension Keyword.Yes: ComputeKeyword {
+    public static let name = "yes"
 
     public func compute() throws -> JSON {
         let conditions = `if`?.conditionList ?? []

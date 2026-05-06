@@ -1,7 +1,7 @@
 import Foundation
 import AnyCoding
 
-public enum JSON: Equatable, Sendable {
+public enum JSON: Equatable, Hashable, Sendable {
     case null
     case bool(Bool)
     case int(Int)
@@ -200,7 +200,7 @@ private final class JSONAnyEncoder: AnyEncoder {
         if let value = value as? JSON {
             return value.any
         }
-        if let value = value as? Item {
+        if let value = value as? Keyword.Item {
             return value.path.map(\.json.any)
         }
         if let values = value as? [Any] {
@@ -216,7 +216,7 @@ private final class JSONAnyEncoder: AnyEncoder {
         switch value {
         case let value as JSON:
             return value.any
-        case let value as Item:
+        case let value as Keyword.Item:
             return value.path.map(\.json.any)
         case is NSNull:
             return NSNull()

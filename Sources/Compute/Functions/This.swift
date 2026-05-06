@@ -1,22 +1,24 @@
-public struct This: Codable, Equatable, Sendable {
-    public let value: JSON
-    public let condition: JSON?
+extension Keyword {
+    public struct This: Codable, Equatable, Sendable {
+        public let value: JSON
+        public let condition: JSON?
 
-    public init(value: JSON, condition: JSON? = nil) {
-        self.value = value
-        self.condition = condition
+        public init(value: JSON, condition: JSON? = nil) {
+            self.value = value
+            self.condition = condition
+        }
     }
 }
 
-extension This: ComputeKeyword {
-    public static let keyword = "this"
+extension Keyword.This: ComputeKeyword {
+    public static let name = "this"
 
     public func compute() throws -> JSON {
         try selectedValue() ?? .null
     }
 }
 
-extension This {
+extension Keyword.This {
     func selectedValue() throws -> JSON? {
         let condition = try condition?.decode(Bool.self) ?? true
         guard condition else { return nil }
@@ -24,7 +26,7 @@ extension This {
     }
 }
 
-extension This: CustomComputeKeyword {
+extension Keyword.This: CustomComputeKeyword {
     func compute(
         context: Compute.Context,
         runtime: ComputeFunctionRuntime,

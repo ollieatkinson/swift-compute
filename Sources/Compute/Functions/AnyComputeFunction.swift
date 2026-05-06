@@ -1,12 +1,12 @@
 public struct AnyComputeFunction: AnyReturnsKeyword {
-    public let keyword: String
+    public let name: String
     private let valueImplementation: @Sendable (JSON) throws -> JSON
 
     public init(
-        keyword: String,
+        name: String,
         value: @escaping @Sendable (JSON) throws -> JSON
     ) {
-        self.keyword = keyword
+        self.name = name
         self.valueImplementation = value
     }
 

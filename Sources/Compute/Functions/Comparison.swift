@@ -1,56 +1,94 @@
 import Foundation
 
-public struct Comparison: Codable, Equatable, Sendable {
-    public var match: Match?
-    public var equal: Equal?
-    public var less: Less?
-    public var greater: Greater?
-    public var less_or_equal: LessOrEqual?
-    public var greater_or_equal: GreaterOrEqual?
+extension Keyword {
+    public struct Comparison: Codable, Equatable, Sendable {
+        public var match: Match?
+        public var equal: Equal?
+        public var less: Less?
+        public var greater: Greater?
+        public var less_or_equal: LessOrEqual?
+        public var greater_or_equal: GreaterOrEqual?
 
-    public init(
-        match: Match? = nil,
-        equal: Equal? = nil,
-        less: Less? = nil,
-        greater: Greater? = nil,
-        less_or_equal: LessOrEqual? = nil,
-        greater_or_equal: GreaterOrEqual? = nil
-    ) {
-        self.match = match
-        self.equal = equal
-        self.less = less
-        self.greater = greater
-        self.less_or_equal = less_or_equal
-        self.greater_or_equal = greater_or_equal
+        public init(
+            match: Match? = nil,
+            equal: Equal? = nil,
+            less: Less? = nil,
+            greater: Greater? = nil,
+            less_or_equal: LessOrEqual? = nil,
+            greater_or_equal: GreaterOrEqual? = nil
+        ) {
+            self.match = match
+            self.equal = equal
+            self.less = less
+            self.greater = greater
+            self.less_or_equal = less_or_equal
+            self.greater_or_equal = greater_or_equal
+        }
     }
 
-    public static func match(lhs: JSON, rhs: JSON) -> Comparison {
-        Comparison(match: Match(lhs: lhs, rhs: rhs))
+    public struct Match: Codable, Equatable, Sendable, OperandPair {
+        public let lhs: JSON
+        public let rhs: JSON
+
+        public init(lhs: JSON, rhs: JSON) {
+            self.lhs = lhs
+            self.rhs = rhs
+        }
     }
 
-    public static func equal(lhs: JSON, rhs: JSON) -> Comparison {
-        Comparison(equal: Equal(lhs: lhs, rhs: rhs))
+    public struct Equal: Codable, Equatable, Sendable, OperandPair {
+        public let lhs: JSON
+        public let rhs: JSON
+
+        public init(lhs: JSON, rhs: JSON) {
+            self.lhs = lhs
+            self.rhs = rhs
+        }
     }
 
-    public static func less(lhs: JSON, rhs: JSON) -> Comparison {
-        Comparison(less: Less(lhs: lhs, rhs: rhs))
+    public struct Less: Codable, Equatable, Sendable, OperandPair {
+        public let lhs: JSON
+        public let rhs: JSON
+
+        public init(lhs: JSON, rhs: JSON) {
+            self.lhs = lhs
+            self.rhs = rhs
+        }
     }
 
-    public static func greater(lhs: JSON, rhs: JSON) -> Comparison {
-        Comparison(greater: Greater(lhs: lhs, rhs: rhs))
+    public struct Greater: Codable, Equatable, Sendable, OperandPair {
+        public let lhs: JSON
+        public let rhs: JSON
+
+        public init(lhs: JSON, rhs: JSON) {
+            self.lhs = lhs
+            self.rhs = rhs
+        }
     }
 
-    public static func lessOrEqual(lhs: JSON, rhs: JSON) -> Comparison {
-        Comparison(less_or_equal: LessOrEqual(lhs: lhs, rhs: rhs))
+    public struct LessOrEqual: Codable, Equatable, Sendable, OperandPair {
+        public let lhs: JSON
+        public let rhs: JSON
+
+        public init(lhs: JSON, rhs: JSON) {
+            self.lhs = lhs
+            self.rhs = rhs
+        }
     }
 
-    public static func greaterOrEqual(lhs: JSON, rhs: JSON) -> Comparison {
-        Comparison(greater_or_equal: GreaterOrEqual(lhs: lhs, rhs: rhs))
+    public struct GreaterOrEqual: Codable, Equatable, Sendable, OperandPair {
+        public let lhs: JSON
+        public let rhs: JSON
+
+        public init(lhs: JSON, rhs: JSON) {
+            self.lhs = lhs
+            self.rhs = rhs
+        }
     }
 }
 
-extension Comparison: ComputeKeyword {
-    public static let keyword = "comparison"
+extension Keyword.Comparison: ComputeKeyword {
+    public static let name = "comparison"
 
     public func compute() throws -> JSON {
         if let match {
@@ -75,18 +113,8 @@ extension Comparison: ComputeKeyword {
     }
 }
 
-public struct Match: Codable, Equatable, Sendable, OperandPair {
-    public let lhs: JSON
-    public let rhs: JSON
-
-    public init(lhs: JSON, rhs: JSON) {
-        self.lhs = lhs
-        self.rhs = rhs
-    }
-}
-
-extension Match: ComputeKeyword {
-    public static let keyword = "match"
+extension Keyword.Match: ComputeKeyword {
+    public static let name = "match"
 
     public func compute() throws -> JSON {
         let lhs = try self.lhs.decode(String.self)
@@ -95,90 +123,40 @@ extension Match: ComputeKeyword {
     }
 }
 
-public struct Equal: Codable, Equatable, Sendable, OperandPair {
-    public let lhs: JSON
-    public let rhs: JSON
-
-    public init(lhs: JSON, rhs: JSON) {
-        self.lhs = lhs
-        self.rhs = rhs
-    }
-}
-
-extension Equal: ComputeKeyword {
-    public static let keyword = "equal"
+extension Keyword.Equal: ComputeKeyword {
+    public static let name = "equal"
 
     public func compute() throws -> JSON {
         .bool(lhs == rhs)
     }
 }
 
-public struct Less: Codable, Equatable, Sendable, OperandPair {
-    public let lhs: JSON
-    public let rhs: JSON
-
-    public init(lhs: JSON, rhs: JSON) {
-        self.lhs = lhs
-        self.rhs = rhs
-    }
-}
-
-extension Less: ComputeKeyword {
-    public static let keyword = "less"
+extension Keyword.Less: ComputeKeyword {
+    public static let name = "less"
 
     public func compute() throws -> JSON {
         try orderedComparison(string: <, number: <)
     }
 }
 
-public struct Greater: Codable, Equatable, Sendable, OperandPair {
-    public let lhs: JSON
-    public let rhs: JSON
-
-    public init(lhs: JSON, rhs: JSON) {
-        self.lhs = lhs
-        self.rhs = rhs
-    }
-}
-
-extension Greater: ComputeKeyword {
-    public static let keyword = "greater"
+extension Keyword.Greater: ComputeKeyword {
+    public static let name = "greater"
 
     public func compute() throws -> JSON {
         try orderedComparison(string: >, number: >)
     }
 }
 
-public struct LessOrEqual: Codable, Equatable, Sendable, OperandPair {
-    public let lhs: JSON
-    public let rhs: JSON
-
-    public init(lhs: JSON, rhs: JSON) {
-        self.lhs = lhs
-        self.rhs = rhs
-    }
-}
-
-extension LessOrEqual: ComputeKeyword {
-    public static let keyword = "less_or_equal"
+extension Keyword.LessOrEqual: ComputeKeyword {
+    public static let name = "less_or_equal"
 
     public func compute() throws -> JSON {
         try orderedComparison(string: <=, number: <=)
     }
 }
 
-public struct GreaterOrEqual: Codable, Equatable, Sendable, OperandPair {
-    public let lhs: JSON
-    public let rhs: JSON
-
-    public init(lhs: JSON, rhs: JSON) {
-        self.lhs = lhs
-        self.rhs = rhs
-    }
-}
-
-extension GreaterOrEqual: ComputeKeyword {
-    public static let keyword = "greater_or_equal"
+extension Keyword.GreaterOrEqual: ComputeKeyword {
+    public static let name = "greater_or_equal"
 
     public func compute() throws -> JSON {
         try orderedComparison(string: >=, number: >=)
