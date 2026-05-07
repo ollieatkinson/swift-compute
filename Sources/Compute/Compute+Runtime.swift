@@ -379,7 +379,7 @@ extension Compute {
         }
 
         private func publish(_ state: JSON) {
-            for (route, _) in routeContinuations {
+            for route in Array(routeContinuations.keys) {
                 let result: Result<JSON, JSONError>
                 if let value = state.value(at: route) {
                     result = .success(value)
