@@ -3,7 +3,7 @@ import Testing
 
 @Suite(.serialized)
 struct ExplainTests {
-    @Test func returnsTheComputedValueWithDisplayableThoughts() async throws {
+    @Test func returns_the_computed_value_with_displayable_thoughts() async throws {
         let json: JSON = [
             "{returns}": [
                 "explain": [
@@ -44,7 +44,7 @@ struct ExplainTests {
         ])
     }
 
-    @Test func returnsAUsefulPayloadWhenTheExplainedValueFails() async throws {
+    @Test func returns_a_useful_payload_when_the_explained_value_fails() async throws {
         let json: JSON = [
             "{returns}": [
                 "explain": [

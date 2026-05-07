@@ -4,7 +4,7 @@ import Testing
 @Suite(.serialized)
 struct ExistsTests {
 
-    @Test func evaluatesResolvedValuesAndMissingValues() async throws {
+    @Test func evaluates_resolved_values_and_missing_values() async throws {
         try await expect([
             "{returns}": [
                 "exists": [
@@ -21,7 +21,7 @@ struct ExistsTests {
         ], in: Compute.Context(item: users[0]), equals: false)
     }
 
-    @Test func reactsToReferenceChanges() async throws {
+    @Test func reacts_to_reference_changes() async throws {
         let references = TestReferences()
         let runtime = try runtime([
             "{returns}": [

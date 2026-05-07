@@ -4,7 +4,7 @@ import Testing
 @Suite(.serialized)
 struct MapTests {
 
-    @Test func copiesValuesFromItsLocalItemContext() async throws {
+    @Test func copies_values_from_its_local_item_context() async throws {
         try await expect(["{returns}": ["map": ["src": 4]]], equals: 4)
         try await expect(
             [
@@ -64,7 +64,7 @@ struct MapTests {
         )
     }
 
-    @Test func mapsIdentityEmptySourcesComputedCopiesAndIndexedPaths() async throws {
+    @Test func maps_identity_empty_sources_computed_copies_and_indexed_paths() async throws {
         try await expect([
             "{returns}": [
                 "map": [
@@ -145,7 +145,7 @@ struct MapTests {
         ])
     }
 
-    @Test func copiesComputedExistsIntoNestedOutput() async throws {
+    @Test func copies_computed_exists_into_nested_output() async throws {
         let json: JSON = [
             "{returns}": [
                 "map": [

@@ -4,7 +4,7 @@ import Testing
 @Suite(.serialized)
 struct ContainsTests {
 
-    @Test func evaluatesStringContainment() async throws {
+    @Test func evaluates_string_containment() async throws {
         let json: JSON = [
             "{returns}": [
                 "contains": [

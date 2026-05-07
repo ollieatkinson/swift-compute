@@ -4,7 +4,7 @@ import Testing
 @Suite
 struct ComputerTests {
 
-    @Test func classifiesKeywordsFromReturnsJSON() throws {
+    @Test func classifies_keywords_from_returns_json() throws {
         let references = TestReferences()
         let computer = Computer.default.merging([
             Keyword.From.Function(references: references),

@@ -5,7 +5,7 @@ import Testing
 @Suite(.serialized)
 struct HTTPTests {
 
-    @Test func performsResolvedRequestsAsAnAsyncReturnsKeyword() async throws {
+    @Test func performs_resolved_requests_as_an_async_returns_keyword() async throws {
         let json: JSON = [
             "{returns}": [
                 "http": [
@@ -53,7 +53,7 @@ struct HTTPTests {
         ])
     }
 
-    @Test func recomputesRequestURLWhenReferencedURLChanges() async throws {
+    @Test func recomputes_request_url_when_referenced_url_changes() async throws {
         let references = TestReferences()
         await references.set("users_url", to: "https://example.com/users")
         let requests = HTTPRequestProbe()
@@ -96,7 +96,7 @@ struct HTTPTests {
         await runtime.cancel()
     }
 
-    @Test func returnsPlainTextBodiesWhenResponseIsNotJSON() async throws {
+    @Test func returns_plain_text_bodies_when_response_is_not_json() async throws {
         let function = Keyword.HTTP.Function { _ in
             Keyword.HTTP.Response(data: Data("accepted".utf8), status: 202)
         }

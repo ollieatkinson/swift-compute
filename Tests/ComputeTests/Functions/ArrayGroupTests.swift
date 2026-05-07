@@ -3,7 +3,7 @@ import Testing
 @Suite(.serialized)
 struct ArrayGroupTests {
 
-    @Test func groupsIntoCountsWithOverflowPolicies() async throws {
+    @Test func groups_into_counts_with_overflow_policies() async throws {
         try await expect([
             "{returns}": [
                 "array_group": [
@@ -30,7 +30,7 @@ struct ArrayGroupTests {
         ], equals: [[1], [2, 3], [4, 5, 6], [7, 8, 9]])
     }
 
-    @Test func groupsByComputedItemValueAndOrdersGroups() async throws {
+    @Test func groups_by_computed_item_value_and_orders_groups() async throws {
         try await expect([
             "{returns}": [
                 "array_group": [
@@ -51,7 +51,7 @@ struct ArrayGroupTests {
         ])
     }
 
-    @Test func resolvesComputedIntoOptions() async throws {
+    @Test func resolves_computed_into_options() async throws {
         try await expect([
             "{returns}": [
                 "array_group": [

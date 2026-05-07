@@ -3,7 +3,7 @@ import Testing
 
 @Suite(.serialized)
 struct BrainRuntimeBehaviorTests {
-    @Test func runtimeStepsThroughLeafComputesBeforeReplacingTheRoot() async throws {
+    @Test func runtime_steps_through_leaf_computes_before_replacing_the_root() async throws {
         let references = TestReferences()
         await references.set("minimum_age", to: 36)
         let json: JSON = [
@@ -51,7 +51,7 @@ struct BrainRuntimeBehaviorTests {
         await runtime.cancel()
     }
 
-    @Test func runtimeThoughtsDescribeDefaultValues() async throws {
+    @Test func runtime_thoughts_describe_default_values() async throws {
         let json: JSON = [
             "{returns}": [
                 "this": [
@@ -71,7 +71,7 @@ struct BrainRuntimeBehaviorTests {
         await runtime.cancel()
     }
 
-    @Test func runtimeStepsTheJSONStateAfterEachPropagationWave() async throws {
+    @Test func runtime_steps_the_json_state_after_each_propagation_wave() async throws {
         let references = TestReferences()
         await references.set("minimum_age", to: 36)
         let json: JSON = [
@@ -108,7 +108,7 @@ struct BrainRuntimeBehaviorTests {
         await runtime.cancel()
     }
 
-    @Test func runtimeStepsThroughSixMixedSyncAndAsyncComputes() async throws {
+    @Test func runtime_steps_through_six_mixed_sync_and_async_computes() async throws {
         let references = TestReferences()
         await references.set("minimum_age", to: 36)
         await references.set("manual_review", to: true)
@@ -207,7 +207,7 @@ struct BrainRuntimeBehaviorTests {
         await runtime.cancel()
     }
 
-    @Test func runtimeStepObservesAllReadyComputesFromTheDeepestWave() async throws {
+    @Test func runtime_step_observes_all_ready_computes_from_the_deepest_wave() async throws {
         let json: JSON = [
             "left": ["{returns}": ["comparison": ["equal": ["lhs": 1, "rhs": 1]]]],
             "right": ["{returns}": ["comparison": ["equal": ["lhs": 1, "rhs": 2]]]],
@@ -223,7 +223,7 @@ struct BrainRuntimeBehaviorTests {
         #expect(step.remainingThoughts == 0)
     }
 
-    @Test func runtimeRunKeepsTheBrainAliveForFutureReferenceUpdates() async throws {
+    @Test func runtime_run_keeps_the_brain_alive_for_future_reference_updates() async throws {
         let references = TestReferences()
         await references.set("minimum_age", to: 38)
         let json: JSON = [
@@ -251,7 +251,7 @@ struct BrainRuntimeBehaviorTests {
         await runtime.cancel()
     }
 
-    @Test func localContextComputesResolveAsTheirOwnPond() async throws {
+    @Test func local_context_computes_resolve_as_their_own_pond() async throws {
         let json: JSON = [
             "{returns}": [
                 "array_filter": [
@@ -281,7 +281,7 @@ struct BrainRuntimeBehaviorTests {
         #expect(await runtime.remainingThoughtCount == 0)
     }
 
-    @Test func complexLocalComputeRecordsNestedReturnsInTheSameBrainStep() async throws {
+    @Test func complex_local_compute_records_nested_returns_in_the_same_brain_step() async throws {
         let references = TestReferences()
         await references.set("minimum_age", to: 36)
         await references.set("city", to: "Manchester")
@@ -343,7 +343,7 @@ struct BrainRuntimeBehaviorTests {
         await runtime.cancel()
     }
 
-    @Test func complexLocalComputeReactsToEveryNestedReturnsValueChanging() async throws {
+    @Test func complex_local_compute_reacts_to_every_nested_returns_value_changing() async throws {
         let references = TestReferences()
         await references.set("minimum_age", to: 36)
         await references.set("city", to: "Manchester")
@@ -405,7 +405,7 @@ struct BrainRuntimeBehaviorTests {
         await runtime.cancel()
     }
 
-    @Test func customComputeFunctionsCanBeStandaloneRuntimeNodes() async throws {
+    @Test func custom_compute_functions_can_be_standalone_runtime_nodes() async throws {
         let document: JSON = [
             "value": ["{returns}": ["echo": "typed function"]],
         ]

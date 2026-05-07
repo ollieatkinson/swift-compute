@@ -4,7 +4,7 @@ import Testing
 
 @Suite(.serialized)
 struct BrainTests {
-    @Test func commitsBoundedThoughtsUntilSettled() async throws {
+    @Test func commits_bounded_thoughts_until_settled() async throws {
         let brain = Brain<String, Int>(
             [
                 .init("adult", inputs: ["age"]),
@@ -31,7 +31,7 @@ struct BrainTests {
         await brain.cancelStreams()
     }
 
-    @Test func propagatesThroughDependentConceptsAcrossWaves() async throws {
+    @Test func propagates_through_dependent_concepts_across_waves() async throws {
         let graph = arithmeticGraph(
             [
                 "a + b + c": .sum("a", "b", "c"),
@@ -60,7 +60,7 @@ struct BrainTests {
         await graph.cancelStreams()
     }
 
-    @Test func selfDependentConceptAdvancesOneWaveAtATime() async throws {
+    @Test func self_dependent_concept_advances_one_wave_at_a_time() async throws {
         let graph = arithmeticGraph(
             [
                 "x": .sum("x", "increment"),
@@ -87,7 +87,7 @@ struct BrainTests {
         await graph.cancelStreams()
     }
 
-    @Test func blankBrainCommitsStagedValuesWithoutConcepts() async throws {
+    @Test func blank_brain_commits_staged_values_without_concepts() async throws {
         let brain = Brain<String, Int>(
             [],
             remainingThoughts: { _ in 0 }
@@ -103,7 +103,7 @@ struct BrainTests {
         await brain.cancelStreams()
     }
 
-    @Test func gameOfLifeBlinkerOscillatesOneGenerationPerCommit() async throws {
+    @Test func game_of_life_blinker_oscillates_one_generation_per_commit() async throws {
         let cells = Cell.board(width: 5, height: 5)
         let vertical: Set<Cell> = [
             Cell(2, 1),

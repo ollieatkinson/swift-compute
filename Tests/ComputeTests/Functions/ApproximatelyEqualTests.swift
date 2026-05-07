@@ -4,7 +4,7 @@ import Testing
 @Suite(.serialized)
 struct ApproximatelyEqualTests {
 
-    @Test func evaluatesNumericAccuracy() async throws {
+    @Test func evaluates_numeric_accuracy() async throws {
         try await expect(
             [
                 "{returns}": [

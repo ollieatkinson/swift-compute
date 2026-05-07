@@ -3,7 +3,7 @@ import Testing
 @Suite(.serialized)
 struct ArrayFilterTests {
 
-    @Test func evaluatesThePredicateForEachItem() async throws {
+    @Test func evaluates_the_predicate_for_each_item() async throws {
         try await expect(
             [
                 "{returns}": [
@@ -90,7 +90,7 @@ struct ArrayFilterTests {
         )
     }
 
-    @Test func filtersPrimitivesObjectsCountsAndMissingFields() async throws {
+    @Test func filters_primitives_objects_counts_and_missing_fields() async throws {
         try await expect([
             "{returns}": [
                 "array_filter": [
@@ -190,7 +190,7 @@ struct ArrayFilterTests {
         ])
     }
 
-    @Test func filtersWithDefaultsAndComputedArrayInputs() async throws {
+    @Test func filters_with_defaults_and_computed_array_inputs() async throws {
         try await expect([
             "{returns}": [
                 "array_filter": [
