@@ -12,7 +12,7 @@ struct EvalTests {
                     "context": ["count": 40],
                 ],
             ],
-        ], functions: [Compute.Keywords.Eval.function]) == 42)
+        ], functions: [Compute.Keyword.Eval.function]) == 42)
     }
 
     @Test func supports_computed_expression_and_context() async throws {
@@ -26,7 +26,7 @@ struct EvalTests {
                     ],
                 ],
             ],
-        ], functions: [Compute.Keywords.Eval.function]) == 42)
+        ], functions: [Compute.Keyword.Eval.function]) == 42)
     }
 
     @Test func is_not_part_of_the_default_computer() throws {

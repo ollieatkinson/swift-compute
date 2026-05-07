@@ -1,4 +1,4 @@
-extension Compute.Keywords {
+extension Compute.Keyword {
     public struct ArraySlice: Codable, Equatable, Sendable {
         public static let name = "array_slice"
 
@@ -9,7 +9,7 @@ extension Compute.Keywords {
     }
 }
 
-extension Compute.Keywords.ArraySlice: Compute.Keyword {
+extension Compute.Keyword.ArraySlice: Compute.KeywordDefinition {
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let of = try await $of.compute(in: frame)
         guard case .array(let values) = of else {

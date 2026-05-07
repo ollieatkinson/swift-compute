@@ -1,12 +1,12 @@
-extension Compute.Keywords {
+extension Compute.Keyword {
     public struct Either: Equatable, Sendable {
         public let branches: [This]
     }
 }
 
-extension Compute.Keywords.Either: Codable {
+extension Compute.Keyword.Either: Codable {
     public init(from decoder: Decoder) throws {
-        self.branches = try [Compute.Keywords.This](from: decoder)
+        self.branches = try [Compute.Keyword.This](from: decoder)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -14,7 +14,7 @@ extension Compute.Keywords.Either: Codable {
     }
 }
 
-extension Compute.Keywords.Either: Compute.Keyword {
+extension Compute.Keyword.Either: Compute.KeywordDefinition {
     public static let name = "either"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {

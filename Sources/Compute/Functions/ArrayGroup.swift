@@ -1,6 +1,6 @@
 import Algorithms
 
-extension Compute.Keywords {
+extension Compute.Keyword {
     public struct ArrayGroup: Codable, Equatable, Sendable {
         public static let name = "array_group"
 
@@ -32,7 +32,7 @@ extension Compute.Keywords {
     }
 }
 
-extension Compute.Keywords.ArrayGroup: Compute.Keyword {
+extension Compute.Keyword.ArrayGroup: Compute.KeywordDefinition {
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let source = try await $array.compute(in: frame)
@@ -59,12 +59,12 @@ extension Compute.Keywords.ArrayGroup: Compute.Keyword {
             keyedItems.append(KeyedItem(index: index, key: key, value: value))
         }
         let orderValue = try await by.$order.compute(in: frame)
-        let order = try orderValue?.decode(Compute.Keywords.ArraySort.Order.self) ?? .ascending
+        let order = try orderValue?.decode(Compute.Keyword.ArraySort.Order.self) ?? .ascending
         return .array(try ItemGroup.groups(from: keyedItems).elements(ordered: order).map(JSON.array))
     }
 }
 
-extension Compute.Keywords.ArrayGroup {
+extension Compute.Keyword.ArrayGroup {
     fileprivate enum GroupingMode {
         case into(Into)
         case by(By)
@@ -198,9 +198,9 @@ extension Compute.Keywords.ArrayGroup {
     }
 }
 
-private extension Array where Element == Compute.Keywords.ArrayGroup.ItemGroup {
-    func elements(ordered order: Compute.Keywords.ArraySort.Order) throws -> [[JSON]] {
-        let predicate = Compute.Keywords.ArraySort.Predicate(order: order)
+private extension Array where Element == Compute.Keyword.ArrayGroup.ItemGroup {
+    func elements(ordered order: Compute.Keyword.ArraySort.Order) throws -> [[JSON]] {
+        let predicate = Compute.Keyword.ArraySort.Predicate(order: order)
         return try sorted { lhs, rhs in
             (try predicate.areInIncreasingOrder(lhs.key, rhs.key)) ?? (lhs.offset < rhs.offset)
         }.map(\.elements)

@@ -55,12 +55,14 @@ public protocol AnyReturnsKeyword: Sendable {
 }
 
 extension Compute {
-    public protocol Keyword: Codable, Equatable, Sendable {
+    public protocol KeywordDefinition: Codable, Equatable, Sendable {
         static var name: String { get }
         func compute(in frame: Compute.Frame) async throws -> JSON?
     }
+}
 
-    public struct KeywordFunction<K: Keyword>: AnyReturnsKeyword {
+extension Compute.Keyword {
+    public struct Function<K: Compute.KeywordDefinition>: AnyReturnsKeyword {
         public var name: String {
             K.name
         }
@@ -73,9 +75,9 @@ extension Compute {
     }
 }
 
-extension Compute.Keyword {
-    public static var function: Compute.KeywordFunction<Self> {
-        Compute.KeywordFunction()
+extension Compute.KeywordDefinition {
+    public static var function: Compute.Keyword.Function<Self> {
+        Compute.Keyword.Function()
     }
 }
 

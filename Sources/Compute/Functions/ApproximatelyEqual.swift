@@ -1,4 +1,4 @@
-extension Compute.Keywords {
+extension Compute.Keyword {
     public struct ApproximatelyEqual: Codable, Equatable, Sendable {
         @Computed public var lhs: JSON
         @Computed public var rhs: JSON
@@ -6,7 +6,7 @@ extension Compute.Keywords {
     }
 }
 
-extension Compute.Keywords.ApproximatelyEqual: Compute.Keyword {
+extension Compute.Keyword.ApproximatelyEqual: Compute.KeywordDefinition {
     public static let name = "approximately_equal"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {

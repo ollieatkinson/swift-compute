@@ -1,4 +1,4 @@
-extension Compute.Keywords {
+extension Compute.Keyword {
     public struct Not: Codable, Equatable, Sendable {
         public let value: JSON
 
@@ -16,7 +16,7 @@ extension Compute.Keywords {
     }
 }
 
-extension Compute.Keywords.Not: Compute.Keyword {
+extension Compute.Keyword.Not: Compute.KeywordDefinition {
     public static let name = "not"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {

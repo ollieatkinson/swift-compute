@@ -75,7 +75,7 @@ let document: JSON = [
 let runtime = Compute.Runtime(
     document: document,
     functions: [
-        Compute.Keywords.From.Function(references: deviceReferences),
+        Compute.Keyword.From.Function(references: deviceReferences),
     ]
 )
 
@@ -194,7 +194,7 @@ let document: JSON = [
 let runtime = Compute.Runtime(
     document: document,
     functions: [
-        Compute.Keywords.From.Function(references: deviceReferences),
+        Compute.Keyword.From.Function(references: deviceReferences),
     ]
 )
 
@@ -222,9 +222,9 @@ The default computer includes keywords for:
 - text formatting with `text`
 - HTTP values with `http`
 
-Reference values can be added with `Compute.Keywords.From.Function(references:)`. JavaScript evaluation can be added explicitly with `Compute.Keywords.Eval.function`.
+Reference values can be added with `Compute.Keyword.From.Function(references:)`. JavaScript evaluation can be added explicitly with `Compute.Keyword.Eval.function`.
 
-Custom keywords can be added by conforming to `Compute.Keyword` or `AnyReturnsKeyword`, declaring a `name`, and passing them into `Compute.Runtime`.
+Custom keywords can be added by conforming to `Compute.KeywordDefinition` or `AnyReturnsKeyword`, declaring a `name`, and passing them into `Compute.Runtime`.
 
 `array_reduce` evaluates `next` once per element. During each iteration, the local `item` context contains `item`, `index`, and `accumulator`.
 

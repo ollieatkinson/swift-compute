@@ -2,38 +2,38 @@ public struct Computer: Sendable {
     public let functions: [String: any AnyReturnsKeyword]
 
     public static let `default` = Computer([
-        Compute.Keywords.This.function,
-        Compute.Keywords.Yes.function,
-        Compute.Keywords.Contains.function,
-        Compute.Keywords.Membership.function,
-        Compute.Keywords.ApproximatelyEqual.function,
-        Compute.Keywords.Comparison.function,
-        Compute.Keywords.Not.function,
-        Compute.Keywords.Either.function,
-        Compute.Keywords.Explain.function,
-        Compute.Keywords.Error.function,
-        Compute.Keywords.HTTP.Function(),
-        Compute.Keywords.Text.function,
-        Compute.Keywords.Item.function,
-        Compute.Keywords.Count.function,
-        Compute.Keywords.Exists.function,
-        Compute.Keywords.Map.function,
-        Compute.Keywords.ArraySort.function,
-        Compute.Keywords.ArraySlice.function,
-        Compute.Keywords.ArraySubscript.function,
-        Compute.Keywords.ArrayZip.function,
-        Compute.Keywords.ArrayGroup.function,
-        Compute.Keywords.ArrayMap.function,
-        Compute.Keywords.ArrayFilter.function,
-        Compute.Keywords.ArrayReduce.function,
+        Compute.Keyword.This.function,
+        Compute.Keyword.Yes.function,
+        Compute.Keyword.Contains.function,
+        Compute.Keyword.Membership.function,
+        Compute.Keyword.ApproximatelyEqual.function,
+        Compute.Keyword.Comparison.function,
+        Compute.Keyword.Not.function,
+        Compute.Keyword.Either.function,
+        Compute.Keyword.Explain.function,
+        Compute.Keyword.Error.function,
+        Compute.Keyword.HTTP.Function(),
+        Compute.Keyword.Text.function,
+        Compute.Keyword.Item.function,
+        Compute.Keyword.Count.function,
+        Compute.Keyword.Exists.function,
+        Compute.Keyword.Map.function,
+        Compute.Keyword.ArraySort.function,
+        Compute.Keyword.ArraySlice.function,
+        Compute.Keyword.ArraySubscript.function,
+        Compute.Keyword.ArrayZip.function,
+        Compute.Keyword.ArrayGroup.function,
+        Compute.Keyword.ArrayMap.function,
+        Compute.Keyword.ArrayFilter.function,
+        Compute.Keyword.ArrayReduce.function,
     ])
 
     public init(_ functions: [any AnyReturnsKeyword] = []) {
         self.functions = Dictionary(functions.map { ($0.name, $0) }, uniquingKeysWith: { _, last in last })
     }
 
-    public subscript(keyword: String) -> Keyword? {
-        functions[keyword].map { Keyword(name: keyword, function: $0) }
+    public subscript(keyword: String) -> RegisteredKeyword? {
+        functions[keyword].map { RegisteredKeyword(name: keyword, function: $0) }
     }
 
     public func merging(_ functions: [any AnyReturnsKeyword]) -> Computer {
@@ -42,7 +42,7 @@ public struct Computer: Sendable {
 }
 
 extension Computer {
-    public struct Keyword: Sendable {
+    public struct RegisteredKeyword: Sendable {
         public let name: String
         public let function: any AnyReturnsKeyword
 
@@ -56,13 +56,13 @@ extension Computer {
     }
 }
 
-extension Computer.Keyword: Equatable {
+extension Computer.RegisteredKeyword: Equatable {
     public static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.name == rhs.name
     }
 }
 
-extension Computer.Keyword {
+extension Computer.RegisteredKeyword {
     public init?(returns data: [String: JSON]?, computer: Computer = .default) {
         guard case .object(let returns)? = data?["{returns}"] else { return nil }
         guard returns.count == 1, let name = returns.keys.first else { return nil }

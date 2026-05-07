@@ -1,10 +1,10 @@
-extension Compute.Keywords {
+extension Compute.Keyword {
     public struct Exists: Codable, Equatable, Sendable {
         @Computed public var value: JSON?
     }
 }
 
-extension Compute.Keywords.Exists: Compute.Keyword {
+extension Compute.Keyword.Exists: Compute.KeywordDefinition {
     public static let name = "exists"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {

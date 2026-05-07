@@ -1,4 +1,4 @@
-extension Compute.Keywords {
+extension Compute.Keyword {
     public struct Map: Codable, Equatable, Sendable {
         @Computed public var src: JSON
         @Computed public var dst: JSON?
@@ -11,7 +11,7 @@ extension Compute.Keywords {
     }
 }
 
-extension Compute.Keywords.Map: Compute.Keyword {
+extension Compute.Keyword.Map: Compute.KeywordDefinition {
     public static let name = "map"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {

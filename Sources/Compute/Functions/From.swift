@@ -1,4 +1,4 @@
-extension Compute.Keywords {
+extension Compute.Keyword {
     public struct From: Codable, Equatable, Sendable {
         public static let name = "from"
 
@@ -22,9 +22,9 @@ extension Compute {
     }
 }
 
-extension Compute.Keywords.From {
+extension Compute.Keyword.From {
     public struct Function<References>: AnyReturnsKeyword where References: Compute.References {
-        public let name = Compute.Keywords.From.name
+        public let name = Compute.Keyword.From.name
         private let references: References
 
         public init(references: References) {
@@ -32,16 +32,16 @@ extension Compute.Keywords.From {
         }
 
         public func compute(data input: JSON, frame: Compute.Frame) async throws -> JSON? {
-            let from = try JSON.decoded(Compute.Keywords.From.self, from: input)
+            let from = try JSON.decoded(Compute.Keyword.From.self, from: input)
             return try await references.value(for: from.reference, context: from.context)
         }
     }
 }
 
-extension Compute.Keywords.From.Function: ReturnsKeyword where References: Compute.AsyncReferences {
+extension Compute.Keyword.From.Function: ReturnsKeyword where References: Compute.AsyncReferences {
     public func subject(data input: JSON, frame: Compute.Frame) -> AsyncStream<Result<JSON, JSONError>> {
         do {
-            let from = try JSON.decoded(Compute.Keywords.From.self, from: input)
+            let from = try JSON.decoded(Compute.Keyword.From.self, from: input)
             return references.values(for: from.reference, context: from.context)
         } catch {
             let (stream, continuation) = AsyncStream.makeStream(of: Result<JSON, JSONError>.self)

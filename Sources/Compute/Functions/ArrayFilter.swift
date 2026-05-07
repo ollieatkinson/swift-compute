@@ -1,11 +1,11 @@
-extension Compute.Keywords {
+extension Compute.Keyword {
     public struct ArrayFilter: Codable, Equatable, Sendable {
         @Computed public var array: JSON
         @Computed public var predicate: JSON
     }
 }
 
-extension Compute.Keywords.ArrayFilter: Compute.Keyword {
+extension Compute.Keyword.ArrayFilter: Compute.KeywordDefinition {
     public static let name = "array_filter"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {

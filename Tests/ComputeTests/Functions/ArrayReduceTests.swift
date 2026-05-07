@@ -66,7 +66,7 @@ struct ArrayReduceTests {
         ]
         let runtime = Compute.Runtime(
             document: json,
-            functions: [Compute.Keywords.From.Function(references: references), add]
+            functions: [Compute.Keyword.From.Function(references: references), add]
         )
         var stream = runtime.run().makeAsyncIterator()
 

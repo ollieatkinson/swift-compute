@@ -1,6 +1,6 @@
 import Foundation
 
-extension Compute.Keywords {
+extension Compute.Keyword {
     public struct HTTP: Codable, Equatable, Sendable {
         public static let name = "http"
 
@@ -64,7 +64,7 @@ extension Compute.Keywords {
 
             var json: JSON {
                 var object: [String: JSON] = [
-                    "body": Compute.Keywords.HTTP.bodyJSON(from: data),
+                    "body": Compute.Keyword.HTTP.bodyJSON(from: data),
                     "headers": .object(headers.mapValues(JSON.string)),
                 ]
                 if let url {
@@ -79,9 +79,9 @@ extension Compute.Keywords {
     }
 }
 
-extension Compute.Keywords.HTTP {
+extension Compute.Keyword.HTTP {
     public struct Function: ReturnsKeyword {
-        public let name = Compute.Keywords.HTTP.name
+        public let name = Compute.Keyword.HTTP.name
 
         private let perform: @Sendable (URLRequest) async throws -> Response
 
@@ -97,13 +97,13 @@ extension Compute.Keywords.HTTP {
         }
 
         public func compute(data input: JSON, frame: Compute.Frame) async throws -> JSON? {
-            let http = try JSON.decoded(Compute.Keywords.HTTP.self, from: input)
+            let http = try JSON.decoded(Compute.Keyword.HTTP.self, from: input)
             let request = try http.request.urlRequest()
             return try await perform(request).json
         }
     }
 }
-extension Compute.Keywords.HTTP.Request {
+extension Compute.Keyword.HTTP.Request {
     func urlRequest() throws -> URLRequest {
         let urlString = try url.decode(String.self)
         guard let url = URL(string: urlString) else {
@@ -147,7 +147,7 @@ extension Compute.Keywords.HTTP.Request {
     }
 }
 
-extension Compute.Keywords.HTTP {
+extension Compute.Keyword.HTTP {
     static func bodyJSON(from data: Data) -> JSON {
         guard !data.isEmpty else { return .null }
         if let value = try? JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed) {

@@ -1,11 +1,11 @@
-extension Compute.Keywords {
+extension Compute.Keyword {
     public struct Membership: Codable, Equatable, Sendable {
         @Computed public var lhs: JSON
         @Computed public var rhs: JSON
     }
 }
 
-extension Compute.Keywords.Membership: Compute.Keyword {
+extension Compute.Keyword.Membership: Compute.KeywordDefinition {
     public static let name = "membership"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {

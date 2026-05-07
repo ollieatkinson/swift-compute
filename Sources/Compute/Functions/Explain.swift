@@ -4,7 +4,7 @@ import Foundation
 import FoundationModels
 #endif
 
-extension Compute.Keywords {
+extension Compute.Keyword {
     public struct Explain: Codable, Equatable, Sendable {
         public enum Mode: String, Codable, Equatable, Sendable {
             case trace
@@ -32,7 +32,7 @@ extension Compute.Keywords {
     }
 }
 
-extension Compute.Keywords.Explain: Compute.Keyword {
+extension Compute.Keyword.Explain: Compute.KeywordDefinition {
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let capture = await frame.runtime.capture {
@@ -67,7 +67,7 @@ extension Compute.Keywords.Explain: Compute.Keyword {
     }
 }
 
-private extension Compute.Keywords.Explain {
+private extension Compute.Keyword.Explain {
     func naturalLanguageExplanation(computedValue: JSON, thoughts: [Compute.Thought], localItem: JSON?) async -> String? {
         guard mode == .foundationModel else { return nil }
 #if canImport(FoundationModels) && (os(iOS) || os(macOS))

@@ -1,13 +1,13 @@
-extension Compute.Keywords {
+extension Compute.Keyword {
     public struct ArrayMap: Codable, Equatable, Sendable {
         @Computed public var over: JSON
-        public let copy: [Compute.Keywords.Map.Copy]?
+        public let copy: [Compute.Keyword.Map.Copy]?
         @Computed public var into_self: JSON?
         @Computed public var flattened: JSON?
     }
 }
 
-extension Compute.Keywords.ArrayMap: Compute.Keyword {
+extension Compute.Keyword.ArrayMap: Compute.KeywordDefinition {
     public static let name = "array_map"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {

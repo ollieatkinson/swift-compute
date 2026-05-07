@@ -1,4 +1,4 @@
-extension Compute.Keywords {
+extension Compute.Keyword {
     public struct ArrayReduce: Codable, Equatable, Sendable {
         public static let name = "array_reduce"
 
@@ -8,7 +8,7 @@ extension Compute.Keywords {
     }
 }
 
-extension Compute.Keywords.ArrayReduce: Compute.Keyword {
+extension Compute.Keyword.ArrayReduce: Compute.KeywordDefinition {
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let source = try await $array.compute(in: frame)

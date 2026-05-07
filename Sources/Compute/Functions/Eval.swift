@@ -1,6 +1,6 @@
 import JavaScriptCore
 
-extension Compute.Keywords {
+extension Compute.Keyword {
     public struct Eval: Codable, Equatable, Sendable {
         public static let name = "eval"
 
@@ -9,7 +9,7 @@ extension Compute.Keywords {
     }
 }
 
-extension Compute.Keywords.Eval: Compute.Keyword {
+extension Compute.Keyword.Eval: Compute.KeywordDefinition {
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let expression = try await $expression.compute(in: frame)
         let context = try await $context.compute(in: frame) ?? [:]

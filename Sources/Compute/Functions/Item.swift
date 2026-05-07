@@ -1,4 +1,4 @@
-extension Compute.Keywords {
+extension Compute.Keyword {
     public struct Item: Equatable, Sendable {
         public let path: [Compute.Route.Component]
 
@@ -8,7 +8,7 @@ extension Compute.Keywords {
     }
 }
 
-extension Compute.Keywords.Item: Codable {
+extension Compute.Keyword.Item: Codable {
     public init(from decoder: Decoder) throws {
         var container = try decoder.unkeyedContainer()
         var path: [Compute.Route.Component] = []
@@ -31,7 +31,7 @@ extension Compute.Keywords.Item: Codable {
     }
 }
 
-extension Compute.Keywords.Item: Compute.Keyword {
+extension Compute.Keyword.Item: Compute.KeywordDefinition {
     public static let name = "item"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {

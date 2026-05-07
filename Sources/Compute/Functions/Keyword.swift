@@ -1,3 +1,3 @@
 extension Compute {
-    public enum Keywords {}
+    public enum Keyword {}
 }

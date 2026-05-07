@@ -1,6 +1,6 @@
 import Algorithms
 
-extension Compute.Keywords {
+extension Compute.Keyword {
     public struct ArrayZip: Codable, Equatable, Sendable {
         public static let name = "array_zip"
 
@@ -9,7 +9,7 @@ extension Compute.Keywords {
     }
 }
 
-extension Compute.Keywords.ArrayZip: Compute.Keyword {
+extension Compute.Keyword.ArrayZip: Compute.KeywordDefinition {
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let together = try await $together.compute(in: frame)
         guard case .array(let values) = together else {

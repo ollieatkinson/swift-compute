@@ -158,7 +158,7 @@ actor TestReferences: Compute.AsyncReferences {
     }
 }
 
-struct Echo: Compute.Keyword {
+struct Echo: Compute.KeywordDefinition {
     static let name = "echo"
     let payload: JSON
 
@@ -192,7 +192,7 @@ func runtime(
     in context: Compute.Context = Compute.Context(),
     references: TestReferences
 ) throws -> Compute.Runtime {
-    try runtime(json, in: context, functions: [Compute.Keywords.From.Function(references: references)])
+    try runtime(json, in: context, functions: [Compute.Keyword.From.Function(references: references)])
 }
 
 func value(

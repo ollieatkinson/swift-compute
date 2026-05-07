@@ -1,4 +1,4 @@
-extension Compute.Keywords {
+extension Compute.Keyword {
     public struct Text: Codable, Equatable, Sendable {
         public static let name = "text"
 
@@ -16,7 +16,7 @@ extension Compute.Keywords {
     }
 }
 
-extension Compute.Keywords.Text: Compute.Keyword {
+extension Compute.Keyword.Text: Compute.KeywordDefinition {
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
         if let joining = from.joining {
             return try await joining.compute(in: frame)
@@ -24,7 +24,7 @@ extension Compute.Keywords.Text: Compute.Keyword {
         throw JSONError("Expected text formatter")
     }
 }
-extension Compute.Keywords.Text.Joining {
+extension Compute.Keyword.Text.Joining {
     func compute(in frame: Compute.Frame) async throws -> JSON {
         let array = try await $array.compute(in: frame)
         let separatorValue = try await $separator.compute(in: frame)

@@ -1,6 +1,6 @@
 import Foundation
 
-extension Compute.Keywords {
+extension Compute.Keyword {
     public struct Comparison: Codable, Equatable, Sendable {
         public var match: Match?
         public var equal: Equal?
@@ -41,7 +41,7 @@ extension Compute.Keywords {
     }
 }
 
-extension Compute.Keywords.Comparison: Compute.Keyword {
+extension Compute.Keyword.Comparison: Compute.KeywordDefinition {
     public static let name = "comparison"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
@@ -67,7 +67,7 @@ extension Compute.Keywords.Comparison: Compute.Keyword {
     }
 }
 
-extension Compute.Keywords.Match: Compute.Keyword {
+extension Compute.Keyword.Match: Compute.KeywordDefinition {
     public static let name = "match"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
@@ -77,7 +77,7 @@ extension Compute.Keywords.Match: Compute.Keyword {
     }
 }
 
-extension Compute.Keywords.Equal: Compute.Keyword {
+extension Compute.Keyword.Equal: Compute.KeywordDefinition {
     public static let name = "equal"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
@@ -87,7 +87,7 @@ extension Compute.Keywords.Equal: Compute.Keyword {
     }
 }
 
-extension Compute.Keywords.Less: Compute.Keyword {
+extension Compute.Keyword.Less: Compute.KeywordDefinition {
     public static let name = "less"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
@@ -95,7 +95,7 @@ extension Compute.Keywords.Less: Compute.Keyword {
     }
 }
 
-extension Compute.Keywords.Greater: Compute.Keyword {
+extension Compute.Keyword.Greater: Compute.KeywordDefinition {
     public static let name = "greater"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
@@ -103,7 +103,7 @@ extension Compute.Keywords.Greater: Compute.Keyword {
     }
 }
 
-extension Compute.Keywords.LessOrEqual: Compute.Keyword {
+extension Compute.Keyword.LessOrEqual: Compute.KeywordDefinition {
     public static let name = "less_or_equal"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
@@ -111,7 +111,7 @@ extension Compute.Keywords.LessOrEqual: Compute.Keyword {
     }
 }
 
-extension Compute.Keywords.GreaterOrEqual: Compute.Keyword {
+extension Compute.Keyword.GreaterOrEqual: Compute.KeywordDefinition {
     public static let name = "greater_or_equal"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {

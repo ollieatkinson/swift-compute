@@ -1,6 +1,6 @@
 import Algorithms
 
-extension Compute.Keywords {
+extension Compute.Keyword {
     public struct ArraySort: Codable, Equatable, Sendable {
         public static let name = "array_sort"
 
@@ -24,7 +24,7 @@ extension Compute.Keywords {
     }
 }
 
-extension Compute.Keywords.ArraySort: Compute.Keyword {
+extension Compute.Keyword.ArraySort: Compute.KeywordDefinition {
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let array = try await $array.compute(in: frame)
         guard case .array(let values) = array else {
@@ -45,7 +45,7 @@ extension Compute.Keywords.ArraySort: Compute.Keyword {
     }
 }
 
-extension Compute.Keywords.ArraySort.Predicate {
+extension Compute.Keyword.ArraySort.Predicate {
     func areInIncreasingOrder(_ lhs: JSON, _ rhs: JSON) throws -> Bool? {
         let lhs = value(in: lhs)
         let rhs = value(in: rhs)

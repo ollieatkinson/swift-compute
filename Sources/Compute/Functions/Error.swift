@@ -1,4 +1,4 @@
-extension Compute.Keywords {
+extension Compute.Keyword {
     public struct Error: Codable, Equatable, Sendable {
         public static let name = "error"
 
@@ -6,7 +6,7 @@ extension Compute.Keywords {
     }
 }
 
-extension Compute.Keywords.Error: Compute.Keyword {
+extension Compute.Keyword.Error: Compute.KeywordDefinition {
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let message = try await $message.compute(in: frame)
         throw JSONError(try message.decode(String.self))
