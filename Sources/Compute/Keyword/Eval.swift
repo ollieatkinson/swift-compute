@@ -4,7 +4,7 @@ extension Compute.Keyword {
     public struct Eval: Codable, Equatable, Sendable {
         public static let name = "eval"
 
-        @Computed public var expression: JSON
+        @Computed public var expression: String
         @Computed public var context: [String: JSON]?
     }
 }
@@ -20,7 +20,7 @@ extension Compute.Keyword.Eval: Compute.KeywordDefinition {
         for (key, value) in context {
             js.setObject(value.any, forKeyedSubscript: key as NSString)
         }
-        let result = js.evaluateScript(try expression.decode(String.self))
+        let result = js.evaluateScript(expression)
         if let exception = js.exception {
             throw JSONError(exception.toString() ?? "Unknown JavaScript exception")
         }

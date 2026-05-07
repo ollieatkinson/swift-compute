@@ -145,4 +145,33 @@ struct ArrayMapTests {
             ],
         ], equals: [1, 2, 4])
     }
+
+    @Test func resolves_computes_inside_over_array() async throws {
+        try await expect([
+            "{returns}": [
+                "array_map": [
+                    "over": [
+                        "{returns}": [
+                            "this": [
+                                "value": [
+                                    ["int": 1],
+                                    ["int": ["{returns}": ["count": ["of": [1, 2, 3]]]]],
+                                ],
+                            ],
+                        ],
+                    ],
+                    "copy": [
+                        [
+                            "value": ["{returns}": ["item": ["int"]]],
+                            "to": ["copy"],
+                        ],
+                    ],
+                    "into_self": true,
+                ],
+            ],
+        ], equals: [
+            ["int": 1, "copy": 1],
+            ["int": 3, "copy": 3],
+        ])
+    }
 }

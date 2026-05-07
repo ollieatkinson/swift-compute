@@ -74,4 +74,47 @@ struct YesTests {
         ], equals: true)
         try await expect(nestedThisUnless, equals: true)
     }
+
+    @Test func resolves_computed_condition_arrays_and_elements() async throws {
+        try await expect([
+            "{returns}": [
+                "yes": [
+                    "if": [
+                        "{returns}": [
+                            "this": [
+                                "value": [
+                                    true,
+                                    ["{returns}": ["not": false]],
+                                    [
+                                        "{returns}": [
+                                            "comparison": [
+                                                "equal": [
+                                                    "lhs": ["{returns}": ["item": ["enabled"]]],
+                                                    "rhs": true,
+                                                ],
+                                            ],
+                                        ],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ], in: Compute.Context(item: ["enabled": true]), equals: true)
+
+        try await expect([
+            "{returns}": [
+                "yes": [
+                    "if": [
+                        true,
+                        ["{returns}": ["not": false]],
+                    ],
+                    "unless": [
+                        ["{returns}": ["this": ["value": false]]],
+                    ],
+                ],
+            ],
+        ], equals: true)
+    }
 }

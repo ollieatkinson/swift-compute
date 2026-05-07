@@ -1,7 +1,7 @@
 extension Compute.Keyword {
     public struct ArrayFilter: Codable, Equatable, Sendable {
-        @Computed public var array: JSON
-        @Computed public var predicate: JSON
+        @Computed public var array: [JSON]
+        @Computed public var predicate: Bool
     }
 }
 
@@ -9,29 +9,20 @@ extension Compute.Keyword.ArrayFilter: Compute.KeywordDefinition {
     public static let name = "array_filter"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
-        let source = try await $array.compute(in: frame)
-        guard case .array(let values) = source else {
-            throw JSONError("array_filter expected an array")
+        let values: [JSON]
+        do {
+            values = try await $array.compute(in: frame)
+        } catch {
+            let error = JSONError(error)
+            guard error.message.hasPrefix("Expected a [Any]") else {
+                throw error
+            }
+            throw JSONError("array_filter expected an array", path: error.path)
         }
-        var predicates: [JSON] = []
+        var predicates: [Bool] = []
         for (index, value) in values.enumerated() {
             let keep = try await $predicate.compute(in: frame, item: value, appending: .index(index))
-            predicates.append(.bool(try keep.decode(Bool.self)))
-        }
-        return try Self.filtered(array: source, predicate: .array(predicates))
-    }
-
-    private static func filtered(array: JSON, predicate: JSON) throws -> JSON {
-        guard case .array(let values) = array else {
-            throw JSONError("array_filter expected an array")
-        }
-        let predicates: [Bool]
-        switch predicate {
-        case .array(let predicateValues):
-            predicates = try predicateValues.map { try $0.decode(Bool.self) }
-        default:
-            let predicate = try predicate.decode(Bool.self)
-            predicates = Array(repeating: predicate, count: values.count)
+            predicates.append(keep)
         }
         guard predicates.count == values.count else {
             throw JSONError("array_filter predicate count did not match array count")

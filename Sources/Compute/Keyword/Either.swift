@@ -19,7 +19,7 @@ extension Compute.Keyword.Either: Compute.KeywordDefinition {
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
         for branch in branches {
-            let condition = try await branch.$condition.compute(in: frame)?.decode(Bool.self) ?? true
+            let condition = try await branch.$condition.compute(in: frame) ?? true
             guard condition else { continue }
             return try await branch.$value.compute(in: frame)
         }

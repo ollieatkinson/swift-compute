@@ -171,4 +171,40 @@ struct MapTests {
             "is": ["a": ["thing": true]],
         ])
     }
+
+    @Test func resolves_computes_inside_source_and_destination() async throws {
+        try await expect([
+            "{returns}": [
+                "map": [
+                    "src": [
+                        "{returns}": [
+                            "this": [
+                                "value": [
+                                    "values": [
+                                        1,
+                                        ["{returns}": ["count": ["of": [1, 2, 3]]]],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                    "dst": [
+                        "values": [
+                            0,
+                            ["{returns}": ["item": ["values", 1]]],
+                        ],
+                    ],
+                    "copy": [
+                        [
+                            "value": ["{returns}": ["item": ["values"]]],
+                            "to": ["copied"],
+                        ],
+                    ],
+                ],
+            ],
+        ], equals: [
+            "values": [0, 3],
+            "copied": [1, 3],
+        ])
+    }
 }

@@ -10,9 +10,9 @@ extension Compute.Keyword {
         public var greater_or_equal: GreaterOrEqual?
     }
 
-    public struct Match: Codable, Equatable, Sendable, OperandPair {
-        @Computed public var lhs: JSON
-        @Computed public var rhs: JSON
+    public struct Match: Codable, Equatable, Sendable {
+        @Computed public var lhs: String
+        @Computed public var rhs: String
     }
 
     public struct Equal: Codable, Equatable, Sendable, OperandPair {
@@ -71,8 +71,8 @@ extension Compute.Keyword.Match: Compute.KeywordDefinition {
     public static let name = "match"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
-        let lhs = try await $lhs.compute(in: frame).decode(String.self)
-        let rhs = try await $rhs.compute(in: frame).decode(String.self)
+        let lhs = try await $lhs.compute(in: frame)
+        let rhs = try await $rhs.compute(in: frame)
         return .bool(lhs.range(of: rhs, options: NSString.CompareOptions.regularExpression) != nil)
     }
 }

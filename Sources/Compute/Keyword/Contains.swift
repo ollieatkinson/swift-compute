@@ -1,7 +1,7 @@
 extension Compute.Keyword {
-    public struct Contains: Codable, Equatable, Sendable, OperandPair {
-        @Computed public var lhs: JSON
-        @Computed public var rhs: JSON
+    public struct Contains: Codable, Equatable, Sendable {
+        @Computed public var lhs: String
+        @Computed public var rhs: String
     }
 }
 
@@ -11,6 +11,6 @@ extension Compute.Keyword.Contains: Compute.KeywordDefinition {
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let lhs = try await $lhs.compute(in: frame)
         let rhs = try await $rhs.compute(in: frame)
-        return .bool(try lhs.decode(String.self).contains(rhs.decode(String.self)))
+        return .bool(lhs.contains(rhs))
     }
 }
