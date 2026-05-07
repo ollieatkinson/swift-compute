@@ -94,18 +94,95 @@ Wrap a decision in `explain` when the caller needs both the computed value and a
 let document: JSON = [
     "{returns}": [
         "explain": [
+            "context": [
+                "label": "Boarding eligibility",
+                "purpose": "explains why the user is seeing the ready-to-board state",
+                "surface": "flight boarding status tooltip",
+            ],
+            "mode": "foundation_model",
             "value": [
                 "{returns}": [
-                    "comparison": [
-                        "greater_or_equal": [
-                            "lhs": [
+                    "yes": [
+                        "if": [
+                            [
                                 "{returns}": [
-                                    "from": [
-                                        "reference": "subject.age",
+                                    "comparison": [
+                                        "greater_or_equal": [
+                                            "lhs": [
+                                                "{returns}": [
+                                                    "from": [
+                                                        "reference": "device.profile.age",
+                                                    ],
+                                                ],
+                                            ],
+                                            "rhs": [
+                                                "{returns}": [
+                                                    "from": [
+                                                        "reference": "server.flight.minimum_boarding_age",
+                                                    ],
+                                                ],
+                                            ],
+                                        ],
                                     ],
                                 ],
                             ],
-                            "rhs": 18,
+                            [
+                                "{returns}": [
+                                    "membership": [
+                                        "lhs": [
+                                            "{returns}": [
+                                                "from": [
+                                                    "reference": "device.profile.loyalty_tier",
+                                                ],
+                                            ],
+                                        ],
+                                        "rhs": [
+                                            "{returns}": [
+                                                "from": [
+                                                    "reference": "server.flight.allowed_loyalty_tiers",
+                                                ],
+                                            ],
+                                        ],
+                                    ],
+                                ],
+                            ],
+                            [
+                                "{returns}": [
+                                    "from": [
+                                        "reference": "server.flight.boarding_open",
+                                    ],
+                                ],
+                            ],
+                            [
+                                "{returns}": [
+                                    "from": [
+                                        "reference": "device.network.is_online",
+                                    ],
+                                ],
+                            ],
+                            [
+                                "{returns}": [
+                                    "comparison": [
+                                        "greater_or_equal": [
+                                            "lhs": [
+                                                "{returns}": [
+                                                    "from": [
+                                                        "reference": "device.battery.level_percent",
+                                                    ],
+                                                ],
+                                            ],
+                                            "rhs": 20,
+                                        ],
+                                    ],
+                                ],
+                            ],
+                        ],
+                        "unless": [
+                            "{returns}": [
+                                "from": [
+                                    "reference": "server.flight.manual_review_required",
+                                ],
+                            ],
                         ],
                     ],
                 ],
@@ -126,7 +203,10 @@ let explanation = try await runtime.value()
 // explanation["ok"] == true
 // explanation["value"] == true
 // explanation["summary"] == "true"
-// explanation["thoughts"] contains the evaluated `from` and `comparison` steps.
+// explanation["thoughts"] contains the evaluated device/server `from` references.
+// On iOS 26+ or macOS 26+ with Apple Intelligence available,
+// explanation["explanation"] contains a concise on-device model explanation,
+// suitable for user-facing help text such as a tooltip.
 ```
 
 ## Built-in Keywords
@@ -148,7 +228,7 @@ Custom keywords can be added by conforming to `ComputeKeyword` or `AnyReturnsKey
 
 `array_reduce` evaluates `next` once per element. During each iteration, the local `item` context contains `item`, `index`, and `accumulator`.
 
-`explain` evaluates a value and returns an object containing `ok`, `value`, `summary`, and displayable `thoughts`. If the explained value fails, `explain` returns `ok: false` with an `error` string instead of throwing.
+`explain` evaluates a value and returns an object containing `ok`, `value`, `summary`, and displayable `thoughts`. Set `mode` to `"foundation_model"` to add a natural-language `explanation` using Apple's on-device Foundation Models framework when it is available on iOS or macOS. `context` is optional user-facing context that helps the model explain what the computed value affects. On unsupported platforms, unavailable models, or generation failure, `explain` falls back to the trace-only payload. If the explained value fails, `explain` returns `ok: false` with an `error` string instead of throwing.
 
 ## Philosophy
 
