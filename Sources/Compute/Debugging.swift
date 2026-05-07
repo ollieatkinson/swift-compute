@@ -1,9 +1,9 @@
 import CustomDump
 import Foundation
 
-extension ComputeRuntime {
+extension Compute.Runtime {
     public nonisolated func _printChanges(
-        at route: ComputeRoute = .root,
+        at route: Compute.Route = .root,
         _ label: String = "⏳",
         printer: @escaping @Sendable (String) async -> Void = { print($0) }
     ) -> AsyncStream<Result<JSON, JSONError>> {
@@ -36,9 +36,9 @@ extension ComputeRuntime {
 private enum ChangeLog {
     static func render(
         label: String,
-        route: ComputeRoute,
+        route: Compute.Route,
         result: Result<JSON, JSONError>,
-        thoughts: [ComputeThought],
+        thoughts: [Compute.Thought],
         previous: JSON?
     ) -> String {
         var lines = ["\(label)._printChanges"]
@@ -56,7 +56,7 @@ private enum ChangeLog {
         return lines.joined(separator: "\n")
     }
 
-    private static func append(_ thoughts: [ComputeThought], to lines: inout [String]) {
+    private static func append(_ thoughts: [Compute.Thought], to lines: inout [String]) {
         guard !thoughts.isEmpty else { return }
         lines.append("  thoughts:")
         for (index, thought) in thoughts.enumerated() {
@@ -96,11 +96,11 @@ private enum ChangeLog {
             .joined(separator: "\n")
     }
 
-    private static func path(_ route: ComputeRoute) -> String {
+    private static func path(_ route: Compute.Route) -> String {
         route.path.isEmpty ? "/" : route.path.joined(separator: ".")
     }
 
-    private static func output(_ thought: ComputeThought) -> String {
+    private static func output(_ thought: Compute.Thought) -> String {
         if let error = thought.error {
             return "throw \(error.description)"
         }

@@ -1,4 +1,4 @@
-extension Keyword {
+extension Compute.Keywords {
     public struct ArraySubscript: Codable, Equatable, Sendable {
         public static let name = "array_subscript"
 
@@ -8,8 +8,8 @@ extension Keyword {
     }
 }
 
-extension Keyword.ArraySubscript: ComputeKeyword {
-    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+extension Compute.Keywords.ArraySubscript: Compute.Keyword {
+    public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let of = try await $of.compute(in: frame)
         guard case .array(let values) = of else {
             throw JSONError("array_subscript expected an array")

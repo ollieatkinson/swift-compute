@@ -200,7 +200,7 @@ private final class JSONAnyEncoder: AnyEncoder {
         if let value = value as? JSON {
             return value.any
         }
-        if let value = value as? Keyword.Item {
+        if let value = value as? Compute.Keywords.Item {
             return value.path.map(\.json.any)
         }
         if let values = value as? [Any] {
@@ -216,7 +216,7 @@ private final class JSONAnyEncoder: AnyEncoder {
         switch value {
         case let value as JSON:
             return value.any
-        case let value as Keyword.Item:
+        case let value as Compute.Keywords.Item:
             return value.path.map(\.json.any)
         case is NSNull:
             return NSNull()

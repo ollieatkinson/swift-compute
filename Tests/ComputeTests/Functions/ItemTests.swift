@@ -27,7 +27,7 @@ struct ItemTests {
     }
 
     @Test func reads_values_from_runtime_context() async throws {
-        let runtime = ComputeRuntime(
+        let runtime = Compute.Runtime(
             document: ["{returns}": ["item": ["name"]]],
             context: Compute.Context(item: users[1])
         )

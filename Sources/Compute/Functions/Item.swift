@@ -1,19 +1,19 @@
-extension Keyword {
+extension Compute.Keywords {
     public struct Item: Equatable, Sendable {
-        public let path: [ComputeRoute.Component]
+        public let path: [Compute.Route.Component]
 
-        public init(_ path: [ComputeRoute.Component]) {
+        public init(_ path: [Compute.Route.Component]) {
             self.path = path
         }
     }
 }
 
-extension Keyword.Item: Codable {
+extension Compute.Keywords.Item: Codable {
     public init(from decoder: Decoder) throws {
         var container = try decoder.unkeyedContainer()
-        var path: [ComputeRoute.Component] = []
+        var path: [Compute.Route.Component] = []
         while !container.isAtEnd {
-            path.append(try container.decode(ComputeRoute.Component.self))
+            path.append(try container.decode(Compute.Route.Component.self))
         }
         self.init(path)
     }
@@ -31,11 +31,11 @@ extension Keyword.Item: Codable {
     }
 }
 
-extension Keyword.Item: ComputeKeyword {
+extension Compute.Keywords.Item: Compute.Keyword {
     public static let name = "item"
 
-    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+    public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let source = frame.context.item ?? .null
-        return source.value(at: ComputeRoute(path)) ?? .null
+        return source.value(at: Compute.Route(path)) ?? .null
     }
 }

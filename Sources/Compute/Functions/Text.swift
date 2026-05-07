@@ -1,4 +1,4 @@
-extension Keyword {
+extension Compute.Keywords {
     public struct Text: Codable, Equatable, Sendable {
         public static let name = "text"
 
@@ -16,16 +16,16 @@ extension Keyword {
     }
 }
 
-extension Keyword.Text: ComputeKeyword {
-    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+extension Compute.Keywords.Text: Compute.Keyword {
+    public func compute(in frame: Compute.Frame) async throws -> JSON? {
         if let joining = from.joining {
             return try await joining.compute(in: frame)
         }
         throw JSONError("Expected text formatter")
     }
 }
-extension Keyword.Text.Joining {
-    func compute(in frame: ComputeFrame) async throws -> JSON {
+extension Compute.Keywords.Text.Joining {
+    func compute(in frame: Compute.Frame) async throws -> JSON {
         let array = try await $array.compute(in: frame)
         let separatorValue = try await $separator.compute(in: frame)
         let terminatorValue = try await $terminator.compute(in: frame)

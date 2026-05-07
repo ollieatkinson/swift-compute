@@ -1,6 +1,6 @@
 import Algorithms
 
-extension Keyword {
+extension Compute.Keywords {
     public struct ArrayGroup: Codable, Equatable, Sendable {
         public static let name = "array_group"
 
@@ -32,9 +32,9 @@ extension Keyword {
     }
 }
 
-extension Keyword.ArrayGroup: ComputeKeyword {
+extension Compute.Keywords.ArrayGroup: Compute.Keyword {
 
-    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+    public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let source = try await $array.compute(in: frame)
         guard case .array(let values) = source else {
             throw JSONError("array_group expected an array")
@@ -51,7 +51,7 @@ extension Keyword.ArrayGroup: ComputeKeyword {
     private func group(
         _ values: [JSON],
         by: By,
-        frame: ComputeFrame
+        frame: Compute.Frame
     ) async throws -> JSON {
         var keyedItems: [KeyedItem] = []
         for (index, value) in values.enumerated() {
@@ -59,12 +59,12 @@ extension Keyword.ArrayGroup: ComputeKeyword {
             keyedItems.append(KeyedItem(index: index, key: key, value: value))
         }
         let orderValue = try await by.$order.compute(in: frame)
-        let order = try orderValue?.decode(Keyword.ArraySort.Order.self) ?? .ascending
+        let order = try orderValue?.decode(Compute.Keywords.ArraySort.Order.self) ?? .ascending
         return .array(try ItemGroup.groups(from: keyedItems).elements(ordered: order).map(JSON.array))
     }
 }
 
-extension Keyword.ArrayGroup {
+extension Compute.Keywords.ArrayGroup {
     fileprivate enum GroupingMode {
         case into(Into)
         case by(By)
@@ -86,7 +86,7 @@ extension Keyword.ArrayGroup {
         let overflow: Overflow
         let remainder: Remainder
 
-        init(_ into: Into, frame: ComputeFrame) async throws {
+        init(_ into: Into, frame: Compute.Frame) async throws {
             let counts = try await into.$counts.compute(in: frame)
             let overflow = try await into.$overflow.compute(in: frame)
             let remainder = try await into.$remainder.compute(in: frame)
@@ -198,9 +198,9 @@ extension Keyword.ArrayGroup {
     }
 }
 
-private extension Array where Element == Keyword.ArrayGroup.ItemGroup {
-    func elements(ordered order: Keyword.ArraySort.Order) throws -> [[JSON]] {
-        let predicate = Keyword.ArraySort.Predicate(order: order)
+private extension Array where Element == Compute.Keywords.ArrayGroup.ItemGroup {
+    func elements(ordered order: Compute.Keywords.ArraySort.Order) throws -> [[JSON]] {
+        let predicate = Compute.Keywords.ArraySort.Predicate(order: order)
         return try sorted { lhs, rhs in
             (try predicate.areInIncreasingOrder(lhs.key, rhs.key)) ?? (lhs.offset < rhs.offset)
         }.map(\.elements)

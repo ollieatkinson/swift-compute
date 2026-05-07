@@ -1,17 +1,17 @@
 @propertyWrapper
 public struct Computed<Value: Codable & Sendable>: Codable, Sendable {
     public private(set) var wrappedValue: Value
-    private let route: [ComputeRoute.Component]
+    private let route: [Compute.Route.Component]
 
     public var projectedValue: Computed<Value> {
         self
     }
 
-    public init(wrappedValue: Value, route: ComputeRoute.Component) {
+    public init(wrappedValue: Value, route: Compute.Route.Component) {
         self.init(wrappedValue: wrappedValue, route: [route])
     }
 
-    public init(wrappedValue: Value, route: [ComputeRoute.Component]) {
+    public init(wrappedValue: Value, route: [Compute.Route.Component]) {
         self.wrappedValue = wrappedValue
         self.route = route
     }
@@ -25,7 +25,7 @@ public struct Computed<Value: Codable & Sendable>: Codable, Sendable {
         try wrappedValue.encode(to: encoder)
     }
 
-    fileprivate static func component(from key: any CodingKey) -> ComputeRoute.Component {
+    fileprivate static func component(from key: any CodingKey) -> Compute.Route.Component {
         if let index = key.intValue {
             return .index(index)
         }
@@ -33,16 +33,16 @@ public struct Computed<Value: Codable & Sendable>: Codable, Sendable {
     }
 
     fileprivate func field(
-        in frame: ComputeFrame,
+        in frame: Compute.Frame,
         item: JSON? = nil,
-        appending suffix: [ComputeRoute.Component] = []
-    ) throws -> ComputeFrame {
+        appending suffix: [Compute.Route.Component] = []
+    ) throws -> Compute.Frame {
         guard !route.isEmpty else {
             throw JSONError("Computed property is missing a route")
         }
         let context = item.map(frame.context.with(item:)) ?? frame.context
         let depth = item == nil ? frame.depth : frame.depth + 1
-        return ComputeFrame(
+        return Compute.Frame(
             context: context,
             runtime: frame.runtime,
             route: frame.route.appending(contentsOf: route + suffix),
@@ -59,9 +59,9 @@ extension Computed: Equatable where Value: Equatable {
 
 public extension Computed where Value == JSON {
     func compute(
-        in frame: ComputeFrame,
+        in frame: Compute.Frame,
         item: JSON? = nil,
-        appending suffix: ComputeRoute.Component...
+        appending suffix: Compute.Route.Component...
     ) async throws -> JSON {
         try await wrappedValue.compute(frame: field(in: frame, item: item, appending: suffix))
     }
@@ -69,16 +69,16 @@ public extension Computed where Value == JSON {
 
 public extension Computed where Value == JSON? {
     func compute(
-        in frame: ComputeFrame,
+        in frame: Compute.Frame,
         item: JSON? = nil,
-        appending suffix: ComputeRoute.Component...
+        appending suffix: Compute.Route.Component...
     ) async throws -> JSON? {
         try await wrappedValue?.compute(frame: field(in: frame, item: item, appending: suffix))
     }
 }
 
 public extension Computed where Value == [String: JSON]? {
-    func compute(in frame: ComputeFrame) async throws -> [String: JSON]? {
+    func compute(in frame: Compute.Frame) async throws -> [String: JSON]? {
         guard let wrappedValue else { return nil }
         var object: [String: JSON] = [:]
         for key in wrappedValue.keys.sorted() {

@@ -1,1 +1,3 @@
-public enum Keyword {}
+extension Compute {
+    public enum Keywords {}
+}

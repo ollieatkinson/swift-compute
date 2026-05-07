@@ -27,7 +27,7 @@ extension OperandPair {
 func computedOperands(
     lhs: Computed<JSON>,
     rhs: Computed<JSON>,
-    in frame: ComputeFrame
+    in frame: Compute.Frame
 ) async throws -> Operands {
     let lhs = try await lhs.compute(in: frame)
     let rhs = try await rhs.compute(in: frame)

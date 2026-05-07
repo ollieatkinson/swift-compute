@@ -1,76 +1,90 @@
-public struct ComputeFrame: Sendable {
-    public let context: Compute.Context
-    let runtime: ComputeFunctionRuntime
-    public let route: ComputeRoute
-    public let depth: Int
+extension Compute {
+    public struct Frame: Sendable {
+        public let context: Compute.Context
+        let runtime: Compute.FunctionRuntime
+        public let route: Compute.Route
+        public let depth: Int
 
-    public func compute(_ data: JSON, at route: ComputeRoute? = nil) async throws -> JSON {
-        try await data.compute(frame: ComputeFrame(
-            context: context,
-            runtime: runtime,
-            route: route ?? self.route,
-            depth: depth
-        ))
-    }
+        init(
+            context: Compute.Context, runtime: Compute.FunctionRuntime, route: Compute.Route, depth: Int
+        ) {
+            self.context = context
+            self.runtime = runtime
+            self.route = route
+            self.depth = depth
+        }
 
-    func incrementDepth() -> ComputeFrame {
-        ComputeFrame(context: context, runtime: runtime, route: route, depth: depth + 1)
-    }
+        public func compute(_ data: JSON, at route: Compute.Route? = nil) async throws -> JSON {
+            try await data.compute(
+                frame: Frame(
+                    context: context,
+                    runtime: runtime,
+                    route: route ?? self.route,
+                    depth: depth
+                ))
+        }
 
-    public subscript(route: ComputeRoute.Component...) -> ComputeFrame {
-        ComputeFrame(
-            context: context,
-            runtime: runtime,
-            route: self.route.appending(contentsOf: route),
-            depth: depth
-        )
-    }
+        func incrementDepth() -> Frame {
+            Frame(context: context, runtime: runtime, route: route, depth: depth + 1)
+        }
 
-    public subscript(item item: JSON, _ route: ComputeRoute.Component...) -> ComputeFrame {
-        ComputeFrame(
-            context: context.with(item: item),
-            runtime: runtime,
-            route: self.route.appending(contentsOf: route),
-            depth: depth + 1
-        )
+        public subscript(route: Compute.Route.Component...) -> Frame {
+            Frame(
+                context: context,
+                runtime: runtime,
+                route: self.route.appending(contentsOf: route),
+                depth: depth
+            )
+        }
+
+        public subscript(item item: JSON, _ route: Compute.Route.Component...) -> Frame {
+            Frame(
+                context: context.with(item: item),
+                runtime: runtime,
+                route: self.route.appending(contentsOf: route),
+                depth: depth + 1
+            )
+        }
     }
 }
 
 public protocol AnyReturnsKeyword: Sendable {
     var name: String { get }
 
-    func compute(data: JSON, frame: ComputeFrame) async throws -> JSON?
+    func compute(data: JSON, frame: Compute.Frame) async throws -> JSON?
 }
 
-public protocol ComputeKeyword: Codable, Equatable, Sendable {
-    static var name: String { get }
-    func compute(in frame: ComputeFrame) async throws -> JSON?
-}
-
-public struct ComputeKeywordFunction<K: ComputeKeyword>: AnyReturnsKeyword {
-    public var name: String {
-        K.name
+extension Compute {
+    public protocol Keyword: Codable, Equatable, Sendable {
+        static var name: String { get }
+        func compute(in frame: Compute.Frame) async throws -> JSON?
     }
 
-    public init() {}
+    public struct KeywordFunction<K: Keyword>: AnyReturnsKeyword {
+        public var name: String {
+            K.name
+        }
 
-    public func compute(data: JSON, frame: ComputeFrame) async throws -> JSON? {
-        try await JSON.decoded(K.self, from: data).compute(in: frame)
+        public init() {}
+
+        public func compute(data: JSON, frame: Compute.Frame) async throws -> JSON? {
+            try await JSON.decoded(K.self, from: data).compute(in: frame)
+        }
     }
 }
 
-public extension ComputeKeyword {
-    static var function: ComputeKeywordFunction<Self> {
-        ComputeKeywordFunction()
+extension Compute.Keyword {
+    public static var function: Compute.KeywordFunction<Self> {
+        Compute.KeywordFunction()
     }
 }
 
 public protocol ReturnsKeyword: AnyReturnsKeyword {
-    func subject(data: JSON, frame: ComputeFrame) -> AsyncStream<Result<JSON, JSONError>>
+    func subject(data: JSON, frame: Compute.Frame) -> AsyncStream<Result<JSON, JSONError>>
 }
 
 extension ReturnsKeyword {
-    public func subject(data: JSON, frame: ComputeFrame) -> AsyncStream<Result<JSON, JSONError>> {
+    public func subject(data: JSON, frame: Compute.Frame) -> AsyncStream<Result<JSON, JSONError>> {
         let (stream, continuation) = AsyncStream.makeStream(
             of: Result<JSON, JSONError>.self,
             bufferingPolicy: .unbounded

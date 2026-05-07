@@ -1,13 +1,13 @@
-extension Keyword {
+extension Compute.Keywords {
     public struct Exists: Codable, Equatable, Sendable {
         @Computed public var value: JSON?
     }
 }
 
-extension Keyword.Exists: ComputeKeyword {
+extension Compute.Keywords.Exists: Compute.Keyword {
     public static let name = "exists"
 
-    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+    public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let computed: JSON
         do {
             computed = try await $value.compute(in: frame) ?? .null

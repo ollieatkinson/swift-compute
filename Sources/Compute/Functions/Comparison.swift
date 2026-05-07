@@ -1,6 +1,6 @@
 import Foundation
 
-extension Keyword {
+extension Compute.Keywords {
     public struct Comparison: Codable, Equatable, Sendable {
         public var match: Match?
         public var equal: Equal?
@@ -41,10 +41,10 @@ extension Keyword {
     }
 }
 
-extension Keyword.Comparison: ComputeKeyword {
+extension Compute.Keywords.Comparison: Compute.Keyword {
     public static let name = "comparison"
 
-    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+    public func compute(in frame: Compute.Frame) async throws -> JSON? {
         if let match {
             return try await match.compute(in: frame)
         }
@@ -67,54 +67,54 @@ extension Keyword.Comparison: ComputeKeyword {
     }
 }
 
-extension Keyword.Match: ComputeKeyword {
+extension Compute.Keywords.Match: Compute.Keyword {
     public static let name = "match"
 
-    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+    public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let lhs = try await $lhs.compute(in: frame).decode(String.self)
         let rhs = try await $rhs.compute(in: frame).decode(String.self)
         return .bool(lhs.range(of: rhs, options: NSString.CompareOptions.regularExpression) != nil)
     }
 }
 
-extension Keyword.Equal: ComputeKeyword {
+extension Compute.Keywords.Equal: Compute.Keyword {
     public static let name = "equal"
 
-    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+    public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let lhs = try await $lhs.compute(in: frame)
         let rhs = try await $rhs.compute(in: frame)
         return .bool(lhs == rhs)
     }
 }
 
-extension Keyword.Less: ComputeKeyword {
+extension Compute.Keywords.Less: Compute.Keyword {
     public static let name = "less"
 
-    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+    public func compute(in frame: Compute.Frame) async throws -> JSON? {
         try await computedOperands(lhs: $lhs, rhs: $rhs, in: frame).orderedComparison(string: <, number: <)
     }
 }
 
-extension Keyword.Greater: ComputeKeyword {
+extension Compute.Keywords.Greater: Compute.Keyword {
     public static let name = "greater"
 
-    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+    public func compute(in frame: Compute.Frame) async throws -> JSON? {
         try await computedOperands(lhs: $lhs, rhs: $rhs, in: frame).orderedComparison(string: >, number: >)
     }
 }
 
-extension Keyword.LessOrEqual: ComputeKeyword {
+extension Compute.Keywords.LessOrEqual: Compute.Keyword {
     public static let name = "less_or_equal"
 
-    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+    public func compute(in frame: Compute.Frame) async throws -> JSON? {
         try await computedOperands(lhs: $lhs, rhs: $rhs, in: frame).orderedComparison(string: <=, number: <=)
     }
 }
 
-extension Keyword.GreaterOrEqual: ComputeKeyword {
+extension Compute.Keywords.GreaterOrEqual: Compute.Keyword {
     public static let name = "greater_or_equal"
 
-    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+    public func compute(in frame: Compute.Frame) async throws -> JSON? {
         try await computedOperands(lhs: $lhs, rhs: $rhs, in: frame).orderedComparison(string: >=, number: >=)
     }
 }

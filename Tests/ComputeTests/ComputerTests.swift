@@ -7,7 +7,7 @@ struct ComputerTests {
     @Test func classifies_keywords_from_returns_json() throws {
         let references = TestReferences()
         let computer = Computer.default.merging([
-            Keyword.From.Function(references: references),
+            Compute.Keywords.From.Function(references: references),
             Echo.function,
         ])
 
@@ -29,10 +29,10 @@ struct ComputerTests {
         #expect(try keyword(in: ["{returns}": ["missing": nil]], using: computer) == nil)
     }
 
-    private func keyword(in json: JSON, using computer: Computer) throws -> Compute.Keyword? {
+    private func keyword(in json: JSON, using computer: Computer) throws -> Computer.Keyword? {
         guard case .object(let object) = json else {
             throw JSONError("Expected object")
         }
-        return Compute.Keyword(returns: object, computer: computer)
+        return Computer.Keyword(returns: object, computer: computer)
     }
 }

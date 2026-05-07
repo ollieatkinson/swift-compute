@@ -140,7 +140,7 @@ struct BrainRuntimeBehaviorTests {
         let runtime = try runtime(json)
 
         let step = try await runtime.step()
-        #expect(Set(step.thoughts.map(\.route)) == Set<ComputeRoute>([["left"], ["right"]]))
+        #expect(Set(step.thoughts.map(\.route)) == Set<Compute.Route>([["left"], ["right"]]))
         #expect(step.state == [
             "left": true,
             "right": false,
@@ -340,7 +340,7 @@ struct BrainRuntimeBehaviorTests {
     }
 }
 
-private func fromReferences(in thoughts: [ComputeThought]) -> [String] {
+private func fromReferences(in thoughts: [Compute.Thought]) -> [String] {
     thoughts.compactMap { thought in
         guard thought.keyword == "from" else { return nil }
         guard case .object(let input)? = thought.input else { return nil }
@@ -350,7 +350,7 @@ private func fromReferences(in thoughts: [ComputeThought]) -> [String] {
     }
 }
 
-private func outputsByRoute(in thoughts: [ComputeThought]) -> [ComputeRoute: JSON] {
+private func outputsByRoute(in thoughts: [Compute.Thought]) -> [Compute.Route: JSON] {
     thoughts.reduce(into: [:]) { outputs, thought in
         if let output = thought.output {
             outputs[thought.route] = output

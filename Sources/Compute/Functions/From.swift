@@ -1,4 +1,4 @@
-extension Keyword {
+extension Compute.Keywords {
     public struct From: Codable, Equatable, Sendable {
         public static let name = "from"
 
@@ -12,34 +12,36 @@ extension Keyword {
     }
 }
 
-public protocol ComputeReferences: Sendable {
-    func value(for reference: JSON, context: [String: JSON]?) async throws -> JSON
+extension Compute {
+    public protocol References: Sendable {
+        func value(for reference: JSON, context: [String: JSON]?) async throws -> JSON
+    }
+
+    public protocol AsyncReferences: References {
+        func values(for reference: JSON, context: [String: JSON]?) -> AsyncStream<Result<JSON, JSONError>>
+    }
 }
 
-extension Keyword.From {
-    public struct Function<References>: AnyReturnsKeyword where References: ComputeReferences {
-        public let name = Keyword.From.name
+extension Compute.Keywords.From {
+    public struct Function<References>: AnyReturnsKeyword where References: Compute.References {
+        public let name = Compute.Keywords.From.name
         private let references: References
 
         public init(references: References) {
             self.references = references
         }
 
-        public func compute(data input: JSON, frame: ComputeFrame) async throws -> JSON? {
-            let from = try JSON.decoded(Keyword.From.self, from: input)
+        public func compute(data input: JSON, frame: Compute.Frame) async throws -> JSON? {
+            let from = try JSON.decoded(Compute.Keywords.From.self, from: input)
             return try await references.value(for: from.reference, context: from.context)
         }
     }
 }
 
-public protocol AsyncComputeReferences: ComputeReferences {
-    func values(for reference: JSON, context: [String: JSON]?) -> AsyncStream<Result<JSON, JSONError>>
-}
-
-extension Keyword.From.Function: ReturnsKeyword where References: AsyncComputeReferences {
-    public func subject(data input: JSON, frame: ComputeFrame) -> AsyncStream<Result<JSON, JSONError>> {
+extension Compute.Keywords.From.Function: ReturnsKeyword where References: Compute.AsyncReferences {
+    public func subject(data input: JSON, frame: Compute.Frame) -> AsyncStream<Result<JSON, JSONError>> {
         do {
-            let from = try JSON.decoded(Keyword.From.self, from: input)
+            let from = try JSON.decoded(Compute.Keywords.From.self, from: input)
             return references.values(for: from.reference, context: from.context)
         } catch {
             let (stream, continuation) = AsyncStream.makeStream(of: Result<JSON, JSONError>.self)

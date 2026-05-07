@@ -1,6 +1,6 @@
 import Algorithms
 
-extension Keyword {
+extension Compute.Keywords {
     public struct ArraySort: Codable, Equatable, Sendable {
         public static let name = "array_sort"
 
@@ -8,10 +8,10 @@ extension Keyword {
         public let predicates: [Predicate]?
 
         public struct Predicate: Codable, Equatable, Sendable {
-            public let key_path: [ComputeRoute.Component]?
+            public let key_path: [Compute.Route.Component]?
             public let order: Order
 
-            public init(key_path: [ComputeRoute.Component]? = nil, order: Order) {
+            public init(key_path: [Compute.Route.Component]? = nil, order: Order) {
                 self.key_path = key_path
                 self.order = order
             }
@@ -24,8 +24,8 @@ extension Keyword {
     }
 }
 
-extension Keyword.ArraySort: ComputeKeyword {
-    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+extension Compute.Keywords.ArraySort: Compute.Keyword {
+    public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let array = try await $array.compute(in: frame)
         guard case .array(let values) = array else {
             throw JSONError("array_sort expected an array")
@@ -45,7 +45,7 @@ extension Keyword.ArraySort: ComputeKeyword {
     }
 }
 
-extension Keyword.ArraySort.Predicate {
+extension Compute.Keywords.ArraySort.Predicate {
     func areInIncreasingOrder(_ lhs: JSON, _ rhs: JSON) throws -> Bool? {
         let lhs = value(in: lhs)
         let rhs = value(in: rhs)
@@ -71,7 +71,7 @@ extension Keyword.ArraySort.Predicate {
         guard let key_path else {
             return json
         }
-        return json.value(at: ComputeRoute(key_path)) ?? .null
+        return json.value(at: Compute.Route(key_path)) ?? .null
     }
 }
 

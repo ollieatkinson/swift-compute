@@ -1,6 +1,6 @@
 import Algorithms
 
-extension Keyword {
+extension Compute.Keywords {
     public struct ArrayZip: Codable, Equatable, Sendable {
         public static let name = "array_zip"
 
@@ -9,8 +9,8 @@ extension Keyword {
     }
 }
 
-extension Keyword.ArrayZip: ComputeKeyword {
-    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+extension Compute.Keywords.ArrayZip: Compute.Keyword {
+    public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let together = try await $together.compute(in: frame)
         guard case .array(let values) = together else {
             throw JSONError("array_zip expected an array of arrays")

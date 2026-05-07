@@ -44,7 +44,7 @@ extension JSON {
         }
     }
 
-    func value(at route: ComputeRoute) -> JSON? {
+    func value(at route: Compute.Route) -> JSON? {
         var current = self
         for component in route.components {
             switch (component, current) {
@@ -68,8 +68,8 @@ extension JSON {
 
     func conceptRoutes(
         functions: [String: any AnyReturnsKeyword],
-        from route: ComputeRoute = .root
-    ) -> [ComputeRoute] {
+        from route: Compute.Route = .root
+    ) -> [Compute.Route] {
         switch self {
         case .object(let object):
             if let invocation = Compute.Invocation(object: object) {
@@ -79,7 +79,7 @@ extension JSON {
                 }
                 return [route]
             }
-            var routes: [ComputeRoute] = []
+            var routes: [Compute.Route] = []
             for key in object.keys.sorted() {
                 routes.append(contentsOf: object[key]?.conceptRoutes(
                     functions: functions,
@@ -88,7 +88,7 @@ extension JSON {
             }
             return routes
         case .array(let values):
-            var routes: [ComputeRoute] = []
+            var routes: [Compute.Route] = []
             for (index, value) in values.enumerated() {
                 routes.append(contentsOf: value.conceptRoutes(
                     functions: functions,
@@ -101,13 +101,13 @@ extension JSON {
         }
     }
 
-    mutating func set(_ value: JSON, at route: ComputeRoute) throws {
+    mutating func set(_ value: JSON, at route: Compute.Route) throws {
         try set(value, at: ArraySlice(route.components), path: route.path)
     }
 
     private mutating func set(
         _ value: JSON,
-        at components: ArraySlice<ComputeRoute.Component>,
+        at components: ArraySlice<Compute.Route.Component>,
         path: [String]
     ) throws {
         guard let head = components.first else {
@@ -135,22 +135,22 @@ extension JSON {
     }
 
     func compute(
-        frame: ComputeFrame
+        frame: Compute.Frame
     ) async throws -> JSON {
         try await compute(context: frame.context, runtime: frame.runtime, route: frame.route, depth: frame.depth)
     }
 
     private func compute(
         context: Compute.Context,
-        runtime: ComputeFunctionRuntime,
-        route: ComputeRoute = .root,
+        runtime: Compute.FunctionRuntime,
+        route: Compute.Route = .root,
         depth: Int
     ) async throws -> JSON {
         switch self {
         case .object(let object):
             if let invocation = Compute.Invocation(object: object) {
                 guard depth < 20 else {
-                    throw ComputeError.recursionLimitExceeded
+                    throw Compute.Error.recursionLimitExceeded
                 }
 
                 let functionRoute = route["{returns}", .key(invocation.keyword)]
@@ -173,7 +173,7 @@ extension JSON {
                             route: fallbackRoute,
                             depth: depth
                         )
-                        await runtime.record(ComputeThought(
+                        await runtime.record(Compute.Thought(
                             route: fallbackRoute,
                             depth: fallbackRoute.components.count,
                             keyword: "default",
@@ -193,7 +193,7 @@ extension JSON {
                         route: fallbackRoute,
                         depth: depth
                     )
-                    await runtime.record(ComputeThought(
+                    await runtime.record(Compute.Thought(
                         route: fallbackRoute,
                         depth: fallbackRoute.components.count,
                         keyword: "default",

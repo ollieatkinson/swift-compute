@@ -1,82 +1,86 @@
-public struct ComputeRoute: Hashable, Sendable, ExpressibleByArrayLiteral {
-    public enum Component: Hashable, Codable, Sendable, ExpressibleByStringLiteral, ExpressibleByIntegerLiteral {
-        case key(String)
-        case index(Int)
+extension Compute {
+    public struct Route: Hashable, Sendable, ExpressibleByArrayLiteral {
+        public enum Component: Hashable, Codable, Sendable, ExpressibleByStringLiteral,
+            ExpressibleByIntegerLiteral
+        {
+            case key(String)
+            case index(Int)
 
-        public init(stringLiteral value: String) {
-            self = .key(value)
-        }
-
-        public init(integerLiteral value: Int) {
-            self = .index(value)
-        }
-
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.singleValueContainer()
-            if let index = try? container.decode(Int.self) {
-                self = .index(index)
-                return
+            public init(stringLiteral value: String) {
+                self = .key(value)
             }
-            self = .key(try container.decode(String.self))
-        }
 
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.singleValueContainer()
-            switch self {
-            case .key(let key):
-                try container.encode(key)
-            case .index(let index):
-                try container.encode(index)
+            public init(integerLiteral value: Int) {
+                self = .index(value)
+            }
+
+            public init(from decoder: Decoder) throws {
+                let container = try decoder.singleValueContainer()
+                if let index = try? container.decode(Int.self) {
+                    self = .index(index)
+                    return
+                }
+                self = .key(try container.decode(String.self))
+            }
+
+            public func encode(to encoder: Encoder) throws {
+                var container = encoder.singleValueContainer()
+                switch self {
+                case .key(let key):
+                    try container.encode(key)
+                case .index(let index):
+                    try container.encode(index)
+                }
+            }
+
+            var json: JSON {
+                switch self {
+                case .key(let key):
+                    return .string(key)
+                case .index(let index):
+                    return .int(index)
+                }
             }
         }
 
-        var json: JSON {
-            switch self {
-            case .key(let key):
-                return .string(key)
-            case .index(let index):
-                return .int(index)
-            }
+        public static let root = Route()
+
+        public let components: [Component]
+
+        public init(_ components: [Component] = []) {
+            self.components = components
         }
-    }
 
-    public static let root = ComputeRoute()
+        public init(arrayLiteral elements: Component...) {
+            self.init(elements)
+        }
 
-    public let components: [Component]
+        public func appending(_ component: Component) -> Route {
+            Route(components + [component])
+        }
 
-    public init(_ components: [Component] = []) {
-        self.components = components
-    }
+        subscript(components: Component...) -> Route {
+            appending(contentsOf: components)
+        }
 
-    public init(arrayLiteral elements: Component...) {
-        self.init(elements)
-    }
+        public func appending(contentsOf components: [Component]) -> Route {
+            Route(self.components + components)
+        }
 
-    public func appending(_ component: Component) -> ComputeRoute {
-        ComputeRoute(components + [component])
-    }
-
-    subscript(components: Component...) -> ComputeRoute {
-        appending(contentsOf: components)
-    }
-
-    public func appending(contentsOf components: [Component]) -> ComputeRoute {
-        ComputeRoute(self.components + components)
-    }
-
-    public var path: [String] {
-        components.map { component in
-            switch component {
-            case .key(let key):
-                return key
-            case .index(let index):
-                return String(index)
+        public var path: [String] {
+            components.map { component in
+                switch component {
+                case .key(let key):
+                    return key
+                case .index(let index):
+                    return String(index)
+                }
             }
         }
     }
 }
 
-extension ComputeRoute: Codable {
+extension Compute.Route: Codable {
     public init(from decoder: Decoder) throws {
         var container = try decoder.unkeyedContainer()
         var components: [Component] = []

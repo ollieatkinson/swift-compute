@@ -1,14 +1,14 @@
-extension Keyword {
+extension Compute.Keywords {
     public struct ArrayFilter: Codable, Equatable, Sendable {
         @Computed public var array: JSON
         @Computed public var predicate: JSON
     }
 }
 
-extension Keyword.ArrayFilter: ComputeKeyword {
+extension Compute.Keywords.ArrayFilter: Compute.Keyword {
     public static let name = "array_filter"
 
-    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+    public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let source = try await $array.compute(in: frame)
         guard case .array(let values) = source else {
             throw JSONError("array_filter expected an array")

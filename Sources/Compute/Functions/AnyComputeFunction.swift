@@ -10,7 +10,7 @@ public struct AnyComputeFunction: AnyReturnsKeyword {
         self.valueImplementation = value
     }
 
-    public func compute(data input: JSON, frame: ComputeFrame) async throws -> JSON? {
+    public func compute(data input: JSON, frame: Compute.Frame) async throws -> JSON? {
         let input = try await frame.compute(input)
         return try valueImplementation(input)
     }

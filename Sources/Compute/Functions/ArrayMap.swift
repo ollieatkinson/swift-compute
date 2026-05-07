@@ -1,16 +1,16 @@
-extension Keyword {
+extension Compute.Keywords {
     public struct ArrayMap: Codable, Equatable, Sendable {
         @Computed public var over: JSON
-        public let copy: [Keyword.Map.Copy]?
+        public let copy: [Compute.Keywords.Map.Copy]?
         @Computed public var into_self: JSON?
         @Computed public var flattened: JSON?
     }
 }
 
-extension Keyword.ArrayMap: ComputeKeyword {
+extension Compute.Keywords.ArrayMap: Compute.Keyword {
     public static let name = "array_map"
 
-    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+    public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let source = try await $over.compute(in: frame)
         guard case .array(let values) = source else {
             throw JSONError("array_map expected an array")
@@ -25,7 +25,7 @@ extension Keyword.ArrayMap: ComputeKeyword {
                         in: frame["over", .index(index)],
                         item: value
                     )
-                    try destination.set(copied, at: ComputeRoute(copy.to))
+                    try destination.set(copied, at: Compute.Route(copy.to))
                 }
                 mapped.append(destination)
             } else {

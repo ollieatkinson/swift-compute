@@ -148,7 +148,7 @@ struct ExplainTests {
             ],
         ]
 
-        let output = try await value(json, functions: [Keyword.From.Function(references: references)])
+        let output = try await value(json, functions: [Compute.Keywords.From.Function(references: references)])
         print("foundation_model explain output: \(output)")
 
         guard case .object(let payload) = output else {

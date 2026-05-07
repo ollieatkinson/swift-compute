@@ -1,11 +1,29 @@
 import Foundation
 
-public enum ComputeError: Error, Equatable, Sendable {
-    case unresolvedReference(JSON)
-    case recursionLimitExceeded
+public enum Compute {
+    public enum Error: Swift.Error, Equatable, Sendable {
+        case unresolvedReference(JSON)
+        case recursionLimitExceeded
+    }
+
+    public struct Context: Equatable, Sendable {
+        public var item: JSON?
+
+        public init(item: JSON? = nil) {
+            self.item = item
+        }
+
+        public func with(item: JSON) -> Context {
+            var context = self
+            context.item = item
+            return context
+        }
+    }
 }
 
-public struct JSONError: Error, Codable, Equatable, Hashable, Sendable, CustomStringConvertible, LocalizedError {
+public struct JSONError: Swift.Error, Codable, Equatable, Hashable, Sendable,
+    CustomStringConvertible, LocalizedError
+{
     public let message: String
     public let path: [String]
 
@@ -14,7 +32,7 @@ public struct JSONError: Error, Codable, Equatable, Hashable, Sendable, CustomSt
         self.path = path
     }
 
-    public init(_ error: any Error, path: [String] = []) {
+    public init(_ error: any Swift.Error, path: [String] = []) {
         if let error = error as? JSONError {
             self = error
             return
@@ -33,21 +51,5 @@ public struct JSONError: Error, Codable, Equatable, Hashable, Sendable, CustomSt
 
     public var errorDescription: String? {
         description
-    }
-}
-
-public enum Compute {
-    public struct Context: Equatable, Sendable {
-        public var item: JSON?
-
-        public init(item: JSON? = nil) {
-            self.item = item
-        }
-
-        public func with(item: JSON) -> Context {
-            var context = self
-            context.item = item
-            return context
-        }
     }
 }

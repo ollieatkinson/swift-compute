@@ -4,7 +4,7 @@ import Foundation
 import FoundationModels
 #endif
 
-extension Keyword {
+extension Compute.Keywords {
     public struct Explain: Codable, Equatable, Sendable {
         public enum Mode: String, Codable, Equatable, Sendable {
             case trace
@@ -32,9 +32,9 @@ extension Keyword {
     }
 }
 
-extension Keyword.Explain: ComputeKeyword {
+extension Compute.Keywords.Explain: Compute.Keyword {
 
-    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+    public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let capture = await frame.runtime.capture {
             try await $value.compute(in: frame)
         }
@@ -67,8 +67,8 @@ extension Keyword.Explain: ComputeKeyword {
     }
 }
 
-private extension Keyword.Explain {
-    func naturalLanguageExplanation(computedValue: JSON, thoughts: [ComputeThought], localItem: JSON?) async -> String? {
+private extension Compute.Keywords.Explain {
+    func naturalLanguageExplanation(computedValue: JSON, thoughts: [Compute.Thought], localItem: JSON?) async -> String? {
         guard mode == .foundationModel else { return nil }
 #if canImport(FoundationModels) && (os(iOS) || os(macOS))
         if #available(iOS 26.0, macOS 26.0, *) {
@@ -91,7 +91,7 @@ private enum FoundationModelExplainProvider {
     static func explanation(
         expression: JSON,
         computedValue: JSON,
-        thoughts: [ComputeThought],
+        thoughts: [Compute.Thought],
         explanationContext: JSON?,
         localItem: JSON?
     ) async -> String? {
@@ -128,7 +128,7 @@ private enum FoundationModelExplainProvider {
     private static func prompt(
         expression: JSON,
         computedValue: JSON,
-        thoughts: [ComputeThought],
+        thoughts: [Compute.Thought],
         explanationContext: JSON?,
         localItem: JSON?
     ) -> String {
@@ -152,7 +152,7 @@ private enum FoundationModelExplainProvider {
         """
     }
 
-    private static func referencedLocalData(localItem: JSON?, thoughts: [ComputeThought]) -> JSON? {
+    private static func referencedLocalData(localItem: JSON?, thoughts: [Compute.Thought]) -> JSON? {
         guard localItem != nil else { return nil }
 
         let values = thoughts.compactMap { thought -> JSON? in
@@ -170,7 +170,7 @@ private enum FoundationModelExplainProvider {
 }
 #endif
 
-private extension ComputeThought {
+private extension Compute.Thought {
     var explanationJSON: JSON {
         var object: [String: JSON] = [
             "depth": .int(depth),

@@ -30,7 +30,7 @@ struct ComputeRuntimeEdgeCaseTests {
         let steps = try await [first, second]
         let routes = steps.flatMap { $0.thoughts.map(\.route) }
 
-        #expect(Set(routes) == Set<ComputeRoute>([["left"], ["right"]]))
+        #expect(Set(routes) == Set<Compute.Route>([["left"], ["right"]]))
         #expect(steps.map(\.remainingThoughts).sorted() == [0, 0])
         #expect(try await runtime.value() == [
             "left": true,
