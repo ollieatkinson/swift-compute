@@ -33,7 +33,13 @@ let package = Package(
                 .product(name: "CustomDump", package: "swift-custom-dump"),
             ]
         ),
-        .testTarget(name: "BrainTests", dependencies: ["Brain"]),
+        .testTarget(
+            name: "BrainTests",
+            dependencies: [
+                "Brain",
+                .product(name: "Algorithms", package: "swift-algorithms"),
+            ]
+        ),
         .testTarget(name: "ComputeTests", dependencies: ["Compute"]),
     ]
 )
