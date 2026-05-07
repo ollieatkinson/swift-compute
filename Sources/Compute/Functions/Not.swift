@@ -19,7 +19,8 @@ extension Keyword {
 extension Keyword.Not: ComputeKeyword {
     public static let name = "not"
 
-    public func compute() throws -> JSON {
-        .bool(!(try value.decode(Bool.self)))
+    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+        let value = try await value.compute(frame: frame)
+        return .bool(!(try value.decode(Bool.self)))
     }
 }

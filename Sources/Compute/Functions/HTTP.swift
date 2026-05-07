@@ -96,7 +96,7 @@ extension Keyword.HTTP {
             self.perform = perform
         }
 
-        public func value(for input: JSON) async throws -> JSON {
+        public func compute(data input: JSON, frame: ComputeFrame) async throws -> JSON? {
             let http = try JSON.decoded(Keyword.HTTP.self, from: input)
             let request = try http.request.urlRequest()
             return try await perform(request).json

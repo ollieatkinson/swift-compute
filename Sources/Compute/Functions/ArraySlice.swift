@@ -17,13 +17,17 @@ extension Keyword {
 }
 
 extension Keyword.ArraySlice: ComputeKeyword {
-    public func compute() throws -> JSON {
+    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+        let of = try await of.compute(frame: frame["of"])
         guard case .array(let values) = of else {
             throw JSONError("array_slice expected an array")
         }
-        let source = try (reversed?.decode(Bool.self) ?? false) ? Array(values.reversed()) : values
-        let lower = clamp(try from?.decode(Int.self) ?? source.startIndex, to: source.indices)
-        let upper = clamp(try to?.decode(Int.self) ?? source.endIndex, to: source.indices)
+        let reversed = try await reversed?.compute(frame: frame["reversed"]).decode(Bool.self) ?? false
+        let source = reversed ? Array(values.reversed()) : values
+        let lowerValue = try await from?.compute(frame: frame["from"]).decode(Int.self)
+        let upperValue = try await to?.compute(frame: frame["to"]).decode(Int.self)
+        let lower = clamp(lowerValue ?? source.startIndex, to: source.indices)
+        let upper = clamp(upperValue ?? source.endIndex, to: source.indices)
         guard lower <= upper else {
             return .array([])
         }

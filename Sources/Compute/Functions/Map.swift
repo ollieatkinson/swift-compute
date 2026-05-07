@@ -29,53 +29,29 @@ extension Keyword {
 extension Keyword.Map: ComputeKeyword {
     public static let name = "map"
 
-    public func compute() throws -> JSON {
-        var destination = dst ?? src
-        for copy in copy ?? [] {
-            try destination.set(copy.value, at: ComputeRoute(copy.to))
-        }
-        return destination
-    }
-}
-
-extension Keyword.Map: CustomComputeKeyword {
-    func compute(
-        context: Compute.Context,
-        runtime: ComputeFunctionRuntime,
-        route: ComputeRoute,
-        depth: Int
-    ) async throws -> JSON? {
-        let source = try await src.compute(
-            context: context,
-            runtime: runtime,
-            route: route.appending(.key("src")),
-            depth: depth
-        )
+    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+        let source = try await src.compute(frame: frame["src"])
         var destination: JSON
         if let dst {
-            destination = try await ComputeTaskLocal.$context.withValue(context.with(item: source)) {
-                try await dst.compute(
-                    context: ComputeTaskLocal.context,
-                    runtime: runtime,
-                    route: route.appending(.key("dst")),
-                    depth: depth
-                )
-            }
+            destination = try await dst.compute(frame: frame[item: source, "dst"])
         } else {
             destination = source
         }
         var copies: [Keyword.Map.Copy] = []
         for (index, copy) in (copy ?? []).enumerated() {
-            let value = try await ComputeTaskLocal.$context.withValue(context.with(item: source)) {
-                try await copy.value.compute(
-                    context: ComputeTaskLocal.context,
-                    runtime: runtime,
-                    route: route.appending(.key("copy")).appending(.index(index)).appending(.key("value")),
-                    depth: depth
-                )
-            }
+            let value = try await copy.value.compute(
+                frame: frame[item: source, "copy", .index(index), "value"]
+            )
             copies.append(Keyword.Map.Copy(value: value, to: copy.to))
         }
-        return try Self(src: source, dst: destination, copy: copies).compute()
+        return try Self.mapped(src: source, dst: destination, copy: copies)
+    }
+
+    private static func mapped(src: JSON, dst: JSON?, copy: [Copy]?) throws -> JSON {
+        var destination = dst ?? src
+        for copy in copy ?? [] {
+            try destination.set(copy.value, at: ComputeRoute(copy.to))
+        }
+        return destination
     }
 }

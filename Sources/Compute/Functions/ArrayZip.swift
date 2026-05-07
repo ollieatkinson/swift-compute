@@ -15,7 +15,8 @@ extension Keyword {
 }
 
 extension Keyword.ArrayZip: ComputeKeyword {
-    public func compute() throws -> JSON {
+    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+        let together = try await together.compute(frame: frame["together"])
         guard case .array(let values) = together else {
             throw JSONError("array_zip expected an array of arrays")
         }
@@ -29,7 +30,7 @@ extension Keyword.ArrayZip: ComputeKeyword {
             return .array([])
         }
         let zipped = (0..<count).flatMap { index in arrays.map { $0[index] } }
-        if try flattened?.decode(Bool.self) ?? false {
+        if try await flattened?.compute(frame: frame["flattened"]).decode(Bool.self) ?? false {
             return .array(zipped)
         }
         return .array(zipped.chunks(ofCount: arrays.count).map { JSON.array(Array($0)) })

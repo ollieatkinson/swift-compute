@@ -25,7 +25,7 @@ extension Keyword.From {
             self.references = references
         }
 
-        public func value(for input: JSON) async throws -> JSON {
+        public func compute(data input: JSON, frame: ComputeFrame) async throws -> JSON? {
             let from = try JSON.decoded(Keyword.From.self, from: input)
             return try await references.value(for: from.reference, context: from.context)
         }
@@ -37,15 +37,15 @@ public protocol AsyncComputeReferences: ComputeReferences {
 }
 
 extension Keyword.From.Function: ReturnsKeyword where References: AsyncComputeReferences {
-    public func values(for input: JSON) -> AsyncStream<Result<JSON, JSONError>> {
+    public func subject(data input: JSON, frame: ComputeFrame) -> AsyncStream<Result<JSON, JSONError>> {
         do {
             let from = try JSON.decoded(Keyword.From.self, from: input)
             return references.values(for: from.reference, context: from.context)
         } catch {
-            return AsyncStream { continuation in
-                continuation.yield(.failure(JSONError(error)))
-                continuation.finish()
-            }
+            let (stream, continuation) = AsyncStream.makeStream(of: Result<JSON, JSONError>.self)
+            continuation.yield(.failure(JSONError(error)))
+            continuation.finish()
+            return stream
         }
     }
 }

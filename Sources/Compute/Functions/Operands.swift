@@ -15,6 +15,12 @@ public struct Operands: Codable, Equatable, Sendable, OperandPair {
     }
 }
 extension OperandPair {
+    func computed(in frame: ComputeFrame) async throws -> Operands {
+        let lhs = try await lhs.compute(frame: frame["lhs"])
+        let rhs = try await rhs.compute(frame: frame["rhs"])
+        return Operands(lhs: lhs, rhs: rhs)
+    }
+
     func orderedComparison(
         string: (String, String) -> Bool,
         number: (Double, Double) -> Bool

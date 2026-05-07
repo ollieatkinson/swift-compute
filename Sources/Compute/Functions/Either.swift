@@ -21,40 +21,13 @@ extension Keyword.Either: Codable {
 extension Keyword.Either: ComputeKeyword {
     public static let name = "either"
 
-    public func compute() throws -> JSON {
-        for branch in branches {
-            if let value = try branch.selectedValue() {
-                return value
-            }
-        }
-        return .null
-    }
-}
-
-extension Keyword.Either: CustomComputeKeyword {
-    func compute(
-        context: Compute.Context,
-        runtime: ComputeFunctionRuntime,
-        route: ComputeRoute,
-        depth: Int
-    ) async throws -> JSON? {
-        for (index, branch) in branches.enumerated() {
-            let branchRoute = route.appending(.index(index))
+    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+        for (index, branch) in branches.indexed() {
             let condition = try await branch.condition?
-                .compute(
-                    context: context,
-                    runtime: runtime,
-                    route: branchRoute.appending(.key("condition")),
-                    depth: depth
-                )
+                .compute(frame: frame[.index(index), "condition"])
                 .decode(Bool.self) ?? true
             guard condition else { continue }
-            return try await branch.value.compute(
-                context: context,
-                runtime: runtime,
-                route: branchRoute.appending(.key("value")),
-                depth: depth
-            )
+            return try await branch.value.compute(frame: frame[.index(index), "value"])
         }
         return nil
     }

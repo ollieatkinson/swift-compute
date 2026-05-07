@@ -1,5 +1,5 @@
 extension JSON {
-    var conditionList: [JSON] {
+    func asList() -> [JSON] {
         switch self {
         case .null:
             return []
@@ -10,7 +10,7 @@ extension JSON {
         }
     }
 
-    var countValue: Int {
+    var count: Int {
         switch self {
         case .null:
             return 0
@@ -44,7 +44,7 @@ extension JSON {
         }
     }
 
-    func routeValue(at route: ComputeRoute) -> JSON? {
+    func value(at route: ComputeRoute) -> JSON? {
         var current = self
         for component in route.components {
             switch (component, current) {
@@ -61,50 +61,6 @@ extension JSON {
         return current
     }
 
-    func computableRoutes(
-        functions: [String: any AnyReturnsKeyword],
-        from route: ComputeRoute = .root
-    ) -> [ComputeRoute] {
-        switch self {
-        case .object(let object):
-            if let invocation = Compute.Invocation(object: object) {
-                let argumentRoute = route.appending(.key("{returns}")).appending(.key(invocation.keyword))
-                guard let function = functions[invocation.keyword] else {
-                    return invocation.argument.computableRoutes(functions: functions, from: argumentRoute)
-                }
-                if let custom = function as? any CustomComputeFunction {
-                    return custom.computableRoutes(
-                        argument: invocation.argument,
-                        functions: functions,
-                        route: route,
-                        argumentRoute: argumentRoute
-                    )
-                }
-                let childRoutes = invocation.argument.computableRoutes(functions: functions, from: argumentRoute)
-                return childRoutes.isEmpty ? [route] : childRoutes
-            }
-            var routes: [ComputeRoute] = []
-            for key in object.keys.sorted() {
-                routes.append(contentsOf: object[key]?.computableRoutes(
-                    functions: functions,
-                    from: route.appending(.key(key))
-                ) ?? [])
-            }
-            return routes
-        case .array(let values):
-            var routes: [ComputeRoute] = []
-            for (index, value) in values.enumerated() {
-                routes.append(contentsOf: value.computableRoutes(
-                    functions: functions,
-                    from: route.appending(.index(index))
-                ))
-            }
-            return routes
-        case .null, .bool, .int, .double, .string:
-            return []
-        }
-    }
-
     var isComputeInvocation: Bool {
         guard case .object(let object) = self else { return false }
         return Compute.Invocation(object: object) != nil
@@ -117,20 +73,17 @@ extension JSON {
         switch self {
         case .object(let object):
             if let invocation = Compute.Invocation(object: object) {
-                let argumentRoute = route.appending(.key("{returns}")).appending(.key(invocation.keyword))
-                guard let function = functions[invocation.keyword] else {
+                guard functions[invocation.keyword] != nil else {
+                    let argumentRoute = route["{returns}", .key(invocation.keyword)]
                     return invocation.argument.conceptRoutes(functions: functions, from: argumentRoute)
                 }
-                if let custom = function as? any CustomComputeFunction, custom.evaluatesChildrenInternally {
-                    return [route]
-                }
-                return [route] + invocation.argument.conceptRoutes(functions: functions, from: argumentRoute)
+                return [route]
             }
             var routes: [ComputeRoute] = []
             for key in object.keys.sorted() {
                 routes.append(contentsOf: object[key]?.conceptRoutes(
                     functions: functions,
-                    from: route.appending(.key(key))
+                    from: route[.key(key)]
                 ) ?? [])
             }
             return routes
@@ -139,39 +92,12 @@ extension JSON {
             for (index, value) in values.enumerated() {
                 routes.append(contentsOf: value.conceptRoutes(
                     functions: functions,
-                    from: route.appending(.index(index))
+                    from: route[.index(index)]
                 ))
             }
             return routes
         case .null, .bool, .int, .double, .string:
             return []
-        }
-    }
-
-    func remainingThoughtCount(
-        functions: [String: any AnyReturnsKeyword]
-    ) -> Int {
-        switch self {
-        case .object(let object):
-            if let invocation = Compute.Invocation(object: object) {
-                guard let function = functions[invocation.keyword] else {
-                    return invocation.argument.remainingThoughtCount(functions: functions)
-                }
-                if let custom = function as? any CustomComputeFunction {
-                    return custom.remainingThoughtCount(argument: invocation.argument, functions: functions)
-                }
-                return invocation.argument.remainingThoughtCount(functions: functions) + 1
-            }
-            let children = object.values.reduce(0) { count, value in
-                count + value.remainingThoughtCount(functions: functions)
-            }
-            return children
-        case .array(let values):
-            return values.reduce(0) { count, value in
-                count + value.remainingThoughtCount(functions: functions)
-            }
-        case .null, .bool, .int, .double, .string:
-            return 0
         }
     }
 
@@ -209,6 +135,12 @@ extension JSON {
     }
 
     func compute(
+        frame: ComputeFrame
+    ) async throws -> JSON {
+        try await compute(context: frame.context, runtime: frame.runtime, route: frame.route, depth: frame.depth)
+    }
+
+    private func compute(
         context: Compute.Context,
         runtime: ComputeFunctionRuntime,
         route: ComputeRoute = .root,
@@ -221,7 +153,7 @@ extension JSON {
                     throw ComputeError.recursionLimitExceeded
                 }
 
-                let functionRoute = route.appending(.key("{returns}")).appending(.key(invocation.keyword))
+                let functionRoute = route["{returns}", .key(invocation.keyword)]
                 do {
                     if let value = try await runtime.compute(
                         keyword: invocation.keyword,
@@ -234,7 +166,7 @@ extension JSON {
                     }
                 } catch {
                     if let fallback = invocation.fallback {
-                        let fallbackRoute = route.appending(.key("default"))
+                        let fallbackRoute = route["default"]
                         let output = try await fallback.compute(
                             context: context,
                             runtime: runtime,
@@ -254,7 +186,7 @@ extension JSON {
                     throw error
                 }
                 if let fallback = invocation.fallback {
-                    let fallbackRoute = route.appending(.key("default"))
+                    let fallbackRoute = route["default"]
                     let output = try await fallback.compute(
                         context: context,
                         runtime: runtime,
@@ -279,7 +211,7 @@ extension JSON {
                 computed[key] = try await object[key]?.compute(
                     context: context,
                     runtime: runtime,
-                    route: route.appending(.key(key)),
+                    route: route[.key(key)],
                     depth: depth
                 )
             }
@@ -290,7 +222,7 @@ extension JSON {
                 computed.append(try await value.compute(
                     context: context,
                     runtime: runtime,
-                    route: route.appending(.index(index)),
+                    route: route[.index(index)],
                     depth: depth
                 ))
             }

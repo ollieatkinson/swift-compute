@@ -13,7 +13,22 @@ extension Keyword {
 extension Keyword.ArrayFilter: ComputeKeyword {
     public static let name = "array_filter"
 
-    public func compute() throws -> JSON {
+    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+        let source = try await array.compute(frame: frame["array"])
+        guard case .array(let values) = source else {
+            throw JSONError("array_filter expected an array")
+        }
+        var predicates: [JSON] = []
+        for (index, value) in values.enumerated() {
+            let keep = try await predicate.compute(
+                frame: frame[item: value, "predicate", .index(index)]
+            )
+            predicates.append(.bool(try keep.decode(Bool.self)))
+        }
+        return try Self.filtered(array: source, predicate: .array(predicates))
+    }
+
+    private static func filtered(array: JSON, predicate: JSON) throws -> JSON {
         guard case .array(let values) = array else {
             throw JSONError("array_filter expected an array")
         }
@@ -29,37 +44,5 @@ extension Keyword.ArrayFilter: ComputeKeyword {
             throw JSONError("array_filter predicate count did not match array count")
         }
         return .array(zip(values, predicates).filter(\.1).map(\.0))
-    }
-}
-
-extension Keyword.ArrayFilter: CustomComputeKeyword {
-    func compute(
-        context: Compute.Context,
-        runtime: ComputeFunctionRuntime,
-        route: ComputeRoute,
-        depth: Int
-    ) async throws -> JSON? {
-        let source = try await array.compute(
-            context: context,
-            runtime: runtime,
-            route: route.appending(.key("array")),
-            depth: depth
-        )
-        guard case .array(let values) = source else {
-            throw JSONError("array_filter expected an array")
-        }
-        var predicates: [JSON] = []
-        for (index, value) in values.enumerated() {
-            let keep = try await ComputeTaskLocal.$context.withValue(context.with(item: value)) {
-                try await predicate.compute(
-                    context: ComputeTaskLocal.context,
-                    runtime: runtime,
-                    route: route.appending(.key("predicate")).appending(.index(index)),
-                    depth: depth
-                )
-            }
-            predicates.append(.bool(try keep.decode(Bool.self)))
-        }
-        return try Self(array: source, predicate: .array(predicates)).compute()
     }
 }

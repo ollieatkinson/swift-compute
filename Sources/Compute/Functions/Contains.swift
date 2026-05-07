@@ -13,7 +13,9 @@ extension Keyword {
 extension Keyword.Contains: ComputeKeyword {
     public static let name = "contains"
 
-    public func compute() throws -> JSON {
-        .bool(try lhs.decode(String.self).contains(rhs.decode(String.self)))
+    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+        let lhs = try await lhs.compute(frame: frame["lhs"])
+        let rhs = try await rhs.compute(frame: frame["rhs"])
+        return .bool(try lhs.decode(String.self).contains(rhs.decode(String.self)))
     }
 }

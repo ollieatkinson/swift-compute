@@ -31,21 +31,24 @@ extension Keyword {
 }
 
 extension Keyword.Text: ComputeKeyword {
-    public func compute() throws -> JSON {
+    public func compute(in frame: ComputeFrame) async throws -> JSON? {
         if let joining = from.joining {
-            return try joining.compute()
+            return try await joining.compute(in: frame["from", "joining"])
         }
         throw JSONError("Expected text formatter")
     }
 }
 extension Keyword.Text.Joining {
-    func compute() throws -> JSON {
+    func compute(in frame: ComputeFrame) async throws -> JSON {
+        let array = try await array.compute(frame: frame["array"])
+        let separatorValue = try await separator?.compute(frame: frame["separator"])
+        let terminatorValue = try await terminator?.compute(frame: frame["terminator"])
         guard case .array(let values) = array else {
             throw JSONError("text.joining expected an array")
         }
         let strings = try values.map { try $0.decode(String.self) }
-        let separator = try separator?.decode(String.self) ?? ""
-        let terminator = try terminator?.decode(String.self) ?? ""
+        let separator = try separatorValue?.decode(String.self) ?? ""
+        let terminator = try terminatorValue?.decode(String.self) ?? ""
         return .string(strings.joined(separator: separator).appending(terminator))
     }
 }

@@ -37,12 +37,8 @@ public struct JSONError: Error, Codable, Equatable, Hashable, Sendable, CustomSt
 }
 
 public enum Compute {
-    @propertyWrapper
     public struct Context: Equatable, Sendable {
         public var item: JSON?
-        public var wrappedValue: Context {
-            ComputeTaskLocal.context
-        }
 
         public init(item: JSON? = nil) {
             self.item = item
@@ -53,35 +49,5 @@ public enum Compute {
             context.item = item
             return context
         }
-    }
-}
-
-enum ComputeTaskLocal {
-    @TaskLocal static var context = Compute.Context()
-}
-
-extension Compute {
-    public static var context: Context {
-        ComputeTaskLocal.context
-    }
-
-    @discardableResult
-    public static func withContext<Value: Sendable>(
-        _ update: @Sendable (inout Context) throws -> Void,
-        operation: @Sendable () async throws -> Value
-    ) async rethrows -> Value {
-        var context = ComputeTaskLocal.context
-        try update(&context)
-        return try await ComputeTaskLocal.$context.withValue(context, operation: operation)
-    }
-
-    @discardableResult
-    public static func withContext<Value>(
-        _ update: (inout Context) throws -> Void,
-        operation: () throws -> Value
-    ) rethrows -> Value {
-        var context = ComputeTaskLocal.context
-        try update(&context)
-        return try ComputeTaskLocal.$context.withValue(context, operation: operation)
     }
 }

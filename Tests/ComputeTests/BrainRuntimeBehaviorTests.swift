@@ -16,33 +16,16 @@ struct BrainRuntimeBehaviorTests {
                 ],
             ],
         ]
-        let afterLeafWave: JSON = [
-            "{returns}": [
-                "comparison": [
-                    "greater_or_equal": [
-                        "lhs": 36,
-                        "rhs": 36,
-                    ],
-                ],
-            ],
-        ]
-
         let runtime = try runtime(json, in: Compute.Context(item: users[2]), references: references)
-        var step = try await runtime.step()
+        let step = try await runtime.step()
 
-        #expect(step.thoughts.map(\.keyword) == ["item", "from"])
-        #expect(step.thoughts.map(\.kind) == [.compute, .returns])
+        #expect(step.thoughts.map(\.keyword) == ["item", "from", "comparison"])
+        #expect(step.thoughts.map(\.kind) == [.compute, .returns, .compute])
         #expect(outputsByRoute(in: step.thoughts) == [
             ["{returns}", "comparison", "greater_or_equal", "lhs"]: 36,
             ["{returns}", "comparison", "greater_or_equal", "rhs"]: 36,
+            []: true,
         ])
-        #expect(step.state == afterLeafWave)
-        #expect(step.remainingThoughts == 1)
-        #expect(step.isThinking == true)
-
-        step = try await runtime.step()
-        #expect(step.thoughts.map(\.keyword) == ["comparison"])
-        #expect(step.thoughts.map(\.route) == [[]])
         #expect(step.state == true)
         #expect(step.remainingThoughts == 0)
         #expect(step.isThinking == false)
@@ -86,21 +69,8 @@ struct BrainRuntimeBehaviorTests {
         ]
         let runtime = try runtime(json, in: Compute.Context(item: users[2]), references: references)
 
-        #expect(await runtime.remainingThoughtCount == 3)
-        var step = try await runtime.step()
-        #expect(step.state == [
-            "{returns}": [
-                "comparison": [
-                    "greater_or_equal": [
-                        "lhs": 36,
-                        "rhs": 36,
-                    ],
-                ],
-            ],
-        ])
-        #expect(step.remainingThoughts == 1)
-
-        step = try await runtime.step()
+        #expect(await runtime.remainingThoughtCount == 1)
+        let step = try await runtime.step()
         #expect(step.state == true)
         #expect(step.remainingThoughts == 0)
 
@@ -143,65 +113,20 @@ struct BrainRuntimeBehaviorTests {
                 ],
             ],
         ]
-        let afterLeafWave: JSON = [
-            "{returns}": [
-                "yes": [
-                    "if": [
-                        [
-                            "{returns}": [
-                                "comparison": [
-                                    "greater_or_equal": [
-                                        "lhs": 36,
-                                        "rhs": 36,
-                                    ],
-                                ],
-                            ],
-                        ],
-                    ],
-                    "unless": [
-                        [
-                            "{returns}": [
-                                "not": true,
-                            ],
-                        ],
-                    ],
-                ],
-            ],
-        ]
-        let afterParentWave: JSON = [
-            "{returns}": [
-                "yes": [
-                    "if": [true],
-                    "unless": [false],
-                ],
-            ],
-        ]
         let runtime = try runtime(
             initial,
             in: Compute.Context(item: users[2]),
             references: references
         )
 
-        var thoughts: [ComputeThought] = []
-        var states: [JSON] = []
-        var remaining: [Int] = []
-
-        for _ in 0..<3 {
-            let step = try await runtime.step()
-            thoughts.append(contentsOf: step.thoughts)
-            states.append(step.state)
-            remaining.append(step.remainingThoughts)
-        }
+        let step = try await runtime.step()
+        let thoughts = step.thoughts
 
         #expect(thoughts.map(\.keyword) == ["item", "from", "from", "comparison", "not", "yes"])
         #expect(thoughts.map(\.kind) == [.compute, .returns, .returns, .compute, .compute, .compute])
-        #expect(remaining == [3, 1, 0])
+        #expect(step.remainingThoughts == 0)
         #expect(fromReferences(in: thoughts) == ["minimum_age", "manual_review"])
-        #expect(states == [
-            afterLeafWave,
-            afterParentWave,
-            true,
-        ])
+        #expect(step.state == true)
 
         await references.finish()
         await runtime.cancel()
@@ -238,7 +163,7 @@ struct BrainRuntimeBehaviorTests {
         ]
         let runtime = try runtime(json, in: Compute.Context(item: users[2]), references: references)
 
-        #expect(await runtime.remainingThoughtCount == 3)
+        #expect(await runtime.remainingThoughtCount == 1)
         var events = runtime.run().makeAsyncIterator()
 
         #expect(await events.next() == .success(false))

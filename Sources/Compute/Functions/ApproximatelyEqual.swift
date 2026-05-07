@@ -15,7 +15,9 @@ extension Keyword {
 extension Keyword.ApproximatelyEqual: ComputeKeyword {
     public static let name = "approximately_equal"
 
-    public func compute() throws -> JSON {
-        .bool(try abs(lhs.decode(Double.self) - rhs.decode(Double.self)) < accuracy)
+    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+        let lhs = try await lhs.compute(frame: frame["lhs"])
+        let rhs = try await rhs.compute(frame: frame["rhs"])
+        return .bool(try abs(lhs.decode(Double.self) - rhs.decode(Double.self)) < accuracy)
     }
 }

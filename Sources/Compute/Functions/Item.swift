@@ -34,8 +34,8 @@ extension Keyword.Item: Codable {
 extension Keyword.Item: ComputeKeyword {
     public static let name = "item"
 
-    public func compute() throws -> JSON {
-        let source = ComputeTaskLocal.context.item ?? .null
-        return source.routeValue(at: ComputeRoute(path)) ?? .null
+    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+        let source = frame.context.item ?? .null
+        return source.value(at: ComputeRoute(path)) ?? .null
     }
 }

@@ -56,6 +56,14 @@ public struct ComputeRoute: Hashable, Sendable, ExpressibleByArrayLiteral {
         ComputeRoute(components + [component])
     }
 
+    subscript(components: Component...) -> ComputeRoute {
+        appending(contentsOf: components)
+    }
+
+    public func appending(contentsOf components: [Component]) -> ComputeRoute {
+        ComputeRoute(self.components + components)
+    }
+
     public var path: [String] {
         components.map { component in
             switch component {

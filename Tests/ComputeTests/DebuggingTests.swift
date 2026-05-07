@@ -42,8 +42,9 @@ struct DebuggingTests {
               route: /
               event: ✅ success
               thoughts:
-                [0] returns from @ {returns}.comparison.greater_or_equal.rhs -> 36
-                [1] compute comparison @ / -> true
+                [0] compute item @ {returns}.comparison.greater_or_equal.lhs -> 36
+                [1] returns from @ {returns}.comparison.greater_or_equal.rhs -> 36
+                [2] compute comparison @ / -> true
               state diff:
                 - JSON.bool(false)
                 + JSON.bool(true)

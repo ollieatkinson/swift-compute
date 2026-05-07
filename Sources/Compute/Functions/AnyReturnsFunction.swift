@@ -1,7 +1,7 @@
 public struct AnyReturnsFunction: ReturnsKeyword {
     public let name: String
     private let valueImplementation: @Sendable (JSON) async throws -> JSON
-    private let valuesImplementation: @Sendable (JSON) -> AsyncStream<Result<JSON, JSONError>>
+    private let valuesImplementation: @Sendable (JSON, ComputeFrame) -> AsyncStream<Result<JSON, JSONError>>
 
     public init(
         name: String,
@@ -10,14 +10,24 @@ public struct AnyReturnsFunction: ReturnsKeyword {
     ) {
         self.name = name
         self.valueImplementation = value
-        self.valuesImplementation = values
+        self.valuesImplementation = { data, _ in values(data) }
     }
 
-    public func value(for input: JSON) async throws -> JSON {
+    public init(
+        name: String,
+        value: @escaping @Sendable (JSON) async throws -> JSON,
+        subject: @escaping @Sendable (JSON, ComputeFrame) -> AsyncStream<Result<JSON, JSONError>>
+    ) {
+        self.name = name
+        self.valueImplementation = value
+        self.valuesImplementation = subject
+    }
+
+    public func compute(data input: JSON, frame: ComputeFrame) async throws -> JSON? {
         try await valueImplementation(input)
     }
 
-    public func values(for input: JSON) -> AsyncStream<Result<JSON, JSONError>> {
-        valuesImplementation(input)
+    public func subject(data input: JSON, frame: ComputeFrame) -> AsyncStream<Result<JSON, JSONError>> {
+        valuesImplementation(input, frame)
     }
 }

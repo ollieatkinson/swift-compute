@@ -15,50 +15,20 @@ extension Keyword {
 }
 
 extension Keyword.ArrayReduce: ComputeKeyword {
-    public func compute() throws -> JSON {
-        guard case .array = array else {
-            throw JSONError("array_reduce expected an array")
-        }
-        return initial
-    }
-}
 
-extension Keyword.ArrayReduce: CustomComputeKeyword {
-    func compute(
-        context: Compute.Context,
-        runtime: ComputeFunctionRuntime,
-        route: ComputeRoute,
-        depth: Int
-    ) async throws -> JSON? {
-        let source = try await array.compute(
-            context: context,
-            runtime: runtime,
-            route: route.appending(.key("array")),
-            depth: depth
-        )
+    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+        let source = try await array.compute(frame: frame["array"])
         guard case .array(let values) = source else {
             throw JSONError("array_reduce expected an array")
         }
-        var accumulator = try await initial.compute(
-            context: context,
-            runtime: runtime,
-            route: route.appending(.key("initial")),
-            depth: depth
-        )
+        var accumulator = try await initial.compute(frame: frame["initial"])
         for (index, value) in values.enumerated() {
             let item: JSON = [
                 "accumulator": accumulator,
                 "index": .int(index),
                 "item": value,
             ]
-            accumulator = try await ComputeTaskLocal.$context.withValue(context.with(item: item)) {
-                try await next.compute(
-                    context: ComputeTaskLocal.context,
-                    runtime: runtime,
-                    route: route.appending(.key("next")).appending(.index(index)),
-                    depth: depth
-                )
-            }
+            accumulator = try await next.compute(frame: frame[item: item, "next", .index(index)])
         }
         return accumulator
     }

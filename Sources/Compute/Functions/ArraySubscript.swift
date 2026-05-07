@@ -15,12 +15,14 @@ extension Keyword {
 }
 
 extension Keyword.ArraySubscript: ComputeKeyword {
-    public func compute() throws -> JSON {
+    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+        let of = try await of.compute(frame: frame["of"])
         guard case .array(let values) = of else {
             throw JSONError("array_subscript expected an array")
         }
-        let source = try (reversed?.decode(Bool.self) ?? false) ? Array(values.reversed()) : values
-        let index = try index.decode(Int.self)
+        let reversed = try await reversed?.compute(frame: frame["reversed"]).decode(Bool.self) ?? false
+        let source = reversed ? Array(values.reversed()) : values
+        let index = try await index.compute(frame: frame["index"]).decode(Int.self)
         guard source.indices.contains(index) else {
             return .null
         }

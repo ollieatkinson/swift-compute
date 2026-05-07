@@ -30,7 +30,8 @@ extension Keyword {
 }
 
 extension Keyword.ArraySort: ComputeKeyword {
-    public func compute() throws -> JSON {
+    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+        let array = try await array.compute(frame: frame["array"])
         guard case .array(let values) = array else {
             throw JSONError("array_sort expected an array")
         }
@@ -75,7 +76,7 @@ extension Keyword.ArraySort.Predicate {
         guard let key_path else {
             return json
         }
-        return json.routeValue(at: ComputeRoute(key_path)) ?? .null
+        return json.value(at: ComputeRoute(key_path)) ?? .null
     }
 }
 

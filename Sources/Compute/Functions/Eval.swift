@@ -15,11 +15,18 @@ extension Keyword {
 }
 
 extension Keyword.Eval: ComputeKeyword {
-    public func compute() throws -> JSON {
+    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+        let expression = try await expression.compute(frame: frame["expression"])
+        var context: [String: JSON] = [:]
+        for key in self.context?.keys.sorted() ?? [] {
+            guard let value = self.context?[key] else { continue }
+            context[key] = try await value.compute(frame: frame["context", .key(key)])
+        }
+
         guard let js = JSContext() else {
             throw JSONError("Could not create JSContext")
         }
-        for (key, value) in context ?? [:] {
+        for (key, value) in context {
             js.setObject(value.any, forKeyedSubscript: key as NSString)
         }
         let result = js.evaluateScript(try expression.decode(String.self))

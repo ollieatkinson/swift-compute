@@ -39,25 +39,10 @@ extension Keyword {
 }
 
 extension Keyword.Explain: ComputeKeyword {
-    public func compute() throws -> JSON {
-        value
-    }
-}
 
-extension Keyword.Explain: CustomComputeKeyword {
-    func compute(
-        context: Compute.Context,
-        runtime: ComputeFunctionRuntime,
-        route: ComputeRoute,
-        depth: Int
-    ) async throws -> JSON? {
-        let capture = await runtime.capture {
-            try await value.compute(
-                context: context,
-                runtime: runtime,
-                route: route.appending(.key("value")),
-                depth: depth
-            )
+    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+        let capture = await frame.runtime.capture {
+            try await value.compute(frame: frame["value"])
         }
 
         let thoughts = JSON.array(capture.thoughts.map(\.explanationJSON))
@@ -72,7 +57,7 @@ extension Keyword.Explain: CustomComputeKeyword {
             if let explanation = await naturalLanguageExplanation(
                 computedValue: value,
                 thoughts: capture.thoughts,
-                localItem: context.item
+                localItem: frame.context.item
             ) {
                 payload["explanation"] = .string(explanation)
             }

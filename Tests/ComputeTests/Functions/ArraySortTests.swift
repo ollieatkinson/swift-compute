@@ -1,3 +1,4 @@
+import Compute
 import Testing
 
 @Suite(.serialized)
@@ -29,5 +30,20 @@ struct ArraySortTests {
 
     @Test func returns_identity_without_predicates() async throws {
         try await expect(["{returns}": ["array_sort": ["array": [3, 1, 2]]]], equals: [3, 1, 2])
+    }
+
+    @Test func resolves_computed_array_inputs() async throws {
+        try await expect(
+            [
+                "{returns}": [
+                    "array_sort": [
+                        "array": ["{returns}": ["item": ["scores"]]],
+                        "predicates": [["order": "ascending"]],
+                    ],
+                ],
+            ],
+            in: Compute.Context(item: ["scores": [3, 1, 2]]),
+            equals: [1, 2, 3]
+        )
     }
 }

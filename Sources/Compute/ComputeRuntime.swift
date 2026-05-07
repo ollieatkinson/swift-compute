@@ -139,7 +139,7 @@ public actor ComputeRuntime: Sendable {
     }
 
     public func value(at route: ComputeRoute) async throws -> JSON? {
-        (try await value()).routeValue(at: route)
+        (try await value()).value(at: route)
     }
 
     public func decode<Value: Decodable>(
@@ -301,8 +301,14 @@ public actor ComputeRuntime: Sendable {
         }
         for (key, dependency) in next where subscriptions[key] == nil {
             guard let function = functions[dependency.keyword] as? any ReturnsKeyword else { continue }
+            let frame = ComputeFrame(
+                context: context ?? Compute.Context(),
+                runtime: functionRuntime(),
+                route: .root,
+                depth: 0
+            )
             subscriptions[key] = Task { [weak self] in
-                for await result in function.values(for: dependency.argument) {
+                for await result in function.subject(data: dependency.argument, frame: frame) {
                     if Task.isCancelled { return }
                     guard let self else { return }
                     await self.apply(result, to: dependency)
@@ -364,7 +370,7 @@ public actor ComputeRuntime: Sendable {
     private func publish(_ state: JSON) {
         for route in Array(routeContinuations.keys) {
             let result: Result<JSON, JSONError>
-            if let value = state.routeValue(at: route) {
+            if let value = state.value(at: route) {
                 result = .success(value)
             } else {
                 result = .failure(JSONError("Missing value", path: route.path))
@@ -391,25 +397,24 @@ public actor ComputeRuntime: Sendable {
     }
 
     private func thinking(with runtime: ComputeFunctionRuntime) -> ComputeBrain.Thinking {
-        let context = context ?? ComputeTaskLocal.context
+        let context = context ?? Compute.Context()
         return { lemma, state in
             guard case .route(let route) = lemma else { return nil }
-            return try await ComputeTaskLocal.$context.withValue(context) {
-                try await self.evaluate(route, state: state, runtime: runtime)
-            }
+            return try await self.evaluate(route, state: state, runtime: runtime, context: context)
         }
     }
 
     private func evaluate(
         _ route: ComputeRoute,
         state: ComputeBrain.State,
-        runtime: ComputeFunctionRuntime
+        runtime: ComputeFunctionRuntime,
+        context: Compute.Context
     ) async throws -> ComputeSignal? {
         let current = try document(from: state, excluding: route)
-        guard case .object(let object) = current.routeValue(at: route) else {
+        guard case .object(let object) = current.value(at: route) else {
             return nil
         }
-        let step = try await Self.evaluate(object, at: route, runtime: runtime)
+        let step = try await Self.evaluate(object, at: route, runtime: runtime, context: context)
         var nextState = state
         nextState[.route(route)] = .value(step.output)
         let nextDocument = try document(from: nextState)
@@ -428,11 +433,11 @@ public actor ComputeRuntime: Sendable {
     private static func evaluate(
         _ object: [String: JSON],
         at route: ComputeRoute,
-        runtime: ComputeFunctionRuntime
+        runtime: ComputeFunctionRuntime,
+        context: Compute.Context
     ) async throws -> (keyword: String, kind: ComputeThoughtKind, input: JSON, output: JSON) {
-        let context = ComputeTaskLocal.context
         if let invocation = Compute.Invocation(object: object) {
-            let functionRoute = route.appending(.key("{returns}")).appending(.key(invocation.keyword))
+            let functionRoute = route["{returns}", .key(invocation.keyword)]
             do {
                 if let output = try await runtime.compute(
                     keyword: invocation.keyword,
@@ -447,23 +452,23 @@ public actor ComputeRuntime: Sendable {
                 guard let fallback = invocation.fallback else {
                     return (invocation.keyword, await runtime.kind(for: invocation.keyword), invocation.returnsJSON, .null)
                 }
-                let output = try await fallback.compute(
+                let output = try await fallback.compute(frame: ComputeFrame(
                     context: context,
                     runtime: runtime,
-                    route: route.appending(.key("default")),
+                    route: route["default"],
                     depth: 0
-                )
+                ))
                 return ("default", .defaultValue, fallback, output)
             } catch {
                 guard let fallback = invocation.fallback else {
                     throw error
                 }
-                let output = try await fallback.compute(
+                let output = try await fallback.compute(frame: ComputeFrame(
                     context: context,
                     runtime: runtime,
-                    route: route.appending(.key("default")),
+                    route: route["default"],
                     depth: 0
-                )
+                ))
                 return ("default", .defaultValue, fallback, output)
             }
         }
@@ -483,7 +488,7 @@ public actor ComputeRuntime: Sendable {
         var concepts: [ComputeBrain.Concept] = []
 
         for route in routes {
-            guard let value = document.routeValue(at: route) else { continue }
+            guard let value = document.value(at: route) else { continue }
             state[.route(route)] = .value(value)
             state[.source(route)] = .value(value)
             change[.source(route)] = .value(value)
@@ -510,8 +515,7 @@ public actor ComputeRuntime: Sendable {
     ) -> Set<ComputeLemma> {
         var inputs: Set<ComputeLemma> = []
         if case .object(let object) = value, let invocation = Compute.Invocation(object: object) {
-            let function = functions[invocation.keyword]
-            if let custom = function as? any CustomComputeFunction, custom.evaluatesChildrenInternally {
+            if functions[invocation.keyword] != nil {
                 inputs.insert(.source(route))
             } else {
                 let children = route.directChildConcepts(in: routeConcepts)
@@ -607,30 +611,20 @@ actor ComputeFunctionRuntime {
         recordThought: Bool = true
     ) async throws -> JSON? {
         guard let function = functions[keyword] else { return nil }
+        let frame = ComputeFrame(context: context, runtime: self, route: route, depth: depth)
         let rawOutput: JSON?
-        if let custom = function as? any CustomComputeFunction {
-            rawOutput = try await custom.compute(
-                argument: argument,
-                context: context,
-                runtime: self,
-                route: route,
-                depth: depth
-            )
+        if function is any ReturnsKeyword {
+            let computed = try await argument.compute(frame: frame)
+            rawOutput = try await value(keyword: keyword, argument: computed, frame: frame)
         } else {
-            let computed = try await argument.compute(
-                context: context,
-                runtime: self,
-                route: route,
-                depth: depth
-            )
-            rawOutput = try await value(keyword: keyword, argument: computed, route: route)
+            rawOutput = try await function.compute(data: argument, frame: frame)
         }
-        let output = try await rawOutput?.compute(
+        let output = try await rawOutput?.compute(frame: ComputeFrame(
             context: context,
             runtime: self,
             route: route.computeObjectRoute(for: keyword),
             depth: depth + 1
-        )
+        ))
         if recordThought, let output {
             let thoughtRoute = route.computeObjectRoute(for: keyword)
             thoughts.append(ComputeThought(
@@ -657,17 +651,17 @@ actor ComputeFunctionRuntime {
         }
     }
 
-    func value(keyword: String, argument: JSON, route: ComputeRoute) async throws -> JSON? {
+    func value(keyword: String, argument: JSON, frame: ComputeFrame) async throws -> JSON? {
         guard let function = functions[keyword] else { return nil }
         if function is any ReturnsKeyword {
             let dependency = ComputeDependency(keyword: keyword, argument: argument)
-            let route = dependencyOwner(route.computeObjectRoute(for: keyword))
+            let route = dependencyOwner(frame.route.computeObjectRoute(for: keyword))
             tracked[route, default: []].insert(dependency)
             if let result = results[dependency.key] {
                 return try result.get()
             }
         }
-        return try await function.value(for: argument)
+        return try await function.compute(data: argument, frame: frame)
     }
 
     func registeredFunctions() -> [String: any AnyReturnsKeyword] {

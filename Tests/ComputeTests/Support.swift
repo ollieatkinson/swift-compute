@@ -174,7 +174,7 @@ struct Echo: ComputeKeyword {
         try payload.encode(to: encoder)
     }
 
-    func compute() throws -> JSON {
+    func compute(in frame: ComputeFrame) async throws -> JSON? {
         payload
     }
 }

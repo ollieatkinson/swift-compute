@@ -11,7 +11,8 @@ extension Keyword {
 }
 
 extension Keyword.Error: ComputeKeyword {
-    public func compute() throws -> JSON {
+    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+        let message = try await message.compute(frame: frame["message"])
         throw JSONError(try message.decode(String.self))
     }
 }

@@ -26,19 +26,13 @@ struct ItemTests {
         try await expect(["{returns}": ["item": ["rectangle", 3]]], in: context, equals: 4)
     }
 
-    @Test func reads_values_from_task_local_context() async throws {
-        let runtime = ComputeRuntime(document: ["{returns}": ["item": ["name"]]])
+    @Test func reads_values_from_runtime_context() async throws {
+        let runtime = ComputeRuntime(
+            document: ["{returns}": ["item": ["name"]]],
+            context: Compute.Context(item: users[1])
+        )
 
-        let values = try await Compute.withContext { context in
-            context.item = users[1]
-        } operation: {
-            let runtimeValue = try await runtime.value()
-            let contextItem = try await taskLocalItem()
-            return (runtimeValue, contextItem)
-        }
-
-        #expect(values.0 == "Noah")
-        #expect(values.1 == users[1])
+        #expect(try await runtime.value() == "Noah")
     }
 
     @Test func composes_inside_predicates() async throws {
@@ -56,9 +50,4 @@ struct ItemTests {
             ["Noah", "Ste"]
         )
     }
-}
-
-private func taskLocalItem() async throws -> JSON? {
-    @Compute.Context var context
-    return context.item
 }

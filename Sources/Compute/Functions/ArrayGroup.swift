@@ -50,76 +50,34 @@ extension Keyword {
 }
 
 extension Keyword.ArrayGroup: ComputeKeyword {
-    public func compute() throws -> JSON {
-        guard case .array(let values) = array else {
-            throw JSONError("array_group expected an array")
-        }
-        switch try GroupingMode(into: into, by: by) {
-        case .into(let into):
-            return .array(try IntoPlan(into).groups(from: values).map(JSON.array))
-        case .by:
-            throw JSONError("array_group by requires runtime item context")
-        }
-    }
-}
 
-extension Keyword.ArrayGroup: CustomComputeKeyword {
-    func compute(
-        context: Compute.Context,
-        runtime: ComputeFunctionRuntime,
-        route: ComputeRoute,
-        depth: Int
-    ) async throws -> JSON? {
-        let source = try await array.compute(
-            context: context,
-            runtime: runtime,
-            route: route.appending(.key("array")),
-            depth: depth
-        )
+    public func compute(in frame: ComputeFrame) async throws -> JSON? {
+        let source = try await array.compute(frame: frame["array"])
         guard case .array(let values) = source else {
             throw JSONError("array_group expected an array")
         }
         switch try GroupingMode(into: into, by: by) {
         case .into(let into):
-            let plan = try await IntoPlan(
-                into,
-                context: context,
-                runtime: runtime,
-                route: route,
-                depth: depth
-            )
+            let plan = try await IntoPlan(into, frame: frame)
             return .array(plan.groups(from: values).map(JSON.array))
         case .by(let by):
-            return try await group(values, by: by, context: context, runtime: runtime, route: route, depth: depth)
+            return try await group(values, by: by, frame: frame)
         }
     }
 
     private func group(
         _ values: [JSON],
         by: By,
-        context: Compute.Context,
-        runtime: ComputeFunctionRuntime,
-        route: ComputeRoute,
-        depth: Int
+        frame: ComputeFrame
     ) async throws -> JSON {
         var keyedItems: [KeyedItem] = []
         for (index, value) in values.enumerated() {
-            let key = try await ComputeTaskLocal.$context.withValue(context.with(item: value)) {
-                try await by.value.compute(
-                    context: ComputeTaskLocal.context,
-                    runtime: runtime,
-                    route: route.appending(.key("by")).appending(.key("value")).appending(.index(index)),
-                    depth: depth
-                )
-            }
+            let key = try await by.value.compute(
+                frame: frame[item: value, "by", "value", .index(index)]
+            )
             keyedItems.append(KeyedItem(index: index, key: key, value: value))
         }
-        let orderValue = try await by.order?.compute(
-            context: context,
-            runtime: runtime,
-            route: route.appending(.key("by")).appending(.key("order")),
-            depth: depth
-        )
+        let orderValue = try await by.order?.compute(frame: frame["by", "order"])
         let order = try orderValue?.decode(Keyword.ArraySort.Order.self) ?? .ascending
         return .array(try ItemGroup.groups(from: keyedItems).elements(ordered: order).map(JSON.array))
     }
@@ -154,31 +112,10 @@ extension Keyword.ArrayGroup {
             try validate()
         }
 
-        init(
-            _ into: Into,
-            context: Compute.Context,
-            runtime: ComputeFunctionRuntime,
-            route: ComputeRoute,
-            depth: Int
-        ) async throws {
-            let counts = try await into.counts.compute(
-                context: context,
-                runtime: runtime,
-                route: route.appending(.key("into")).appending(.key("counts")),
-                depth: depth
-            )
-            let overflow = try await into.overflow?.compute(
-                context: context,
-                runtime: runtime,
-                route: route.appending(.key("into")).appending(.key("overflow")),
-                depth: depth
-            )
-            let remainder = try await into.remainder?.compute(
-                context: context,
-                runtime: runtime,
-                route: route.appending(.key("into")).appending(.key("remainder")),
-                depth: depth
-            )
+        init(_ into: Into, frame: ComputeFrame) async throws {
+            let counts = try await into.counts.compute(frame: frame["into", "counts"])
+            let overflow = try await into.overflow?.compute(frame: frame["into", "overflow"])
+            let remainder = try await into.remainder?.compute(frame: frame["into", "remainder"])
             self.counts = try counts.decode([Int].self)
             self.overflow = try overflow?.decode(Overflow.self) ?? .trimmed
             self.remainder = try remainder?.decode(Remainder.self) ?? .trimmed
