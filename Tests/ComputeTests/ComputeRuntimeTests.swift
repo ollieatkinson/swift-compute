@@ -2,7 +2,7 @@ import Compute
 import Testing
 
 @Suite(.serialized)
-struct BrainRuntimeBehaviorTests {
+struct ComputeRuntimeTests {
     @Test func runtime_steps_through_leaf_computes_before_replacing_the_root() async throws {
         let references = TestReferences()
         await references.set("minimum_age", to: 36)
