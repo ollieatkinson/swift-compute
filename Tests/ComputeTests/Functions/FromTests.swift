@@ -4,7 +4,7 @@ import Testing
 @Suite(.serialized)
 struct FromTests {
 
-    @Test func publishesEveryReferenceChange() async throws {
+    @Test func publishes_every_reference_change() async throws {
         let references = TestReferences()
         await references.set("feature", to: true)
         let runtime = try runtime(["{returns}": ["from": ["reference": "feature"]]], references: references)
@@ -20,7 +20,7 @@ struct FromTests {
         await runtime.cancel()
     }
 
-    @Test func recursivelyResolvesReferencedComputes() async throws {
+    @Test func recursively_resolves_referenced_computes() async throws {
         let references = TestReferences()
         await references.set("flag.pointer", to: ["{returns}": ["from": ["reference": "flag.actual"]]])
         await references.set("flag.actual", to: true)
@@ -37,7 +37,7 @@ struct FromTests {
         await runtime.cancel()
     }
 
-    @Test func recursivelyResolvesThreeFromsIntoAComparison() async throws {
+    @Test func recursively_resolves_three_froms_into_a_comparison() async throws {
         let references = TestReferences()
         await references.set("rules.entry", to: ["{returns}": ["from": ["reference": "rules.subject.isEligible"]]])
         await references.set("rules.subject.isEligible", to: ["{returns}": ["from": ["reference": "rules.subject.eligibilityCheck"]]])
@@ -72,7 +72,7 @@ struct FromTests {
         await runtime.cancel()
     }
 
-    @Test func updatesNestedDocumentRoutesWhenAReferenceChanges() async throws {
+    @Test func updates_nested_document_routes_when_a_reference_changes() async throws {
         let references = TestReferences()
         await references.set("minimum_age", to: 36)
         let document: JSON = [
@@ -102,7 +102,7 @@ struct FromTests {
         await runtime.cancel()
     }
 
-    @Test func defaultsAllowStreamsToRecoverFromReferenceFailures() async throws {
+    @Test func defaults_allow_streams_to_recover_from_reference_failures() async throws {
         let references = TestReferences()
         await references.set("feature", to: true)
         let runtime = try runtime([
@@ -121,7 +121,7 @@ struct FromTests {
         await runtime.cancel()
     }
 
-    @Test func missingDefaultsPublishFailuresAndRecover() async throws {
+    @Test func missing_defaults_publish_failures_and_recover() async throws {
         let references = TestReferences()
         await references.set("feature", to: true)
         let runtime = try runtime(["{returns}": ["from": ["reference": "feature"]]], references: references)
@@ -137,7 +137,7 @@ struct FromTests {
         await runtime.cancel()
     }
 
-    @Test func recomputesRecursiveDocumentsWhenDependenciesChange() async throws {
+    @Test func recomputes_recursive_documents_when_dependencies_change() async throws {
         let references = TestReferences()
         await references.set("data.type.boolean", to: true)
         await references.set("data.type.integer", to: 0)
@@ -181,7 +181,7 @@ struct FromTests {
         await runtime.cancel()
     }
 
-    @Test func usesContextWhenResolvingReferences() async throws {
+    @Test func uses_context_when_resolving_references() async throws {
         let references = TestReferences()
         await references.set("feature.access.allowed?subject.id=\"example\"", to: true)
         let json: JSON = [

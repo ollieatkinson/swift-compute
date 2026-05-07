@@ -3,7 +3,7 @@ import Testing
 
 @Suite(.serialized)
 struct DebuggingTests {
-    @Test func computeRuntimePrintChangesLogsEventsThoughtsAndStateDiffs() async throws {
+    @Test func compute_runtime_print_changes_logs_events_thoughts_and_state_diffs() async throws {
         let references = TestReferences()
         await references.set("minimum_age", to: 38)
         let json: JSON = [

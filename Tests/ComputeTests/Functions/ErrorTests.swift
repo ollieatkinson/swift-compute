@@ -3,7 +3,7 @@ import Testing
 @Suite(.serialized)
 struct ErrorKeywordTests {
 
-    @Test func throwsResolvedMessages() async {
+    @Test func throws_resolved_messages() async {
         await expectJSONError(containing: "boom") {
             _ = try await value(["{returns}": ["error": ["message": "boom"]]])
         }

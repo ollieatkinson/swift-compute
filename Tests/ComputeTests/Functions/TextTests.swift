@@ -4,7 +4,7 @@ import Testing
 @Suite(.serialized)
 struct TextTests {
 
-    @Test func joinsResolvedStringsWithSeparatorAndTerminator() async throws {
+    @Test func joins_resolved_strings_with_separator_and_terminator() async throws {
         let json: JSON = [
             "{returns}": [
                 "text": [
@@ -30,7 +30,7 @@ struct TextTests {
         )
     }
 
-    @Test func defaultsToEmptySeparatorAndTerminator() async throws {
+    @Test func defaults_to_empty_separator_and_terminator() async throws {
         try await expect(
             [
                 "{returns}": [

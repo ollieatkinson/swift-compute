@@ -3,7 +3,7 @@ import Testing
 @Suite(.serialized)
 struct EqualTests {
 
-    @Test func comparesTypedNumbersStringsAndArrays() async throws {
+    @Test func compares_typed_numbers_strings_and_arrays() async throws {
         try await expect(["{returns}": ["comparison": ["equal": ["lhs": 1, "rhs": 1]]]], equals: true)
         try await expect(["{returns}": ["comparison": ["equal": ["lhs": 1.0, "rhs": 1.0]]]], equals: true)
         try await expect(["{returns}": ["comparison": ["equal": ["lhs": 1, "rhs": 1.0]]]], equals: false)
@@ -12,7 +12,7 @@ struct EqualTests {
         try await expect(["{returns}": ["comparison": ["equal": ["lhs": [1, 2, 3], "rhs": [1, 2, 3]]]]], equals: true)
     }
 
-    @Test func comparesNestedJSONStructurally() async throws {
+    @Test func compares_nested_json_structurally() async throws {
         try await expect([
             "{returns}": [
                 "comparison": [

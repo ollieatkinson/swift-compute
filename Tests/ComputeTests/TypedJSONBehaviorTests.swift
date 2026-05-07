@@ -4,7 +4,7 @@ import Testing
 @Suite(.serialized)
 struct TypedJSONBehaviorTests {
 
-    @Test func jsonSupportsSwiftLiteralSyntax() throws {
+    @Test func json_supports_swift_literal_syntax() throws {
         let value: JSON = [
             "address": [
                 "city": "London",
@@ -32,7 +32,7 @@ struct TypedJSONBehaviorTests {
         ]))
     }
 
-    @Test func jsonEqualityIsStructuralAndTyped() throws {
+    @Test func json_equality_is_structural_and_typed() throws {
         let integer: JSON = 1
         let double: JSON = 1.0
         let integerDocument: JSON = ["values": [1], "count": 1]
@@ -42,7 +42,7 @@ struct TypedJSONBehaviorTests {
         #expect(integerDocument != doubleDocument)
     }
 
-    @Test func literalJSONValuesCanDecodeToConcreteModels() async throws {
+    @Test func literal_json_values_can_decode_to_concrete_models() async throws {
         try await expect(users[0], as: User.self, equals: User(
             name: "Milos",
             age: 32,
@@ -52,7 +52,7 @@ struct TypedJSONBehaviorTests {
         ))
     }
 
-    @Test func computedJSONValuesCanDecodeToConcreteTypes() async throws {
+    @Test func computed_json_values_can_decode_to_concrete_types() async throws {
         try await expect(
             ["{returns}": ["item": ["address", "city"]]],
             as: String.self,
@@ -76,7 +76,7 @@ struct TypedJSONBehaviorTests {
         )
     }
 
-    @Test func jsonDecoderPreservesPrimitiveTypes() throws {
+    @Test func json_decoder_preserves_primitive_types() throws {
         struct Decoded: Decodable, Equatable {
             let count: Int
             let ratio: Double
@@ -95,7 +95,7 @@ struct TypedJSONBehaviorTests {
         #expect(try value.decode(Decoded.self) == Decoded(count: 1, ratio: 2, enabled: true, title: "feature"))
     }
 
-    @Test func jsonAnyRoundTripsThroughFoundationValues() throws {
+    @Test func json_any_round_trips_through_foundation_values() throws {
         let value: JSON = [
             "enabled": true,
             "missing": nil,

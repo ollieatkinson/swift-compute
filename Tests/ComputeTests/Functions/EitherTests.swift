@@ -4,7 +4,7 @@ import Testing
 @Suite(.serialized)
 struct EitherTests {
 
-    @Test func returnsTheFirstMatchingBranch() async throws {
+    @Test func returns_the_first_matching_branch() async throws {
         try await expect(
             [
                 "{returns}": [
@@ -27,7 +27,7 @@ struct EitherTests {
         )
     }
 
-    @Test func selectsBranchUsingReferencedComputedConditions() async throws {
+    @Test func selects_branch_using_referenced_computed_conditions() async throws {
         let references = TestReferences()
         await references.set("data.array", to: [1, 2, 3, 4, 5, 6, 7, 8, 9])
         let count: JSON = [

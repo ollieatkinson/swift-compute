@@ -4,12 +4,12 @@ import Testing
 @Suite(.serialized)
 struct GreaterOrEqualTests {
 
-    @Test func evaluatesInclusiveOrdering() async throws {
+    @Test func evaluates_inclusive_ordering() async throws {
         try await expect(["{returns}": ["comparison": ["greater_or_equal": ["lhs": 1, "rhs": 2]]]], equals: false)
         try await expect(["{returns}": ["comparison": ["greater_or_equal": ["lhs": 2, "rhs": 2]]]], equals: true)
     }
 
-    @Test func recomputesWhenAReferencedOperandChanges() async throws {
+    @Test func recomputes_when_a_referenced_operand_changes() async throws {
         let references = TestReferences()
         await references.set("minimum_age", to: 38)
         let runtime = try runtime(

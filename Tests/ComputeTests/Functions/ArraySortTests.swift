@@ -3,7 +3,7 @@ import Testing
 @Suite(.serialized)
 struct ArraySortTests {
 
-    @Test func sortsValuesAndObjectsWithStableFallbacks() async throws {
+    @Test func sorts_values_and_objects_with_stable_fallbacks() async throws {
         try await expect(["{returns}": ["array_sort": ["array": [3, 1, 2], "predicates": [["order": "ascending"]]]]], equals: [1, 2, 3])
         try await expect(["{returns}": ["array_sort": ["array": ["b", "c", "a"], "predicates": [["order": "descending"]]]]], equals: ["c", "b", "a"])
         try await expect([
@@ -27,7 +27,7 @@ struct ArraySortTests {
         ])
     }
 
-    @Test func returnsIdentityWithoutPredicates() async throws {
+    @Test func returns_identity_without_predicates() async throws {
         try await expect(["{returns}": ["array_sort": ["array": [3, 1, 2]]]], equals: [3, 1, 2])
     }
 }

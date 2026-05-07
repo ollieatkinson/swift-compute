@@ -3,7 +3,7 @@ import Testing
 
 @Suite(.serialized)
 struct ArrayReduceTests {
-    @Test func foldsValuesUsingAccumulatorItemAndIndexContext() async throws {
+    @Test func folds_values_using_accumulator_item_and_index_context() async throws {
         let json: JSON = [
             "{returns}": [
                 "array_reduce": [
@@ -24,7 +24,7 @@ struct ArrayReduceTests {
         #expect(try await value(json, functions: [add]) == 10)
     }
 
-    @Test func exposesTheCurrentIndexInTheReductionContext() async throws {
+    @Test func exposes_the_current_index_in_the_reduction_context() async throws {
         let json: JSON = [
             "{returns}": [
                 "array_reduce": [
@@ -45,7 +45,7 @@ struct ArrayReduceTests {
         #expect(try await value(json, functions: [add]) == 3)
     }
 
-    @Test func recomputesWhenAReferencedArrayChanges() async throws {
+    @Test func recomputes_when_a_referenced_array_changes() async throws {
         let references = TestReferences()
         await references.set("scores", to: [1, 2])
         let json: JSON = [

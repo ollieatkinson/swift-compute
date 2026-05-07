@@ -4,7 +4,7 @@ import Testing
 @Suite(.serialized)
 struct YesTests {
 
-    @Test func composesNestedBooleanComputes() async throws {
+    @Test func composes_nested_boolean_computes() async throws {
         try await expect(
             [
                 "{returns}": [
@@ -33,7 +33,7 @@ struct YesTests {
         )
     }
 
-    @Test func resolvesNestedUnlessConditionsBeforeCombiningBooleans() async throws {
+    @Test func resolves_nested_unless_conditions_before_combining_booleans() async throws {
         let nestedThisUnless: JSON = [
             "{returns}": [
                 "yes": [

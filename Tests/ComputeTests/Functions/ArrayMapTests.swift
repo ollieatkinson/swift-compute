@@ -3,7 +3,7 @@ import Testing
 @Suite(.serialized)
 struct ArrayMapTests {
 
-    @Test func copiesIntoObjectsAndFlattensArrays() async throws {
+    @Test func copies_into_objects_and_flattens_arrays() async throws {
         try await expect(
             [
                 "{returns}": [
@@ -57,7 +57,7 @@ struct ArrayMapTests {
         )
     }
 
-    @Test func mapsIdentityFlattensMixedArraysAndCopiesIntoExistingObjects() async throws {
+    @Test func maps_identity_flattens_mixed_arrays_and_copies_into_existing_objects() async throws {
         try await expect(["{returns}": ["array_map": ["over": [1, 2, 3, 4, 5, 6, 7, 8, 9]]]], equals: [1, 2, 3, 4, 5, 6, 7, 8, 9])
         try await expect(["{returns}": ["array_map": ["over": [], "flattened": true]]], equals: [])
         try await expect([
@@ -107,7 +107,7 @@ struct ArrayMapTests {
         ])
     }
 
-    @Test func flattensCopiedNestedAndIndexedSubpaths() async throws {
+    @Test func flattens_copied_nested_and_indexed_subpaths() async throws {
         try await expect([
             "{returns}": [
                 "array_map": [

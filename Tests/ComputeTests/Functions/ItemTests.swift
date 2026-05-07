@@ -4,7 +4,7 @@ import Testing
 @Suite(.serialized)
 struct ItemTests {
 
-    @Test func readsValuesFromLocalContext() async throws {
+    @Test func reads_values_from_local_context() async throws {
         let item: JSON = [
             "deeply": [
                 "nested": [
@@ -19,14 +19,14 @@ struct ItemTests {
         try await expect(["{returns}": ["item": ["missing"]]], in: context, equals: nil)
     }
 
-    @Test func supportsIndexedPathComponents() async throws {
+    @Test func supports_indexed_path_components() async throws {
         let context = Compute.Context(item: ["rectangle": [1, 2, 3, 4]])
 
         try await expect(["{returns}": ["item": ["rectangle", 0]]], in: context, equals: 1)
         try await expect(["{returns}": ["item": ["rectangle", 3]]], in: context, equals: 4)
     }
 
-    @Test func readsValuesFromTaskLocalContext() async throws {
+    @Test func reads_values_from_task_local_context() async throws {
         let runtime = ComputeRuntime(document: ["{returns}": ["item": ["name"]]])
 
         let values = try await Compute.withContext { context in
@@ -41,7 +41,7 @@ struct ItemTests {
         #expect(values.1 == users[1])
     }
 
-    @Test func composesInsidePredicates() async throws {
+    @Test func composes_inside_predicates() async throws {
         try await expectNames(
             matching: [
                 "{returns}": [

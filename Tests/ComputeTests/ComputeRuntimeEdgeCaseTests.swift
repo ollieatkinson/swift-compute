@@ -5,7 +5,7 @@ import Testing
 @Suite(.serialized)
 struct ComputeRuntimeEdgeCaseTests {
 
-    @Test func valueSettlesAllReadyComputesAtTheDeepestDepthInOneWave() async throws {
+    @Test func value_settles_all_ready_computes_at_the_deepest_depth_in_one_wave() async throws {
         let runtime = try runtime([
             "left": ["{returns}": ["comparison": ["equal": ["lhs": 1, "rhs": 1]]]],
             "right": ["{returns}": ["comparison": ["equal": ["lhs": 1, "rhs": 2]]]],
@@ -19,7 +19,7 @@ struct ComputeRuntimeEdgeCaseTests {
         #expect(await runtime.thoughts.map(\.output) == [true, false])
     }
 
-    @Test func concurrentStepsAreSerializedThroughTheBrain() async throws {
+    @Test func concurrent_steps_are_serialized_through_the_brain() async throws {
         let runtime = try runtime([
             "left": ["{returns}": ["comparison": ["equal": ["lhs": 1, "rhs": 1]]]],
             "right": ["{returns}": ["comparison": ["equal": ["lhs": 1, "rhs": 2]]]],
@@ -38,7 +38,7 @@ struct ComputeRuntimeEdgeCaseTests {
         ])
     }
 
-    @Test func malformedFunctionPayloadsThrowJSONErrors() async throws {
+    @Test func malformed_function_payloads_throw_json_errors() async throws {
         await expectJSONError(containing: "array_filter expected an array") {
             _ = try await runtime([
                 "{returns}": [
@@ -62,7 +62,7 @@ struct ComputeRuntimeEdgeCaseTests {
         }
     }
 
-    @Test func deeplyNestedSynchronousDocumentsDoNotHitTheRecursionLimit() async throws {
+    @Test func deeply_nested_synchronous_documents_do_not_hit_the_recursion_limit() async throws {
         var document: JSON = true
         for _ in 0..<25 {
             document = [
@@ -77,7 +77,7 @@ struct ComputeRuntimeEdgeCaseTests {
         #expect(try await runtime(document).value() == true)
     }
 
-    @Test func asyncReturnedComputeLoopsHitTheRecursionLimit() async throws {
+    @Test func async_returned_compute_loops_hit_the_recursion_limit() async throws {
         let references = TestReferences()
         await references.set("loop", to: ["{returns}": ["from": ["reference": "loop"]]])
 
@@ -91,7 +91,7 @@ struct ComputeRuntimeEdgeCaseTests {
         await references.finish()
     }
 
-    @Test func generatedComputeLoopsHitTheRecursionLimit() async throws {
+    @Test func generated_compute_loops_hit_the_recursion_limit() async throws {
         let loop = AnyComputeFunction(name: "loop") { _ in
             ["{returns}": ["loop": .object([:])]]
         }
@@ -104,7 +104,7 @@ struct ComputeRuntimeEdgeCaseTests {
         }
     }
 
-    @Test func customAsyncReturnsKeywordsCanStreamUpdates() async throws {
+    @Test func custom_async_returns_keywords_can_stream_updates() async throws {
         let flag = AsyncReturnsProbe(false)
         let runtime = try runtime(
             [

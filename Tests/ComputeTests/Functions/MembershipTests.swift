@@ -4,7 +4,7 @@ import Testing
 @Suite(.serialized)
 struct MembershipTests {
 
-    @Test func evaluatesMembershipInResolvedArrays() async throws {
+    @Test func evaluates_membership_in_resolved_arrays() async throws {
         try await expect(
             [
                 "{returns}": [

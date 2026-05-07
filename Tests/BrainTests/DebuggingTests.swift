@@ -3,7 +3,7 @@ import Testing
 
 @Suite(.serialized)
 struct DebuggingTests {
-    @Test func printChangesLogsThoughtsAndStateDiffs() async throws {
+    @Test func print_changes_logs_thoughts_and_state_diffs() async throws {
         let logs = ChangeLogProbe()
         let brain = Brain<String, Int>(
             [
