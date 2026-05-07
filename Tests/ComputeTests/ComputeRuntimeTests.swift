@@ -132,6 +132,128 @@ struct ComputeRuntimeTests {
         await runtime.cancel()
     }
 
+    @Test func runtime_step_records_nested_synchronous_compute_thoughts() async throws {
+        let json: JSON = [
+            "{returns}": [
+                "yes": [
+                    "if": [
+                        [
+                            "{returns}": [
+                                "comparison": [
+                                    "greater": [
+                                        "lhs": ["{returns}": ["item": ["age"]]],
+                                        "rhs": 30,
+                                    ],
+                                ],
+                            ],
+                        ],
+                        ["{returns}": ["not": false]],
+                    ],
+                    "unless": [
+                        [
+                            "{returns}": [
+                                "comparison": [
+                                    "equal": [
+                                        "lhs": ["{returns}": ["item": ["isClearToFly"]]],
+                                        "rhs": true,
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]
+        let runtime = try runtime(json, in: Compute.Context(item: users[2]))
+
+        let step = try await runtime.step()
+        let thoughts = step.thoughts
+
+        let greaterInput: JSON = [
+            "comparison": [
+                "greater": [
+                    "lhs": ["{returns}": ["item": ["age"]]],
+                    "rhs": 30,
+                ],
+            ],
+        ]
+        let equalInput: JSON = [
+            "comparison": [
+                "equal": [
+                    "lhs": ["{returns}": ["item": ["isClearToFly"]]],
+                    "rhs": true,
+                ],
+            ],
+        ]
+        let yesInput: JSON = [
+            "yes": [
+                "if": [
+                    ["{returns}": greaterInput],
+                    ["{returns}": ["not": false]],
+                ],
+                "unless": [
+                    ["{returns}": equalInput],
+                ],
+            ],
+        ]
+
+        #expect(thoughts == [
+            Compute.Thought(
+                route: ["{returns}", "yes", "if", 0, "{returns}", "comparison", "greater", "lhs"],
+                depth: 8,
+                keyword: "item",
+                kind: .compute,
+                input: ["item": ["age"]],
+                output: 36
+            ),
+            Compute.Thought(
+                route: ["{returns}", "yes", "unless", 0, "{returns}", "comparison", "equal", "lhs"],
+                depth: 8,
+                keyword: "item",
+                kind: .compute,
+                input: ["item": ["isClearToFly"]],
+                output: false
+            ),
+            Compute.Thought(
+                route: ["{returns}", "yes", "if", 0],
+                depth: 4,
+                keyword: "comparison",
+                kind: .compute,
+                input: greaterInput,
+                output: true
+            ),
+            Compute.Thought(
+                route: ["{returns}", "yes", "if", 1],
+                depth: 4,
+                keyword: "not",
+                kind: .compute,
+                input: ["not": false],
+                output: true
+            ),
+            Compute.Thought(
+                route: ["{returns}", "yes", "unless", 0],
+                depth: 4,
+                keyword: "comparison",
+                kind: .compute,
+                input: equalInput,
+                output: false
+            ),
+            Compute.Thought(
+                route: [],
+                depth: 0,
+                keyword: "yes",
+                kind: .compute,
+                input: yesInput,
+                output: true,
+                state: true
+            ),
+        ])
+        #expect(step.state == true)
+        #expect(step.remainingThoughts == 0)
+
+        await runtime.cancel()
+    }
+
     @Test func runtime_step_observes_all_ready_computes_from_the_deepest_wave() async throws {
         let json: JSON = [
             "left": ["{returns}": ["comparison": ["equal": ["lhs": 1, "rhs": 1]]]],

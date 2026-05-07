@@ -59,7 +59,7 @@ private enum ChangeLog {
     private static func append(_ thoughts: [Compute.Thought], to lines: inout [String]) {
         guard !thoughts.isEmpty else { return }
         lines.append("  thoughts:")
-        for (index, thought) in thoughts.enumerated() {
+        for (index, thought) in thoughts.indexed() {
             lines.append("    [\(index)] \(thought.kind.rawValue) \(thought.keyword) @ \(path(thought.route)) -> \(output(thought))")
         }
     }

@@ -242,13 +242,7 @@ extension Compute {
             } catch BrainError.thoughtLimitExceeded {
                 throw Compute.Error.recursionLimitExceeded
             } catch {
-                let jsonError = JSONError(error)
-                if !latestThoughts.contains(where: { $0.keyword == "error" }) {
-                    latestThoughts.append(
-                        Compute.Thought(
-                            route: .root, depth: 0, keyword: "error", kind: .error, error: jsonError))
-                }
-                throw jsonError
+                throw JSONError(error)
             }
             return try await finish(
                 commit, runtime: runtime, subscribe: subscribe, publishWhenSettled: true)
@@ -271,7 +265,10 @@ extension Compute {
 
             let state = try document(from: commit.state)
             let step = Compute.Step(
-                state: state, thoughts: latestThoughts, remainingThoughts: commit.remainingThoughts)
+                state: state,
+                thoughts: latestThoughts,
+                remainingThoughts: commit.remainingThoughts
+            )
             let tracked = await runtime.dependenciesByRoute()
             if merge(tracked) {
                 let graph = Self.graph(
