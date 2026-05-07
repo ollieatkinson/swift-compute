@@ -88,105 +88,18 @@ The document can come from a backend. The values behind `subject.age` and `acces
 
 ## Self-Explainable Decisioning
 
-Wrap a decision in `explain` when the caller needs both the computed value and a displayable trace of how the decision was reached.
+Wrap a decision in `explain` when the caller needs both the computed value and a displayable trace. The explained `value` is the complete compute document, including its `{returns}` wrapper.
 
 ```swift
 let document: JSON = [
     "{returns}": [
         "explain": [
             "context": [
-                "label": "Boarding eligibility",
-                "purpose": "explains why the user is seeing the ready-to-board state",
-                "surface": "flight boarding status tooltip",
+                "label": "Eligibility",
+                "surface": "eligibility help text",
             ],
             "mode": "foundation_model",
-            "value": [
-                "{returns}": [
-                    "yes": [
-                        "if": [
-                            [
-                                "{returns}": [
-                                    "comparison": [
-                                        "greater_or_equal": [
-                                            "lhs": [
-                                                "{returns}": [
-                                                    "from": [
-                                                        "reference": "device.profile.age",
-                                                    ],
-                                                ],
-                                            ],
-                                            "rhs": [
-                                                "{returns}": [
-                                                    "from": [
-                                                        "reference": "server.flight.minimum_boarding_age",
-                                                    ],
-                                                ],
-                                            ],
-                                        ],
-                                    ],
-                                ],
-                            ],
-                            [
-                                "{returns}": [
-                                    "membership": [
-                                        "lhs": [
-                                            "{returns}": [
-                                                "from": [
-                                                    "reference": "device.profile.loyalty_tier",
-                                                ],
-                                            ],
-                                        ],
-                                        "rhs": [
-                                            "{returns}": [
-                                                "from": [
-                                                    "reference": "server.flight.allowed_loyalty_tiers",
-                                                ],
-                                            ],
-                                        ],
-                                    ],
-                                ],
-                            ],
-                            [
-                                "{returns}": [
-                                    "from": [
-                                        "reference": "server.flight.boarding_open",
-                                    ],
-                                ],
-                            ],
-                            [
-                                "{returns}": [
-                                    "from": [
-                                        "reference": "device.network.is_online",
-                                    ],
-                                ],
-                            ],
-                            [
-                                "{returns}": [
-                                    "comparison": [
-                                        "greater_or_equal": [
-                                            "lhs": [
-                                                "{returns}": [
-                                                    "from": [
-                                                        "reference": "device.battery.level_percent",
-                                                    ],
-                                                ],
-                                            ],
-                                            "rhs": 20,
-                                        ],
-                                    ],
-                                ],
-                            ],
-                        ],
-                        "unless": [
-                            "{returns}": [
-                                "from": [
-                                    "reference": "server.flight.manual_review_required",
-                                ],
-                            ],
-                        ],
-                    ],
-                ],
-            ],
+            "value": <document_example_from_above>,
         ],
     ],
 ]
@@ -203,10 +116,9 @@ let explanation = try await runtime.value()
 // explanation["ok"] == true
 // explanation["value"] == true
 // explanation["summary"] == "true"
-// explanation["thoughts"] contains the evaluated device/server `from` references.
-// On iOS 26+ or macOS 26+ with Apple Intelligence available,
-// explanation["explanation"] contains a concise on-device model explanation,
-// suitable for user-facing help text such as a tooltip.
+// explanation["thoughts"] contains the evaluated references and comparisons.
+// example device-model explanation:
+// "You are seeing this because you are at least 18 and have VoiceOver enabled."
 ```
 
 ## Built-in Keywords
