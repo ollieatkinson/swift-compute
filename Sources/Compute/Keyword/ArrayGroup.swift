@@ -51,7 +51,7 @@ extension Compute.Keyword.ArrayGroup: Compute.KeywordDefinition {
         frame: Compute.Frame
     ) async throws -> JSON {
         var keyedItems: [KeyedItem] = []
-        for (index, value) in values.enumerated() {
+        for (index, value) in values.indexed() {
             let key = try await by.$value.compute(in: frame, item: value, appending: .index(index))
             keyedItems.append(KeyedItem(index: index, key: key, value: value))
         }

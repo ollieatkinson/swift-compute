@@ -14,21 +14,8 @@ extension Compute.Keyword {
         public static let name = "explain"
 
         @Computed public var value: JSON
-        public let mode: Mode
+        public let mode: Mode?
         public let context: JSON?
-
-        private enum CodingKeys: String, CodingKey {
-            case value
-            case mode
-            case context
-        }
-
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            self._value = try container.decode(Computed<JSON>.self, forKey: .value)
-            self.mode = try container.decodeIfPresent(Mode.self, forKey: .mode) ?? .trace
-            self.context = try container.decodeIfPresent(JSON.self, forKey: .context)
-        }
     }
 }
 

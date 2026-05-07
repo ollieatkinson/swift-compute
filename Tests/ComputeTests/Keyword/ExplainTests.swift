@@ -52,6 +52,7 @@ struct ExplainTests {
         let json: JSON = [
             "{returns}": [
                 "explain": [
+                    "mode": "trace",
                     "value": [
                         "{returns}": [
                             "error": [
@@ -149,7 +150,6 @@ struct ExplainTests {
         ]
 
         let output = try await value(json, functions: [Compute.Keyword.From.Function(references: references)])
-        print("foundation_model explain output: \(output)")
 
         guard case .object(let payload) = output else {
             Issue.record("Expected explain to return an object, got \(output)")
