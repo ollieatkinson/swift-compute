@@ -4,36 +4,19 @@ extension Keyword {
     public struct ArrayGroup: Codable, Equatable, Sendable {
         public static let name = "array_group"
 
-        public let array: JSON
+        @Computed public var array: JSON
         public let into: Into?
         public let by: By?
 
-        public init(array: JSON, into: Into? = nil, by: By? = nil) {
-            self.array = array
-            self.into = into
-            self.by = by
-        }
-
         public struct By: Codable, Equatable, Sendable {
-            public let value: JSON
-            public let order: JSON?
-
-            public init(value: JSON, order: JSON? = nil) {
-                self.value = value
-                self.order = order
-            }
+            @Computed public var value: JSON
+            @Computed public var order: JSON?
         }
 
         public struct Into: Codable, Equatable, Sendable {
-            public let counts: JSON
-            public let overflow: JSON?
-            public let remainder: JSON?
-
-            public init(counts: JSON, overflow: JSON? = nil, remainder: JSON? = nil) {
-                self.counts = counts
-                self.overflow = overflow
-                self.remainder = remainder
-            }
+            @Computed public var counts: JSON
+            @Computed public var overflow: JSON?
+            @Computed public var remainder: JSON?
         }
 
         public enum Overflow: String, Codable, Sendable {
@@ -52,7 +35,7 @@ extension Keyword {
 extension Keyword.ArrayGroup: ComputeKeyword {
 
     public func compute(in frame: ComputeFrame) async throws -> JSON? {
-        let source = try await array.compute(frame: frame["array"])
+        let source = try await $array.compute(in: frame)
         guard case .array(let values) = source else {
             throw JSONError("array_group expected an array")
         }
@@ -72,12 +55,10 @@ extension Keyword.ArrayGroup: ComputeKeyword {
     ) async throws -> JSON {
         var keyedItems: [KeyedItem] = []
         for (index, value) in values.enumerated() {
-            let key = try await by.value.compute(
-                frame: frame[item: value, "by", "value", .index(index)]
-            )
+            let key = try await by.$value.compute(in: frame, item: value, appending: .index(index))
             keyedItems.append(KeyedItem(index: index, key: key, value: value))
         }
-        let orderValue = try await by.order?.compute(frame: frame["by", "order"])
+        let orderValue = try await by.$order.compute(in: frame)
         let order = try orderValue?.decode(Keyword.ArraySort.Order.self) ?? .ascending
         return .array(try ItemGroup.groups(from: keyedItems).elements(ordered: order).map(JSON.array))
     }
@@ -105,17 +86,10 @@ extension Keyword.ArrayGroup {
         let overflow: Overflow
         let remainder: Remainder
 
-        init(_ into: Into) throws {
-            self.counts = try into.counts.decode([Int].self)
-            self.overflow = try into.overflow?.decode(Overflow.self) ?? .trimmed
-            self.remainder = try into.remainder?.decode(Remainder.self) ?? .trimmed
-            try validate()
-        }
-
         init(_ into: Into, frame: ComputeFrame) async throws {
-            let counts = try await into.counts.compute(frame: frame["into", "counts"])
-            let overflow = try await into.overflow?.compute(frame: frame["into", "overflow"])
-            let remainder = try await into.remainder?.compute(frame: frame["into", "remainder"])
+            let counts = try await into.$counts.compute(in: frame)
+            let overflow = try await into.$overflow.compute(in: frame)
+            let remainder = try await into.$remainder.compute(in: frame)
             self.counts = try counts.decode([Int].self)
             self.overflow = try overflow?.decode(Overflow.self) ?? .trimmed
             self.remainder = try remainder?.decode(Remainder.self) ?? .trimmed

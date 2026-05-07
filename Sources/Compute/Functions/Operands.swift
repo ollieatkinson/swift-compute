@@ -1,8 +1,6 @@
 protocol OperandPair: Sendable {
     var lhs: JSON { get }
     var rhs: JSON { get }
-
-    init(lhs: JSON, rhs: JSON)
 }
 
 public struct Operands: Codable, Equatable, Sendable, OperandPair {
@@ -15,12 +13,6 @@ public struct Operands: Codable, Equatable, Sendable, OperandPair {
     }
 }
 extension OperandPair {
-    func computed(in frame: ComputeFrame) async throws -> Operands {
-        let lhs = try await lhs.compute(frame: frame["lhs"])
-        let rhs = try await rhs.compute(frame: frame["rhs"])
-        return Operands(lhs: lhs, rhs: rhs)
-    }
-
     func orderedComparison(
         string: (String, String) -> Bool,
         number: (Double, Double) -> Bool
@@ -30,4 +22,14 @@ extension OperandPair {
         }
         return .bool(try number(lhs.decode(Double.self), rhs.decode(Double.self)))
     }
+}
+
+func computedOperands(
+    lhs: Computed<JSON>,
+    rhs: Computed<JSON>,
+    in frame: ComputeFrame
+) async throws -> Operands {
+    let lhs = try await lhs.compute(in: frame)
+    let rhs = try await rhs.compute(in: frame)
+    return Operands(lhs: lhs, rhs: rhs)
 }

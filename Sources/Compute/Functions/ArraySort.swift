@@ -4,13 +4,8 @@ extension Keyword {
     public struct ArraySort: Codable, Equatable, Sendable {
         public static let name = "array_sort"
 
-        public let array: JSON
+        @Computed public var array: JSON
         public let predicates: [Predicate]?
-
-        public init(array: JSON, predicates: [Predicate]? = nil) {
-            self.array = array
-            self.predicates = predicates
-        }
 
         public struct Predicate: Codable, Equatable, Sendable {
             public let key_path: [ComputeRoute.Component]?
@@ -31,7 +26,7 @@ extension Keyword {
 
 extension Keyword.ArraySort: ComputeKeyword {
     public func compute(in frame: ComputeFrame) async throws -> JSON? {
-        let array = try await array.compute(frame: frame["array"])
+        let array = try await $array.compute(in: frame)
         guard case .array(let values) = array else {
             throw JSONError("array_sort expected an array")
         }

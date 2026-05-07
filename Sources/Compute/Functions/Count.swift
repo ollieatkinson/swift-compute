@@ -1,10 +1,6 @@
 extension Keyword {
     public struct Count: Codable, Equatable, Sendable {
-        public let of: JSON?
-
-        public init(of: JSON? = nil) {
-            self.of = of
-        }
+        @Computed public var of: JSON?
     }
 }
 
@@ -14,7 +10,7 @@ extension Keyword.Count: ComputeKeyword {
     public func compute(in frame: ComputeFrame) async throws -> JSON? {
         let value: JSON
         do {
-            value = try await (of ?? .null).compute(frame: frame["of"])
+            value = try await $of.compute(in: frame) ?? .null
         } catch {
             value = .null
         }

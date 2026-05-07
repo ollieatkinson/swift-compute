@@ -13,15 +13,9 @@ extension Keyword {
 
         public static let name = "explain"
 
-        public let value: JSON
+        @Computed public var value: JSON
         public let mode: Mode
         public let context: JSON?
-
-        public init(value: JSON, mode: Mode = .trace, context: JSON? = nil) {
-            self.value = value
-            self.mode = mode
-            self.context = context
-        }
 
         private enum CodingKeys: String, CodingKey {
             case value
@@ -31,7 +25,7 @@ extension Keyword {
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            self.value = try container.decode(JSON.self, forKey: .value)
+            self._value = try container.decode(Computed<JSON>.self, forKey: .value)
             self.mode = try container.decodeIfPresent(Mode.self, forKey: .mode) ?? .trace
             self.context = try container.decodeIfPresent(JSON.self, forKey: .context)
         }
@@ -42,7 +36,7 @@ extension Keyword.Explain: ComputeKeyword {
 
     public func compute(in frame: ComputeFrame) async throws -> JSON? {
         let capture = await frame.runtime.capture {
-            try await value.compute(frame: frame["value"])
+            try await $value.compute(in: frame)
         }
 
         let thoughts = JSON.array(capture.thoughts.map(\.explanationJSON))

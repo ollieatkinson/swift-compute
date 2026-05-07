@@ -1,10 +1,6 @@
 extension Keyword {
     public struct Exists: Codable, Equatable, Sendable {
-        public let value: JSON?
-
-        public init(value: JSON? = nil) {
-            self.value = value
-        }
+        @Computed public var value: JSON?
     }
 }
 
@@ -14,7 +10,7 @@ extension Keyword.Exists: ComputeKeyword {
     public func compute(in frame: ComputeFrame) async throws -> JSON? {
         let computed: JSON
         do {
-            computed = try await (value ?? .null).compute(frame: frame["value"])
+            computed = try await $value.compute(in: frame) ?? .null
         } catch {
             computed = .null
         }

@@ -1,12 +1,7 @@
 extension Keyword {
     public struct ArrayFilter: Codable, Equatable, Sendable {
-        public let array: JSON
-        public let predicate: JSON
-
-        public init(array: JSON, predicate: JSON) {
-            self.array = array
-            self.predicate = predicate
-        }
+        @Computed public var array: JSON
+        @Computed public var predicate: JSON
     }
 }
 
@@ -14,15 +9,13 @@ extension Keyword.ArrayFilter: ComputeKeyword {
     public static let name = "array_filter"
 
     public func compute(in frame: ComputeFrame) async throws -> JSON? {
-        let source = try await array.compute(frame: frame["array"])
+        let source = try await $array.compute(in: frame)
         guard case .array(let values) = source else {
             throw JSONError("array_filter expected an array")
         }
         var predicates: [JSON] = []
         for (index, value) in values.enumerated() {
-            let keep = try await predicate.compute(
-                frame: frame[item: value, "predicate", .index(index)]
-            )
+            let keep = try await $predicate.compute(in: frame, item: value, appending: .index(index))
             predicates.append(.bool(try keep.decode(Bool.self)))
         }
         return try Self.filtered(array: source, predicate: .array(predicates))
