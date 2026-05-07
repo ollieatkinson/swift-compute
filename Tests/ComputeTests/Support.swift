@@ -48,7 +48,7 @@ let users: [JSON] = [
     ],
 ]
 
-actor TestReferences: AsyncComputeReferences {
+actor TestReferences: Compute.AsyncReferences {
     private var results: [String: Result<JSON, JSONError>] = [:]
     private var continuations: [String: [UUID: AsyncStream<Result<JSON, JSONError>>.Continuation]] = [:]
 
@@ -74,7 +74,7 @@ actor TestReferences: AsyncComputeReferences {
     func value(for reference: JSON, context: [String: JSON]?) async throws -> JSON {
         let key = try key(for: reference, context: context)
         guard let result = results[key] else {
-            throw ComputeError.unresolvedReference(reference)
+            throw Compute.Error.unresolvedReference(reference)
         }
         return try result.get()
     }
@@ -129,7 +129,7 @@ actor TestReferences: AsyncComputeReferences {
 
     private nonisolated func key(for reference: JSON, context: [String: JSON]?) throws -> String {
         guard case .string(let base) = reference else {
-            throw ComputeError.unresolvedReference(reference)
+            throw Compute.Error.unresolvedReference(reference)
         }
         guard let context else {
             return base
@@ -158,7 +158,7 @@ actor TestReferences: AsyncComputeReferences {
     }
 }
 
-struct Echo: ComputeKeyword {
+struct Echo: Compute.KeywordDefinition {
     static let name = "echo"
     let payload: JSON
 
@@ -174,25 +174,70 @@ struct Echo: ComputeKeyword {
         try payload.encode(to: encoder)
     }
 
-    func compute() throws -> JSON {
+    func compute(in frame: Compute.Frame) async throws -> JSON? {
         payload
     }
+}
+
+struct RouteProbeFunction: AnyReturnsKeyword {
+    var name: String { "route_probe" }
+
+    func compute(data input: JSON, frame: Compute.Frame) async throws -> JSON? {
+        frameSummary(frame, input: input)
+    }
+}
+
+func frameSummary(_ frame: Compute.Frame, input: JSON? = nil) -> JSON {
+    frameSummary(
+        route: frame.route.components,
+        depth: frame.depth,
+        item: frame.context.item,
+        input: input
+    )
+}
+
+func frameSummary(
+    route: [Compute.Route.Component],
+    depth: Int,
+    item: JSON? = nil,
+    input: JSON? = nil
+) -> JSON {
+    var summary: [String: JSON] = [
+        "depth": .int(depth),
+        "item": item ?? .null,
+        "route": routeJSON(route),
+    ]
+    if let input {
+        summary["input"] = input
+    }
+    return .object(summary)
+}
+
+private func routeJSON(_ route: [Compute.Route.Component]) -> JSON {
+    .array(route.map { component in
+        switch component {
+        case .key(let key):
+            return .string(key)
+        case .index(let index):
+            return .int(index)
+        }
+    })
 }
 
 func runtime(
     _ json: JSON,
     in context: Compute.Context = Compute.Context(),
     functions: [any AnyReturnsKeyword] = []
-) throws -> ComputeRuntime {
-    ComputeRuntime(document: json, context: context, functions: functions)
+) throws -> Compute.Runtime {
+    Compute.Runtime(document: json, context: context, functions: functions)
 }
 
 func runtime(
     _ json: JSON,
     in context: Compute.Context = Compute.Context(),
     references: TestReferences
-) throws -> ComputeRuntime {
-    try runtime(json, in: context, functions: [Keyword.From.Function(references: references)])
+) throws -> Compute.Runtime {
+    try runtime(json, in: context, functions: [Compute.Keyword.From.Function(references: references)])
 }
 
 func value(
