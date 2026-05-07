@@ -72,7 +72,7 @@ private extension Compute.Keyword.Explain {
         guard mode == .foundationModel else { return nil }
 #if canImport(FoundationModels) && (os(iOS) || os(macOS))
         if #available(iOS 26.0, macOS 26.0, *) {
-            return await FoundationModelExplainProvider.explanation(
+            return await FoundationModelPrompt.explanation(
                 expression: value,
                 computedValue: computedValue,
                 thoughts: thoughts,
@@ -87,7 +87,7 @@ private extension Compute.Keyword.Explain {
 
 #if canImport(FoundationModels) && (os(iOS) || os(macOS))
 @available(iOS 26.0, macOS 26.0, *)
-private enum FoundationModelExplainProvider {
+private enum FoundationModelPrompt {
     static func explanation(
         expression: JSON,
         computedValue: JSON,
@@ -107,14 +107,7 @@ private enum FoundationModelExplainProvider {
                 explanationContext: explanationContext,
                 localItem: localItem
             ))
-            let explanation = response.content
-                .replacingOccurrences(of: "**", with: "")
-                .replacingOccurrences(of: "*", with: "")
-                .replacingOccurrences(of: "`", with: "")
-                .replacingOccurrences(of: "#", with: "")
-                .components(separatedBy: .whitespacesAndNewlines)
-                .filter { !$0.isEmpty }
-                .joined(separator: " ")
+            let explanation = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
             return explanation.isEmpty ? nil : explanation
         } catch {
             return nil
@@ -122,7 +115,12 @@ private enum FoundationModelExplainProvider {
     }
 
     private static let instructions = """
-    Write exactly one clear plain-English sentence for an end user, suitable for a tooltip. The context is important because it describes where or how the result is consumed. Use fields such as "label", "surface", and "purpose" to understand what the user is seeing, but do not copy them as a heading or prefix. The result and trace are authoritative. Use the trace and referenced local data to explain why. Start with the user-facing outcome, such as "You can..." when the context supports it, not "This result..." or "The result...". For boolean results, explain the actual outcome in context instead of writing true or false. Preserve exact identifiers, comparison relationships, and values. Include the key exact values that explain the outcome, especially numbers and codes used in comparisons or membership checks. For comparisons, keep the observed value and threshold separate; for example, say "74% is greater than or equal to 20%" rather than "74% or higher". Do not expand or reinterpret codes or values; for example, keep "GB" as "GB" instead of changing it to "UK" or "United Kingdom". Translate internal names such as "greater_or_equal" into natural language such as "greater than or equal to". Do not start with a title, heading, label, "result", or "explanation". Do not mention tooltip, JSON, Compute, use markdown, add a heading, make a list, show step-by-step reasoning, quote the example text, invent context, or include raw internal keyword names.
+    Write one user-facing explanation sentence in plain text only.
+    Use second person, starting with "You are seeing this because" when context describes a visible state.
+    Use the context, result, referenced data, and trace.
+    Explain the outcome and key reason, keeping exact values, identifiers, and comparisons.
+    For booleans, explain the outcome instead of saying true or false.
+    Do not use Markdown, headings, lists, labels, raw keyword names, invented context, or "The user".
     """
 
     private static func prompt(
@@ -133,10 +131,10 @@ private enum FoundationModelExplainProvider {
         localItem: JSON?
     ) -> String {
         """
-        Important user-facing context:
+        Context:
         \(explanationContext?.promptDescription ?? "Not provided.")
 
-        Referenced local data:
+        Referenced data:
         \(referencedLocalData(localItem: localItem, thoughts: thoughts)?.promptDescription ?? "Not provided.")
 
         Expression:
@@ -145,10 +143,10 @@ private enum FoundationModelExplainProvider {
         Result:
         \(computedValue.promptDescription)
 
-        Evaluation trace:
+        Trace:
         \(JSON.array(thoughts.map(\.modelExplanationJSON)).promptDescription)
 
-        Explain what the result means in the user-facing context, and why it happened, in exactly one sentence.
+        Reply with one plain-text sentence explaining why you are seeing this result.
         """
     }
 
