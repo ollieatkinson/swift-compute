@@ -53,54 +53,6 @@ struct DebuggingTests {
         await references.finish()
         await runtime.cancel()
     }
-
-    @Test func brainPrintChangesLogsThoughtsAndStateDiffs() async throws {
-        let logs = ChangeLogProbe()
-        let brain = Brain<String, JSON>(
-            [
-                .init("count", inputs: ["input"]),
-            ],
-            state: ["input": 0],
-            change: ["input": 1],
-            remainingThoughts: { state in
-                state["count"] == 1 ? 0 : 1
-            }
-        )
-        var states = brain._printChanges { await logs.append($0) }.makeAsyncIterator()
-
-        #expect(await states.next() == ["input": 0])
-        try await brain.commit { lemma, state in
-            #expect(lemma == "count")
-            return state["input"]
-        }
-        #expect(await states.next()?["count"] == 1)
-
-        let messages = await logs.messages
-        #expect(messages == [
-            """
-            🧠._printChanges
-              state:
-                [
-                  "input": .int(0)
-                ]
-            """,
-            """
-            🧠._printChanges
-              thoughts:
-                [
-                  "count": .int(1)
-                ]
-              state diff:
-                  [
-                +   "count": .int(1),
-                -   "input": .int(0)
-                +   "input": .int(1)
-                  ]
-            """,
-        ])
-
-        await brain.cancelStreams()
-    }
 }
 
 private actor ChangeLogProbe {

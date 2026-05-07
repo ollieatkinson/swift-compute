@@ -3,34 +3,6 @@ import Testing
 
 @Suite(.serialized)
 struct BrainRuntimeBehaviorTests {
-
-    @Test func brainCommitsBoundedThoughtsUntilSettled() async throws {
-        let brain = Brain<String, JSON>(
-            [
-                .init("adult", inputs: ["age"]),
-            ],
-            state: ["age": 17],
-            change: ["age": 21],
-            remainingThoughts: { state in
-                state["adult"] == true ? 0 : 1
-            }
-        )
-
-        let commit = try await brain.commit(thoughts: 1) { lemma, state in
-            #expect(lemma == "adult")
-            #expect(state["age"] == 21)
-            return true
-        }
-
-        #expect(commit.change == ["age": 21])
-        #expect(commit.thoughts == ["adult": true])
-        #expect(commit.state["adult"] == true)
-        #expect(commit.remainingThoughts == 0)
-        #expect(commit.isThinking == false)
-        #expect(await brain.value["adult"] == true)
-        await brain.cancelStreams()
-    }
-
     @Test func runtimeStepsThroughLeafComputesBeforeReplacingTheRoot() async throws {
         let references = TestReferences()
         await references.set("minimum_age", to: 36)

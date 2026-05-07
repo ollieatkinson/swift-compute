@@ -1,34 +1,6 @@
 import CustomDump
 import Foundation
 
-extension Brain {
-    public nonisolated func _printChanges(
-        _ label: String = "🧠",
-        printer: @escaping @Sendable (String) async -> Void = { print($0) }
-    ) -> AsyncStream<State> {
-        AsyncStream { continuation in
-            let task = Task {
-                var previous: State?
-                for await state in states() {
-                    let thoughts = await self.thoughts
-                    await printer(ChangeLog.render(
-                        label: label,
-                        thoughts: thoughts,
-                        previous: previous,
-                        current: state
-                    ))
-                    previous = state
-                    continuation.yield(state)
-                }
-                continuation.finish()
-            }
-            continuation.onTermination = { @Sendable _ in
-                task.cancel()
-            }
-        }
-    }
-}
-
 extension ComputeRuntime {
     public nonisolated func _printChanges(
         at route: ComputeRoute = .root,
@@ -62,18 +34,6 @@ extension ComputeRuntime {
 }
 
 private enum ChangeLog {
-    static func render<State: Equatable, Thoughts: Collection>(
-        label: String,
-        thoughts: Thoughts,
-        previous: State?,
-        current: State
-    ) -> String {
-        var lines = ["\(label)._printChanges"]
-        append(thoughts, to: &lines)
-        appendState(previous: previous, current: current, to: &lines)
-        return lines.joined(separator: "\n")
-    }
-
     static func render(
         label: String,
         route: ComputeRoute,
@@ -94,12 +54,6 @@ private enum ChangeLog {
             lines.append(dumped(error, indentation: 4))
         }
         return lines.joined(separator: "\n")
-    }
-
-    private static func append<Thoughts: Collection>(_ thoughts: Thoughts, to lines: inout [String]) {
-        guard !thoughts.isEmpty else { return }
-        lines.append("  thoughts:")
-        lines.append(dumped(thoughts, indentation: 4))
     }
 
     private static func append(_ thoughts: [ComputeThought], to lines: inout [String]) {

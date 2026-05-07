@@ -86,6 +86,49 @@ let value = try await runtime.value()
 
 The document can come from a backend. The values behind `subject.age` and `accessibility.voiceOver.enabled` can stay on the device, or in a private store that only the device can access.
 
+## Self-Explainable Decisioning
+
+Wrap a decision in `explain` when the caller needs both the computed value and a displayable trace of how the decision was reached.
+
+```swift
+let document: JSON = [
+    "{returns}": [
+        "explain": [
+            "value": [
+                "{returns}": [
+                    "comparison": [
+                        "greater_or_equal": [
+                            "lhs": [
+                                "{returns}": [
+                                    "from": [
+                                        "reference": "subject.age",
+                                    ],
+                                ],
+                            ],
+                            "rhs": 18,
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ],
+]
+
+let runtime = ComputeRuntime(
+    document: document,
+    functions: [
+        Keyword.From.Function(references: deviceReferences),
+    ]
+)
+
+let explanation = try await runtime.value()
+
+// explanation["ok"] == true
+// explanation["value"] == true
+// explanation["summary"] == "true"
+// explanation["thoughts"] contains the evaluated `from` and `comparison` steps.
+```
+
 ## Built-in Keywords
 
 The default computer includes keywords for:

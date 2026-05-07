@@ -1,3 +1,4 @@
+import Brain
 import Foundation
 
 public enum ComputeThoughtKind: String, Codable, Equatable, Sendable {

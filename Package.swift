@@ -6,8 +6,10 @@ let package = Package(
     name: "Compute",
     platforms: [
         .macOS(.v10_15),
+        .iOS(.v17),
     ],
     products: [
+        .library(name: "Brain", targets: ["Brain"]),
         .library(name: "Compute", targets: ["Compute"]),
     ],
     dependencies: [
@@ -17,13 +19,21 @@ let package = Package(
     ],
     targets: [
         .target(
+            name: "Brain",
+            dependencies: [
+                .product(name: "CustomDump", package: "swift-custom-dump"),
+            ]
+        ),
+        .target(
             name: "Compute",
             dependencies: [
+                "Brain",
                 .product(name: "Algorithms", package: "swift-algorithms"),
                 .product(name: "AnyCoding", package: "AnyCoding"),
                 .product(name: "CustomDump", package: "swift-custom-dump"),
             ]
         ),
+        .testTarget(name: "BrainTests", dependencies: ["Brain"]),
         .testTarget(name: "ComputeTests", dependencies: ["Compute"]),
     ]
 )
