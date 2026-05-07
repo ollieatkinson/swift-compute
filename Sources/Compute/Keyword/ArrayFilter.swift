@@ -9,16 +9,7 @@ extension Compute.Keyword.ArrayFilter: Compute.KeywordDefinition {
     public static let name = "array_filter"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
-        let values: [JSON]
-        do {
-            values = try await $array.compute(in: frame)
-        } catch {
-            let error = JSONError(error)
-            guard error.message.hasPrefix("Expected a [Any]") else {
-                throw error
-            }
-            throw JSONError("array_filter expected an array", path: error.path)
-        }
+        let values = try await $array.compute(in: frame)
         var predicates: [Bool] = []
         for (index, value) in values.enumerated() {
             let keep = try await $predicate.compute(in: frame, item: value, appending: .index(index))

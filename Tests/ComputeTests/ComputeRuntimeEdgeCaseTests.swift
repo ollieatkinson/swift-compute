@@ -39,7 +39,7 @@ struct ComputeRuntimeEdgeCaseTests {
     }
 
     @Test func malformed_function_payloads_throw_json_errors() async throws {
-        await expectJSONError(containing: "array_filter expected an array") {
+        await expectJSONError(containing: "Expected a [Any]") {
             _ = try await runtime([
                 "{returns}": [
                     "array_filter": [
