@@ -179,6 +179,51 @@ struct Echo: Compute.KeywordDefinition {
     }
 }
 
+struct RouteProbeFunction: AnyReturnsKeyword {
+    var name: String { "route_probe" }
+
+    func compute(data input: JSON, frame: Compute.Frame) async throws -> JSON? {
+        frameSummary(frame, input: input)
+    }
+}
+
+func frameSummary(_ frame: Compute.Frame, input: JSON? = nil) -> JSON {
+    frameSummary(
+        route: frame.route.components,
+        depth: frame.depth,
+        item: frame.context.item,
+        input: input
+    )
+}
+
+func frameSummary(
+    route: [Compute.Route.Component],
+    depth: Int,
+    item: JSON? = nil,
+    input: JSON? = nil
+) -> JSON {
+    var summary: [String: JSON] = [
+        "depth": .int(depth),
+        "item": item ?? .null,
+        "route": routeJSON(route),
+    ]
+    if let input {
+        summary["input"] = input
+    }
+    return .object(summary)
+}
+
+private func routeJSON(_ route: [Compute.Route.Component]) -> JSON {
+    .array(route.map { component in
+        switch component {
+        case .key(let key):
+            return .string(key)
+        case .index(let index):
+            return .int(index)
+        }
+    })
+}
+
 func runtime(
     _ json: JSON,
     in context: Compute.Context = Compute.Context(),
