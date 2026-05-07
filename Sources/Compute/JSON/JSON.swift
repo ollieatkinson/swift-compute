@@ -345,7 +345,7 @@ extension JSON: Codable {
             self = .array(values)
             return
         }
-        let object = try decoder.container(keyedBy: DynamicCodingKey.self)
+        let object = try decoder.container(keyedBy: AnyCodingKey.self)
         var values: [String: JSON] = [:]
         for key in object.allKeys {
             values[key.stringValue] = try object.decode(JSON.self, forKey: key)
@@ -376,15 +376,15 @@ extension JSON: Codable {
                 try container.encode(value)
             }
         case .object(let values):
-            var container = encoder.container(keyedBy: DynamicCodingKey.self)
+            var container = encoder.container(keyedBy: AnyCodingKey.self)
             for key in values.keys.sorted() {
-                try container.encode(values[key], forKey: DynamicCodingKey(key))
+                try container.encode(values[key], forKey: AnyCodingKey(key))
             }
         }
     }
 }
 
-private struct DynamicCodingKey: CodingKey {
+private struct AnyCodingKey: CodingKey {
     let stringValue: String
     let intValue: Int?
 

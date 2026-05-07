@@ -92,9 +92,7 @@ struct ComputeRuntimeEdgeCaseTests {
     }
 
     @Test func generated_compute_loops_hit_the_recursion_limit() async throws {
-        let loop = AnyComputeFunction(name: "loop") { _ in
-            ["{returns}": ["loop": .object([:])]]
-        }
+        let loop = GeneratedLoopFunction()
 
         await expectJSONError(containing: "recursionLimitExceeded") {
             _ = try await runtime(
@@ -153,20 +151,18 @@ private actor AsyncReturnsProbe {
         continuations.removeAll()
     }
 
-    nonisolated func function(name: String) -> AnyReturnsFunction {
-        AnyReturnsFunction(
-            name: name,
-            value: { [self] _ in await self.value() },
-            values: { [self] _ in self.values() }
-        )
+    nonisolated func function(name: String) -> Function {
+        Function(name: name, probe: self)
     }
 
-    private func value() -> JSON {
+    fileprivate func value() -> JSON {
         current
     }
 
-    private nonisolated func values() -> AsyncStream<Result<JSON, JSONError>> {
-        AsyncStream { continuation in
+    fileprivate nonisolated func values(
+        bufferingPolicy: Compute.ReturnsKeywordDefinition.BufferingPolicy
+    ) -> AsyncStream<Result<JSON, JSONError>> {
+        AsyncStream(bufferingPolicy: bufferingPolicy) { continuation in
             let id = UUID()
             let task = Task { [self] in
                 await self.add(continuation, id: id)
@@ -190,5 +186,30 @@ private actor AsyncReturnsProbe {
 
     private func remove(id: UUID) {
         continuations[id] = nil
+    }
+
+    struct Function: Compute.ReturnsKeywordDefinition {
+        let name: String
+        let probe: AsyncReturnsProbe
+
+        func compute(data input: JSON, frame: Compute.Frame) async throws -> JSON? {
+            await probe.value()
+        }
+
+        func subject(
+            data input: JSON,
+            frame: Compute.Frame,
+            bufferingPolicy: Compute.ReturnsKeywordDefinition.BufferingPolicy
+        ) -> AsyncStream<Result<JSON, JSONError>> {
+            probe.values(bufferingPolicy: bufferingPolicy)
+        }
+    }
+}
+
+private struct GeneratedLoopFunction: AnyReturnsKeyword {
+    let name = "loop"
+
+    func compute(data input: JSON, frame: Compute.Frame) async throws -> JSON? {
+        ["{returns}": ["loop": .object([:])]]
     }
 }

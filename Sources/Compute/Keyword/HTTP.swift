@@ -80,7 +80,7 @@ extension Compute.Keyword {
 }
 
 extension Compute.Keyword.HTTP {
-    public struct Function: ReturnsKeyword {
+    public struct Function: Compute.ReturnsKeywordDefinition {
         public let name = Compute.Keyword.HTTP.name
 
         private let perform: @Sendable (URLRequest) async throws -> Response

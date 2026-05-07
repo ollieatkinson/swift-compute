@@ -38,13 +38,20 @@ extension Compute.Keyword.From {
     }
 }
 
-extension Compute.Keyword.From.Function: ReturnsKeyword where References: Compute.AsyncReferences {
-    public func subject(data input: JSON, frame: Compute.Frame) -> AsyncStream<Result<JSON, JSONError>> {
+extension Compute.Keyword.From.Function: Compute.ReturnsKeywordDefinition where References: Compute.AsyncReferences {
+    public func subject(
+        data input: JSON,
+        frame: Compute.Frame,
+        bufferingPolicy: Compute.ReturnsKeywordDefinition.BufferingPolicy
+    ) -> AsyncStream<Result<JSON, JSONError>> {
         do {
             let from = try JSON.decoded(Compute.Keyword.From.self, from: input)
             return references.values(for: from.reference, context: from.context)
         } catch {
-            let (stream, continuation) = AsyncStream.makeStream(of: Result<JSON, JSONError>.self)
+            let (stream, continuation) = AsyncStream.makeStream(
+                of: Result<JSON, JSONError>.self,
+                bufferingPolicy: bufferingPolicy
+            )
             continuation.yield(.failure(JSONError(error)))
             continuation.finish()
             return stream

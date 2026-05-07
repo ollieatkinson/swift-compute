@@ -79,11 +79,18 @@ struct ArrayReduceTests {
     }
 }
 
-private let add = AnyComputeFunction(name: "add") { input in
-    guard case .object(let object) = input else {
-        throw JSONError("add expected an object")
+private let add = AddFunction()
+
+private struct AddFunction: AnyReturnsKeyword {
+    let name = "add"
+
+    func compute(data input: JSON, frame: Compute.Frame) async throws -> JSON? {
+        let input = try await frame.compute(input)
+        guard case .object(let object) = input else {
+            throw JSONError("add expected an object")
+        }
+        let lhs = try (object["lhs"] ?? .null).decode(Int.self)
+        let rhs = try (object["rhs"] ?? .null).decode(Int.self)
+        return .int(lhs + rhs)
     }
-    let lhs = try (object["lhs"] ?? .null).decode(Int.self)
-    let rhs = try (object["rhs"] ?? .null).decode(Int.self)
-    return .int(lhs + rhs)
 }

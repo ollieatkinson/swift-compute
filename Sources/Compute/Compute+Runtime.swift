@@ -57,19 +57,21 @@ extension Compute {
     }
 }
 
-private enum ComputeLemma: Hashable, Sendable {
-    case source(Compute.Route)
-    case route(Compute.Route)
-    case dependency(String)
-}
+extension Compute {
+    enum Lemma: Hashable, Sendable {
+        case source(Compute.Route)
+        case route(Compute.Route)
+        case dependency(String)
+    }
 
-private enum ComputeSignal: Equatable, Sendable {
-    case value(JSON)
-    case failure(JSONError)
+    enum Signal: Equatable, Sendable {
+        case value(JSON)
+        case failure(JSONError)
 
-    var value: JSON? {
-        guard case .value(let value) = self else { return nil }
-        return value
+        var value: JSON? {
+            guard case .value(let value) = self else { return nil }
+            return value
+        }
     }
 }
 
@@ -80,7 +82,7 @@ private struct RouteContinuation {
 
 extension Compute {
     public actor Runtime: Sendable {
-        private typealias ComputeBrain = Brain<ComputeLemma, ComputeSignal>
+        private typealias ComputeBrain = Brain<Compute.Lemma, Compute.Signal>
 
         private struct Graph: Sendable {
             let concepts: [ComputeBrain.Concept]
@@ -96,7 +98,7 @@ extension Compute {
         private var routeConcepts: Set<Compute.Route>
         private var routeDependencies: [Compute.Route: Set<Compute.Dependency>] = [:]
         private var latestThoughts: [Compute.Thought] = []
-        private var functionResults: [String: Result<JSON, JSONError>] = [:]
+        private var results: [String: Result<JSON, JSONError>] = [:]
         private var subscriptions: [String: Task<Void, Never>] = [:]
         private var observedRoutes: Set<Compute.Route> = []
         private var routeContinuations: [Compute.Route: [UUID: RouteContinuation]] = [:]
@@ -225,7 +227,7 @@ extension Compute {
                 graph = nil
             }
             let runtime = functionRuntime()
-            let commit: BrainCommit<ComputeLemma, ComputeSignal>
+            let commit: BrainCommit<Compute.Lemma, Compute.Signal>
             do {
                 if let graph {
                     commit = try await brain.settle(
@@ -257,7 +259,7 @@ extension Compute {
         }
 
         private func finish(
-            _ commit: BrainCommit<ComputeLemma, ComputeSignal>,
+            _ commit: BrainCommit<Compute.Lemma, Compute.Signal>,
             runtime: Compute.FunctionRuntime,
             subscribe: Bool,
             publishWhenSettled: Bool
@@ -303,14 +305,13 @@ extension Compute {
         }
 
         private func resubscribe(to dependencies: [Compute.Dependency]) {
-            let next = Dictionary(
-                dependencies.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
+            let next = Dictionary(dependencies.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
             for (key, task) in subscriptions where next[key] == nil {
                 task.cancel()
                 subscriptions[key] = nil
             }
             for (key, dependency) in next where subscriptions[key] == nil {
-                guard let function = functions[dependency.keyword] as? any ReturnsKeyword else { continue }
+                guard let function = functions[dependency.keyword] as? any Compute.ReturnsKeywordDefinition else { continue }
                 let frame = Compute.Frame(
                     context: context ?? Compute.Context(),
                     runtime: functionRuntime(),
@@ -318,7 +319,7 @@ extension Compute {
                     depth: 0
                 )
                 subscriptions[key] = Task { [weak self] in
-                    for await result in function.subject(data: dependency.argument, frame: frame) {
+                    for await result in function.subject(data: dependency.argument, frame: frame, bufferingPolicy: .unbounded) {
                         if Task.isCancelled { return }
                         guard let self else { return }
                         await self.apply(result, to: dependency)
@@ -336,8 +337,8 @@ extension Compute {
         }
 
         private func apply(_ result: Result<JSON, JSONError>, to dependency: Compute.Dependency) async {
-            functionResults[dependency.key] = result
-            let signal: ComputeSignal
+            results[dependency.key] = result
+            let signal: Compute.Signal
             switch result {
             case .success(let value):
                 signal = .value(value)
@@ -378,7 +379,7 @@ extension Compute {
         }
 
         private func publish(_ state: JSON) {
-            for route in Array(routeContinuations.keys) {
+            for (route, _) in routeContinuations {
                 let result: Result<JSON, JSONError>
                 if let value = state.value(at: route) {
                     result = .success(value)
@@ -401,7 +402,7 @@ extension Compute {
 
         private func functionRuntime() -> Compute.FunctionRuntime {
             let routes = routeConcepts
-            return Compute.FunctionRuntime(functions: functions, results: functionResults) { route in
+            return Compute.FunctionRuntime(functions: functions, results: results) { route in
                 route.nearestAncestor(in: routes) ?? route
             }
         }
@@ -419,7 +420,7 @@ extension Compute {
             state: ComputeBrain.State,
             runtime: Compute.FunctionRuntime,
             context: Compute.Context
-        ) async throws -> ComputeSignal? {
+        ) async throws -> Compute.Signal? {
             let current = try document(from: state, excluding: route)
             guard case .object(let object) = current.value(at: route) else {
                 return nil
@@ -532,8 +533,8 @@ extension Compute {
             functions: [String: any AnyReturnsKeyword],
             routeConcepts: Set<Compute.Route>,
             routeDependencies: [Compute.Route: Set<Compute.Dependency>]
-        ) -> Set<ComputeLemma> {
-            var inputs: Set<ComputeLemma> = []
+        ) -> Set<Compute.Lemma> {
+            var inputs: Set<Compute.Lemma> = []
             if case .object(let object) = value, let invocation = Compute.Invocation(object: object) {
                 if functions[invocation.keyword] != nil {
                     inputs.insert(.source(route))
@@ -637,7 +638,7 @@ extension Compute {
             guard let function = functions[keyword] else { return nil }
             let frame = Compute.Frame(context: context, runtime: self, route: route, depth: depth)
             let rawOutput: JSON?
-            if function is any ReturnsKeyword {
+            if function is any Compute.ReturnsKeywordDefinition {
                 let computed = try await argument.compute(frame: frame)
                 rawOutput = try await value(keyword: keyword, argument: computed, frame: frame)
             } else {
@@ -679,7 +680,7 @@ extension Compute {
 
         func value(keyword: String, argument: JSON, frame: Compute.Frame) async throws -> JSON? {
             guard let function = functions[keyword] else { return nil }
-            if function is any ReturnsKeyword {
+            if function is any Compute.ReturnsKeywordDefinition {
                 let dependency = Compute.Dependency(keyword: keyword, argument: argument)
                 let route = dependencyOwner(frame.route.computeObjectRoute(for: keyword))
                 tracked[route, default: []].insert(dependency)
@@ -696,7 +697,7 @@ extension Compute {
 
         func kind(for keyword: String) -> Compute.Thought.Kind {
             guard let function = functions[keyword] else { return .compute }
-            return function is any ReturnsKeyword ? .returns : .compute
+            return function is any Compute.ReturnsKeywordDefinition ? .returns : .compute
         }
 
         func dependenciesByRoute() -> [Compute.Route: Set<Compute.Dependency>] {

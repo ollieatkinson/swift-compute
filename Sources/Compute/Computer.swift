@@ -47,11 +47,11 @@ extension Computer {
         public let function: any AnyReturnsKeyword
 
         public var isComputeKeyword: Bool {
-            !(function is any ReturnsKeyword)
+            !(function is any Compute.ReturnsKeywordDefinition)
         }
 
         public var isReturnsKeyword: Bool {
-            function is any ReturnsKeyword
+            function is any Compute.ReturnsKeywordDefinition
         }
     }
 }
