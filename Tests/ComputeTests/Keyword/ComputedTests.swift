@@ -83,6 +83,38 @@ struct ComputedTests {
             ),
         ])
     }
+
+    @Test func typed_computed_arrays_compute_each_element_before_decoding() async throws {
+        let actual = try await value(
+            [
+                "{returns}": [
+                    "typed_computed_probe": [
+                        "conditions": [
+                            true,
+                            ["{returns}": ["not": false]],
+                            [
+                                "{returns}": [
+                                    "comparison": [
+                                        "equal": [
+                                            "lhs": ["{returns}": ["item": ["enabled"]]],
+                                            "rhs": true,
+                                        ],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            in: Compute.Context(item: ["enabled": true]),
+            functions: [TypedComputedProbe.function]
+        )
+
+        #expect(actual == [
+            "conditions": [true, true, true],
+            "missing_optional": true,
+        ])
+    }
 }
 
 private struct ComputedRouteProbe: Compute.KeywordDefinition {
@@ -107,6 +139,22 @@ private struct ComputedRouteProbe: Compute.KeywordDefinition {
             ),
             "entry_zero": try await entries[0].$value.compute(in: frame),
             "expression": try await $expression.compute(in: frame),
+        ]
+    }
+}
+
+private struct TypedComputedProbe: Compute.KeywordDefinition {
+    static let name = "typed_computed_probe"
+
+    @Computed var conditions: [Bool]
+    @Computed var optional: [Bool]?
+
+    func compute(in frame: Compute.Frame) async throws -> JSON? {
+        let conditions = try await $conditions.compute(in: frame)
+        let optional = try await $optional.compute(in: frame)
+        return [
+            "conditions": .array(conditions.map(JSON.bool)),
+            "missing_optional": .bool(optional == nil),
         ]
     }
 }

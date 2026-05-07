@@ -1,28 +1,30 @@
 @propertyWrapper
 public struct Computed<Value: Codable & Sendable>: Codable, Sendable {
-    public private(set) var wrappedValue: Value
+    public private(set) var rawValue: JSON
     private let route: [Compute.Route.Component]
+
+    public var wrappedValue: Value { fatalError("Value is only accessible by computed(in: frame)") }
 
     public var projectedValue: Computed<Value> {
         self
     }
 
-    public init(wrappedValue: Value, route: Compute.Route.Component) {
-        self.init(wrappedValue: wrappedValue, route: [route])
+    public init(rawValue: JSON, route: Compute.Route.Component) {
+        self.init(rawValue: rawValue, route: [route])
     }
 
-    public init(wrappedValue: Value, route: [Compute.Route.Component]) {
-        self.wrappedValue = wrappedValue
+    public init(rawValue: JSON, route: [Compute.Route.Component]) {
+        self.rawValue = rawValue
         self.route = route
     }
 
     public init(from decoder: Decoder) throws {
-        self.wrappedValue = try Value(from: decoder)
+        self.rawValue = try JSON(from: decoder)
         self.route = decoder.codingPath.map(Computed.component(from:))
     }
 
     public func encode(to encoder: Encoder) throws {
-        try wrappedValue.encode(to: encoder)
+        try rawValue.encode(to: encoder)
     }
 
     fileprivate static func component(from key: any CodingKey) -> Compute.Route.Component {
@@ -49,44 +51,37 @@ public struct Computed<Value: Codable & Sendable>: Codable, Sendable {
             depth: depth
         )
     }
-}
 
-extension Computed: Equatable where Value: Equatable {
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.wrappedValue == rhs.wrappedValue
-    }
-}
-
-public extension Computed where Value == JSON {
-    func compute(
-        in frame: Compute.Frame,
-        item: JSON? = nil,
-        appending suffix: Compute.Route.Component...
-    ) async throws -> JSON {
-        try await wrappedValue.compute(frame: field(in: frame, item: item, appending: suffix))
-    }
-}
-
-public extension Computed where Value == JSON? {
-    func compute(
-        in frame: Compute.Frame,
-        item: JSON? = nil,
-        appending suffix: Compute.Route.Component...
-    ) async throws -> JSON? {
-        try await wrappedValue?.compute(frame: field(in: frame, item: item, appending: suffix))
-    }
-}
-
-public extension Computed where Value == [String: JSON]? {
-    func compute(in frame: Compute.Frame) async throws -> [String: JSON]? {
-        guard let wrappedValue else { return nil }
-        var object: [String: JSON] = [:]
-        for key in wrappedValue.keys.sorted() {
-            object[key] = try await wrappedValue[key]?.compute(
-                frame: field(in: frame, appending: [.key(key)])
-            )
+    private static func decoded(_ value: JSON) throws -> Value {
+        if value == .null, let optional = Value.self as? OptionalProtocol.Type {
+            return optional.nilValue as! Value
         }
-        return object
+        return try value.decode(Value.self)
+    }
+}
+
+private protocol OptionalProtocol {
+    static var nilValue: Any { get }
+}
+
+extension Optional: OptionalProtocol {
+    static var nilValue: Any {
+        Optional<Wrapped>.none as Any
+    }
+}
+
+extension Computed: Equatable where Value: Equatable { }
+
+public extension Computed {
+    func compute(
+        in frame: Compute.Frame,
+        item: JSON? = nil,
+        appending suffix: Compute.Route.Component...
+    ) async throws -> Value {
+        let computed = try await rawValue.compute(
+            frame: field(in: frame, item: item, appending: suffix)
+        )
+        return try Self.decoded(computed)
     }
 }
 
@@ -96,7 +91,7 @@ public extension KeyedDecodingContainer {
         forKey key: Key
     ) throws -> Computed<Wrapped?> where Wrapped: Codable & Sendable {
         try decodeIfPresent(type, forKey: key) ?? Computed<Wrapped?>(
-            wrappedValue: nil,
+            rawValue: nil,
             route: codingPath.map(Computed<Wrapped?>.component(from:)) + [.key(key.stringValue)]
         )
     }

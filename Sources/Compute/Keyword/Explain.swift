@@ -73,7 +73,7 @@ private extension Compute.Keyword.Explain {
 #if canImport(FoundationModels) && (os(iOS) || os(macOS))
         if #available(iOS 26.0, macOS 26.0, *) {
             return await FoundationModelPrompt.explanation(
-                expression: value,
+                expression: $value.rawValue,
                 computedValue: computedValue,
                 thoughts: thoughts,
                 explanationContext: context,
