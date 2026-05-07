@@ -29,7 +29,7 @@ extension Keyword.Count: CustomComputeKeyword {
                 context: context,
                 runtime: runtime,
                 route: route.appending(.key("of")),
-                depth: depth + 1
+                depth: depth
             )
         } catch {
             value = .null

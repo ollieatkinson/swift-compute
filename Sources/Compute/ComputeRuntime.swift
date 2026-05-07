@@ -438,7 +438,7 @@ public actor ComputeRuntime: Sendable {
                     argument: invocation.argument,
                     context: context,
                     route: functionRoute,
-                    depth: route.components.count + 1,
+                    depth: 0,
                     recordThought: false
                 ) {
                     return (invocation.keyword, await runtime.kind(for: invocation.keyword), invocation.returnsJSON, output)
@@ -450,7 +450,7 @@ public actor ComputeRuntime: Sendable {
                     context: context,
                     runtime: runtime,
                     route: route.appending(.key("default")),
-                    depth: route.components.count + 1
+                    depth: 0
                 )
                 return ("default", .defaultValue, fallback, output)
             } catch {
@@ -461,7 +461,7 @@ public actor ComputeRuntime: Sendable {
                     context: context,
                     runtime: runtime,
                     route: route.appending(.key("default")),
-                    depth: route.components.count + 1
+                    depth: 0
                 )
                 return ("default", .defaultValue, fallback, output)
             }
@@ -620,7 +620,7 @@ actor ComputeFunctionRuntime {
                 context: context,
                 runtime: self,
                 route: route,
-                depth: depth + 1
+                depth: depth
             )
             rawOutput = try await value(keyword: keyword, argument: computed, route: route)
         }
@@ -642,6 +642,18 @@ actor ComputeFunctionRuntime {
             ))
         }
         return output
+    }
+
+    func capture(
+        _ operation: @Sendable () async throws -> JSON
+    ) async -> (result: Result<JSON, JSONError>, thoughts: [ComputeThought]) {
+        let start = thoughts.count
+        do {
+            let value = try await operation()
+            return (.success(value), Array(thoughts.dropFirst(start)))
+        } catch {
+            return (.failure(JSONError(error)), Array(thoughts.dropFirst(start)))
+        }
     }
 
     func value(keyword: String, argument: JSON, route: ComputeRoute) async throws -> JSON? {

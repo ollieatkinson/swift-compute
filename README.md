@@ -92,8 +92,9 @@ The default computer includes keywords for:
 
 - boolean checks with `yes`, `not`, and `either`
 - comparisons with `comparison`
+- explanations with `explain`
 - explicit failures with `error`
-- collection helpers like `count`, `contains`, `map`, `array_map`, `array_filter`, `array_group`, `array_slice`, `array_sort`, `array_subscript`, and `array_zip`
+- collection helpers like `count`, `contains`, `map`, `array_map`, `array_filter`, `array_group`, `array_reduce`, `array_slice`, `array_sort`, `array_subscript`, and `array_zip`
 - item lookup with `item`
 - text formatting with `text`
 - HTTP values with `http`
@@ -101,6 +102,10 @@ The default computer includes keywords for:
 Reference values can be added with `Keyword.From.Function(references:)`. JavaScript evaluation can be added explicitly with `Keyword.Eval.function`.
 
 Custom keywords can be added by conforming to `ComputeKeyword` or `AnyReturnsKeyword`, declaring a `name`, and passing them into `ComputeRuntime`.
+
+`array_reduce` evaluates `next` once per element. During each iteration, the local `item` context contains `item`, `index`, and `accumulator`.
+
+`explain` evaluates a value and returns an object containing `ok`, `value`, `summary`, and displayable `thoughts`. If the explained value fails, `explain` returns `ok: false` with an `error` string instead of throwing.
 
 ## Philosophy
 

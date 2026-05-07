@@ -38,7 +38,7 @@ extension Keyword.This: CustomComputeKeyword {
                 context: context,
                 runtime: runtime,
                 route: route.appending(.key("condition")),
-                depth: depth + 1
+                depth: depth
             )
             .decode(Bool.self) ?? true
         guard condition else { return nil }
@@ -46,7 +46,7 @@ extension Keyword.This: CustomComputeKeyword {
             context: context,
             runtime: runtime,
             route: route.appending(.key("value")),
-            depth: depth + 1
+            depth: depth
         )
     }
 }

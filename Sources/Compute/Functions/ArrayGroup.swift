@@ -74,7 +74,7 @@ extension Keyword.ArrayGroup: CustomComputeKeyword {
             context: context,
             runtime: runtime,
             route: route.appending(.key("array")),
-            depth: depth + 1
+            depth: depth
         )
         guard case .array(let values) = source else {
             throw JSONError("array_group expected an array")
@@ -109,7 +109,7 @@ extension Keyword.ArrayGroup: CustomComputeKeyword {
                     context: ComputeTaskLocal.context,
                     runtime: runtime,
                     route: route.appending(.key("by")).appending(.key("value")).appending(.index(index)),
-                    depth: depth + 1
+                    depth: depth
                 )
             }
             keyedItems.append(KeyedItem(index: index, key: key, value: value))
@@ -118,7 +118,7 @@ extension Keyword.ArrayGroup: CustomComputeKeyword {
             context: context,
             runtime: runtime,
             route: route.appending(.key("by")).appending(.key("order")),
-            depth: depth + 1
+            depth: depth
         )
         let order = try orderValue?.decode(Keyword.ArraySort.Order.self) ?? .ascending
         return .array(try ItemGroup.groups(from: keyedItems).elements(ordered: order).map(JSON.array))
@@ -165,19 +165,19 @@ extension Keyword.ArrayGroup {
                 context: context,
                 runtime: runtime,
                 route: route.appending(.key("into")).appending(.key("counts")),
-                depth: depth + 1
+                depth: depth
             )
             let overflow = try await into.overflow?.compute(
                 context: context,
                 runtime: runtime,
                 route: route.appending(.key("into")).appending(.key("overflow")),
-                depth: depth + 1
+                depth: depth
             )
             let remainder = try await into.remainder?.compute(
                 context: context,
                 runtime: runtime,
                 route: route.appending(.key("into")).appending(.key("remainder")),
-                depth: depth + 1
+                depth: depth
             )
             self.counts = try counts.decode([Int].self)
             self.overflow = try overflow?.decode(Overflow.self) ?? .trimmed

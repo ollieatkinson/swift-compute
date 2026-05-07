@@ -29,7 +29,7 @@ extension Keyword.Exists: CustomComputeKeyword {
                 context: context,
                 runtime: runtime,
                 route: route.appending(.key("value")),
-                depth: depth + 1
+                depth: depth
             )
         } catch {
             computed = .null

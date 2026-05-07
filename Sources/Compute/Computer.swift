@@ -10,6 +10,7 @@ public struct Computer: Sendable {
         Keyword.Comparison.function,
         Keyword.Not.function,
         Keyword.Either.function,
+        Keyword.Explain.function,
         Keyword.Error.function,
         Keyword.HTTP.Function(),
         Keyword.Text.function,
@@ -24,6 +25,7 @@ public struct Computer: Sendable {
         Keyword.ArrayGroup.function,
         Keyword.ArrayMap.function,
         Keyword.ArrayFilter.function,
+        Keyword.ArrayReduce.function,
     ])
 
     public init(_ functions: [any AnyReturnsKeyword] = []) {

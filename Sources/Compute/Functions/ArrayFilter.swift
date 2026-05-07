@@ -55,7 +55,7 @@ extension Keyword.ArrayFilter: CustomComputeKeyword {
                     context: ComputeTaskLocal.context,
                     runtime: runtime,
                     route: route.appending(.key("predicate")).appending(.index(index)),
-                    depth: depth + 1
+                    depth: depth
                 )
             }
             predicates.append(.bool(try keep.decode(Bool.self)))

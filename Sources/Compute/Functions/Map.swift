@@ -71,7 +71,7 @@ extension Keyword.Map: CustomComputeKeyword {
                     context: ComputeTaskLocal.context,
                     runtime: runtime,
                     route: route.appending(.key("copy")).appending(.index(index)).appending(.key("value")),
-                    depth: depth + 1
+                    depth: depth
                 )
             }
             copies.append(Keyword.Map.Copy(value: value, to: copy.to))

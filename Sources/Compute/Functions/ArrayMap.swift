@@ -55,7 +55,7 @@ extension Keyword.ArrayMap: CustomComputeKeyword {
             context: context,
             runtime: runtime,
             route: route.appending(.key("into_self")),
-            depth: depth + 1
+            depth: depth
         ).decode(Bool.self) ?? false
         for (index, value) in values.enumerated() {
             if let copy {
@@ -65,7 +65,7 @@ extension Keyword.ArrayMap: CustomComputeKeyword {
                         context: ComputeTaskLocal.context,
                         runtime: runtime,
                         route: route.appending(.key("over")).appending(.index(index)),
-                        depth: depth + 1
+                        depth: depth
                     ) ?? .null
                 })
             } else {
@@ -76,7 +76,7 @@ extension Keyword.ArrayMap: CustomComputeKeyword {
             context: context,
             runtime: runtime,
             route: route.appending(.key("flattened")),
-            depth: depth + 1
+            depth: depth
         ).decode(Bool.self) ?? false
         return try Self(over: .array(mapped), flattened: .bool(shouldFlatten)).compute()
     }

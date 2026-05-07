@@ -65,7 +65,7 @@ public struct ComputeKeywordFunction<K: ComputeKeyword>: AnyReturnsKeyword {
                     context: context,
                     runtime: runtime,
                     route: route,
-                    depth: depth + 1
+                    depth: depth
                 )
                 return try await runtime.value(keyword: K.name, argument: computed, route: route)
             }
@@ -148,7 +148,7 @@ extension CustomComputeKeyword {
             context: context,
             runtime: runtime,
             route: route,
-            depth: depth + 1
+            depth: depth
         )
         return try await runtime.value(keyword: Self.name, argument: computed, route: route)
     }

@@ -214,13 +214,13 @@ extension JSON {
         route: ComputeRoute = .root,
         depth: Int
     ) async throws -> JSON {
-        guard depth < 20 else {
-            throw ComputeError.recursionLimitExceeded
-        }
-
         switch self {
         case .object(let object):
             if let invocation = Compute.Invocation(object: object) {
+                guard depth < 20 else {
+                    throw ComputeError.recursionLimitExceeded
+                }
+
                 let functionRoute = route.appending(.key("{returns}")).appending(.key(invocation.keyword))
                 do {
                     if let value = try await runtime.compute(
@@ -228,7 +228,7 @@ extension JSON {
                         argument: invocation.argument,
                         context: context,
                         route: functionRoute,
-                        depth: depth + 1
+                        depth: depth
                     ) {
                         return value
                     }
@@ -239,7 +239,7 @@ extension JSON {
                             context: context,
                             runtime: runtime,
                             route: fallbackRoute,
-                            depth: depth + 1
+                            depth: depth
                         )
                         await runtime.record(ComputeThought(
                             route: fallbackRoute,
@@ -259,7 +259,7 @@ extension JSON {
                         context: context,
                         runtime: runtime,
                         route: fallbackRoute,
-                        depth: depth + 1
+                        depth: depth
                     )
                     await runtime.record(ComputeThought(
                         route: fallbackRoute,
@@ -280,7 +280,7 @@ extension JSON {
                     context: context,
                     runtime: runtime,
                     route: route.appending(.key(key)),
-                    depth: depth + 1
+                    depth: depth
                 )
             }
             return .object(computed)
@@ -291,7 +291,7 @@ extension JSON {
                     context: context,
                     runtime: runtime,
                     route: route.appending(.index(index)),
-                    depth: depth + 1
+                    depth: depth
                 ))
             }
             return .array(computed)

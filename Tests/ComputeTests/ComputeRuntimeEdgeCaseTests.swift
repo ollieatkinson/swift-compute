@@ -62,19 +62,45 @@ struct ComputeRuntimeEdgeCaseTests {
         }
     }
 
-    @Test func deeplyNestedResolvedDocumentsHitTheRecursionLimit() async throws {
-        await expectJSONError(containing: "recursionLimitExceeded") {
-            var document: JSON = true
-            for _ in 0..<25 {
-                document = [
-                    "{returns}": [
-                        "this": [
-                            "value": document,
-                        ],
+    @Test func deeplyNestedSynchronousDocumentsDoNotHitTheRecursionLimit() async throws {
+        var document: JSON = true
+        for _ in 0..<25 {
+            document = [
+                "{returns}": [
+                    "this": [
+                        "value": document,
                     ],
-                ]
-            }
-            _ = try await runtime(document).value()
+                ],
+            ]
+        }
+
+        #expect(try await runtime(document).value() == true)
+    }
+
+    @Test func asyncReturnedComputeLoopsHitTheRecursionLimit() async throws {
+        let references = TestReferences()
+        await references.set("loop", to: ["{returns}": ["from": ["reference": "loop"]]])
+
+        await expectJSONError(containing: "recursionLimitExceeded") {
+            _ = try await runtime(
+                ["{returns}": ["from": ["reference": "loop"]]],
+                references: references
+            ).value()
+        }
+
+        await references.finish()
+    }
+
+    @Test func generatedComputeLoopsHitTheRecursionLimit() async throws {
+        let loop = AnyComputeFunction(name: "loop") { _ in
+            ["{returns}": ["loop": .object([:])]]
+        }
+
+        await expectJSONError(containing: "recursionLimitExceeded") {
+            _ = try await runtime(
+                ["{returns}": ["loop": .object([:])]],
+                functions: [loop]
+            ).value()
         }
     }
 

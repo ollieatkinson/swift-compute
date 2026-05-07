@@ -45,7 +45,7 @@ extension Keyword.Either: CustomComputeKeyword {
                     context: context,
                     runtime: runtime,
                     route: branchRoute.appending(.key("condition")),
-                    depth: depth + 1
+                    depth: depth
                 )
                 .decode(Bool.self) ?? true
             guard condition else { continue }
@@ -53,7 +53,7 @@ extension Keyword.Either: CustomComputeKeyword {
                 context: context,
                 runtime: runtime,
                 route: branchRoute.appending(.key("value")),
-                depth: depth + 1
+                depth: depth
             )
         }
         return nil
