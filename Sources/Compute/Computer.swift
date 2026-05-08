@@ -5,7 +5,6 @@ public struct Computer: Sendable {
         Compute.Keyword.This.function,
         Compute.Keyword.Yes.function,
         Compute.Keyword.Contains.function,
-        Compute.Keyword.Membership.function,
         Compute.Keyword.ApproximatelyEqual.function,
         Compute.Keyword.Comparison.function,
         Compute.Keyword.Not.function,

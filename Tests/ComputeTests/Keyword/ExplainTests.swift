@@ -120,9 +120,9 @@ struct ExplainTests {
                                     ],
                                     [
                                         "{returns}": [
-                                            "membership": [
-                                                "lhs": ["{returns}": ["from": ["reference": "device.profile.loyalty_tier"]]],
-                                                "rhs": ["{returns}": ["from": ["reference": "server.flight.allowed_loyalty_tiers"]]],
+                                            "contains": [
+                                                "lhs": ["{returns}": ["from": ["reference": "server.flight.allowed_loyalty_tiers"]]],
+                                                "rhs": ["{returns}": ["from": ["reference": "device.profile.loyalty_tier"]]],
                                             ],
                                         ],
                                     ],
