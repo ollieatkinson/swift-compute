@@ -37,8 +37,7 @@ extension Compute.Keyword.Explain: Compute.KeywordDefinition {
             ]
             if let explanation = await naturalLanguageExplanation(
                 computedValue: value,
-                thoughts: capture.thoughts,
-                localItem: frame.context.item
+                thoughts: capture.thoughts
             ) {
                 payload["explanation"] = .string(explanation)
             }
@@ -55,7 +54,7 @@ extension Compute.Keyword.Explain: Compute.KeywordDefinition {
 }
 
 private extension Compute.Keyword.Explain {
-    func naturalLanguageExplanation(computedValue: JSON, thoughts: [Compute.Thought], localItem: JSON?) async -> String? {
+    func naturalLanguageExplanation(computedValue: JSON, thoughts: [Compute.Thought]) async -> String? {
         guard mode == .foundationModel else { return nil }
 #if canImport(FoundationModels) && (os(iOS) || os(macOS))
         if #available(iOS 26.0, macOS 26.0, *) {
@@ -63,8 +62,7 @@ private extension Compute.Keyword.Explain {
                 expression: $value.rawValue,
                 computedValue: computedValue,
                 thoughts: thoughts,
-                explanationContext: context,
-                localItem: localItem
+                explanationContext: context
             )
         }
 #endif
@@ -79,8 +77,7 @@ private enum FoundationModelPrompt {
         expression: JSON,
         computedValue: JSON,
         thoughts: [Compute.Thought],
-        explanationContext: JSON?,
-        localItem: JSON?
+        explanationContext: JSON?
     ) async -> String? {
         let model = SystemLanguageModel.default
         guard model.isAvailable else { return nil }
@@ -91,8 +88,7 @@ private enum FoundationModelPrompt {
                 expression: expression,
                 computedValue: computedValue,
                 thoughts: thoughts,
-                explanationContext: explanationContext,
-                localItem: localItem
+                explanationContext: explanationContext
             ))
             let explanation = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
             return explanation.isEmpty ? nil : explanation
@@ -102,55 +98,40 @@ private enum FoundationModelPrompt {
     }
 
     private static let instructions = """
-    Write one user-facing explanation sentence in plain text only.
-    Use second person, starting with "You are seeing this because" when context describes a visible state.
-    Use the context, result, referenced data, and trace.
-    Explain the outcome and key reason, keeping exact values, identifiers, and comparisons.
-    For booleans, explain the outcome instead of saying true or false.
-    Do not use Markdown, headings, lists, labels, raw keyword names, invented context, or "The user".
+    Convert runtime evidence into one user-facing sentence.
+    Begin exactly with "You are seeing this because".
+    Use "you" and "your"; never say "the user".
+    Use the exact final value and exact trace outputs.
+    For false final values, do not mention passed checks unless needed for contrast.
+    For true final values, do not mention failed branches unless they selected a fallback.
+    For `unless`, true means blocked and false means not blocked.
+    For `not`, true means the original source was false.
+    For `either`, explain the branch that produced the final value.
+    For lists, name the returned people or items.
+    Do not expose any raw compute or JSON vocabulary.
     """
 
     private static func prompt(
         expression: JSON,
         computedValue: JSON,
         thoughts: [Compute.Thought],
-        explanationContext: JSON?,
-        localItem: JSON?
+        explanationContext: JSON?
     ) -> String {
         """
         Context:
         \(explanationContext?.promptDescription ?? "Not provided.")
 
-        Referenced data:
-        \(referencedLocalData(localItem: localItem, thoughts: thoughts)?.promptDescription ?? "Not provided.")
-
         Expression:
         \(expression.promptDescription)
 
-        Result:
+        Final value:
         \(computedValue.promptDescription)
 
-        Trace:
+        Runtime evidence:
         \(JSON.array(thoughts.map(\.modelExplanationJSON)).promptDescription)
 
-        Reply with one plain-text sentence explaining why you are seeing this result.
+        One sentence:
         """
-    }
-
-    private static func referencedLocalData(localItem: JSON?, thoughts: [Compute.Thought]) -> JSON? {
-        guard localItem != nil else { return nil }
-
-        let values = thoughts.compactMap { thought -> JSON? in
-            guard case .object(let input)? = thought.input else { return nil }
-            guard case .array(let path)? = input["item"] else { return nil }
-            let value = thought.output ?? .null
-            return [
-                "path": .array(path),
-                "value": value,
-            ]
-        }
-
-        return values.isEmpty ? nil : .array(values)
     }
 }
 #endif
