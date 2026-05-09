@@ -174,7 +174,7 @@ private extension Compute.Thought {
 private extension JSON {
     var promptDescription: String {
         guard let data = try? JSONSerialization.data(withJSONObject: any, options: [.fragmentsAllowed, .sortedKeys]) else {
-            return explanationSummary
+            return String(describing: rawValue)
         }
         return String(decoding: data, as: UTF8.self)
     }
@@ -195,6 +195,6 @@ private extension JSON {
         if let value = string {
             return value
         }
-        return stableDescription
+        return promptDescription
     }
 }

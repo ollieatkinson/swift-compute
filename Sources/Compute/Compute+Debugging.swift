@@ -145,7 +145,7 @@ private enum ChangeLog {
         if let value = json.string {
             return "\"\(value)\""
         }
-        return json.stableDescription
+        return String(describing: json.rawValue)
     }
 
     private struct JSONDump: Equatable, CustomDumpStringConvertible {

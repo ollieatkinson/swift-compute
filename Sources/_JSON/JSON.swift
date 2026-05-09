@@ -192,54 +192,6 @@ public extension JSON {
         return 1
     }
 
-    var stableDescription: String {
-        var output = ""
-        appendStableDescription(to: &output)
-        return output
-    }
-
-    private func appendStableDescription(to output: inout String) {
-        switch rawValue {
-        case is Null:
-            output += "null"
-        case let value as Bool:
-            output += "bool:"
-            output += String(value)
-        case let value as Int:
-            output += "int:"
-            output += String(value)
-        case let value as Double:
-            output += "double:"
-            output += String(value)
-        case let value as String:
-            output += "string:"
-            output += value
-        case let values as Array:
-            output += "["
-            for index in values.indices {
-                if index != values.startIndex {
-                    output += ","
-                }
-                values[index].appendStableDescription(to: &output)
-            }
-            output += "]"
-        case let object as Object:
-            output += "{"
-            for (index, entry) in object.sortedEntries.enumerated() {
-                if index != 0 {
-                    output += ","
-                }
-                output += entry.key
-                output += ":"
-                entry.value.appendStableDescription(to: &output)
-            }
-            output += "}"
-        case let value:
-            output += "fragment:"
-            output += String(describing: value)
-        }
-    }
-
     func data(options: JSONSerialization.WritingOptions = [.fragmentsAllowed]) throws -> Data {
         let value = any
         guard JSONSerialization.isValidJSONObject([value]) else {

@@ -62,7 +62,7 @@ extension Compute {
     enum Lemma: Hashable, Sendable {
         case source(Compute.Route)
         case route(Compute.Route)
-        case dependency(String)
+        case dependency(Compute.Dependency)
     }
 
     enum Signal: Equatable, Sendable {
@@ -99,8 +99,8 @@ extension Compute {
         private var routeConcepts: Set<Compute.Route>
         private var routeDependencies: [Compute.Route: Set<Compute.Dependency>] = [:]
         private var latestThoughts: [Compute.Thought] = []
-        private var results: [String: Result<JSON, JSONError>] = [:]
-        private var subscriptions: [String: Task<Void, Never>] = [:]
+        private var results: [Compute.Dependency: Result<JSON, JSONError>] = [:]
+        private var subscriptions: [Compute.Dependency: Task<Void, Never>] = [:]
         private var observedRoutes: Set<Compute.Route> = []
         private var routeContinuations: [Compute.Route: [UUID: RouteContinuation]] = [:]
 
@@ -303,12 +303,12 @@ extension Compute {
         }
 
         private func resubscribe(to dependencies: [Compute.Dependency]) {
-            let next = Dictionary(dependencies.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
-            for (key, task) in subscriptions where next[key] == nil {
+            let next = Set(dependencies)
+            for (dependency, task) in subscriptions where !next.contains(dependency) {
                 task.cancel()
-                subscriptions[key] = nil
+                subscriptions[dependency] = nil
             }
-            for (key, dependency) in next where subscriptions[key] == nil {
+            for dependency in next where subscriptions[dependency] == nil {
                 guard let function = functions[dependency.keyword] as? any Compute.ReturnsKeywordDefinition else { continue }
                 let frame = Compute.Frame(
                     context: context ?? Compute.Context(),
@@ -316,7 +316,7 @@ extension Compute {
                     route: .root,
                     depth: 0
                 )
-                subscriptions[key] = Task { [weak self] in
+                subscriptions[dependency] = Task { [weak self] in
                     for await result in function.subject(data: dependency.argument, frame: frame, bufferingPolicy: .unbounded) {
                         if Task.isCancelled { return }
                         guard let self else { return }
@@ -335,7 +335,7 @@ extension Compute {
         }
 
         private func apply(_ result: Result<JSON, JSONError>, to dependency: Compute.Dependency) async {
-            results[dependency.key] = result
+            results[dependency] = result
             let signal: Compute.Signal
             switch result {
             case .success(let value):
@@ -343,7 +343,7 @@ extension Compute {
             case .failure(let error):
                 signal = .failure(error)
             }
-            await brain.stage([.dependency(dependency.key): signal])
+            await brain.stage([.dependency(dependency): signal])
             do {
                 try await settle(subscribe: true)
             } catch {
@@ -547,7 +547,7 @@ extension Compute {
             } else {
                 inputs.insert(.source(route))
             }
-            inputs.formUnion((routeDependencies[route] ?? []).map { .dependency($0.key) })
+            inputs.formUnion((routeDependencies[route] ?? []).map(Compute.Lemma.dependency))
             return inputs
         }
 
@@ -592,32 +592,20 @@ extension Compute {
     public struct Dependency: Sendable, Equatable, Hashable {
         public let keyword: String
         public let argument: JSON
-
-        fileprivate var key: String {
-            "\(keyword):\(argument.stableDescription)"
-        }
-
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            lhs.key == rhs.key
-        }
-
-        public func hash(into hasher: inout Hasher) {
-            hasher.combine(key)
-        }
     }
 }
 
 extension Compute {
     actor FunctionRuntime {
         private let functions: [String: any AnyReturnsKeyword]
-        private let results: [String: Result<JSON, JSONError>]
+        private let results: [Compute.Dependency: Result<JSON, JSONError>]
         private let dependencyOwner: @Sendable (Compute.Route) -> Compute.Route
         private var tracked: [Compute.Route: Set<Compute.Dependency>] = [:]
         private var thoughts: [Compute.Thought] = []
 
         init(
             functions: [String: any AnyReturnsKeyword],
-            results: [String: Result<JSON, JSONError>],
+            results: [Compute.Dependency: Result<JSON, JSONError>],
             dependencyOwner: @escaping @Sendable (Compute.Route) -> Compute.Route
         ) {
             self.functions = functions
@@ -682,7 +670,7 @@ extension Compute {
                 let dependency = Compute.Dependency(keyword: keyword, argument: argument)
                 let route = dependencyOwner(frame.route.computeObjectRoute(for: keyword))
                 tracked[route, default: []].insert(dependency)
-                if let result = results[dependency.key] {
+                if let result = results[dependency] {
                     return try result.get()
                 }
             }
