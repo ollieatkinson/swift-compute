@@ -1,3 +1,4 @@
+import _JSON
 import Foundation
 
 #if canImport(FoundationModels) && (os(iOS) || os(macOS))
@@ -179,19 +180,21 @@ private extension JSON {
     }
 
     var explanationSummary: String {
-        switch self {
-        case .null:
+        if isNull {
             return "null"
-        case .bool(let value):
-            return String(value)
-        case .int(let value):
-            return String(value)
-        case .double(let value):
-            return String(value)
-        case .string(let value):
-            return value
-        case .array, .object:
-            return stableDescription
         }
+        if let value = bool {
+            return String(value)
+        }
+        if let value = int {
+            return String(value)
+        }
+        if let value = double {
+            return String(value)
+        }
+        if let value = string {
+            return value
+        }
+        return stableDescription
     }
 }

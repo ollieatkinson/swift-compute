@@ -1,3 +1,4 @@
+import _JSON
 extension Compute.Keyword {
     public struct ArrayMap: Codable, Equatable, Sendable {
         @Computed public var over: [JSON]
@@ -36,7 +37,7 @@ extension Compute.Keyword.ArrayMap: Compute.KeywordDefinition {
     private static func mapped(over values: [JSON], flattened: Bool) -> JSON {
         if flattened {
             return .array(values.flatMap { value in
-                if case .array(let values) = value {
+                if let values = value.array {
                     return values
                 }
                 return [value]

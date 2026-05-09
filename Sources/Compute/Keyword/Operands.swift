@@ -1,3 +1,4 @@
+import _JSON
 protocol OperandPair: Sendable {
     var lhs: JSON { get }
     var rhs: JSON { get }
@@ -17,7 +18,7 @@ extension OperandPair {
         string: (String, String) -> Bool,
         number: (Double, Double) -> Bool
     ) throws -> JSON {
-        if case .string = lhs, case .string = rhs {
+        if lhs.string != nil, rhs.string != nil {
             return .bool(try string(lhs.decode(String.self), rhs.decode(String.self)))
         }
         return .bool(try number(lhs.decode(Double.self), rhs.decode(Double.self)))

@@ -1,3 +1,4 @@
+import _JSON
 extension Compute.Keyword {
     public struct Item: Equatable, Sendable {
         public let path: [Compute.Route.Component]

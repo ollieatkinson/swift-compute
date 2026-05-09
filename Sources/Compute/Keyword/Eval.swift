@@ -1,3 +1,4 @@
+import _JSON
 import JavaScriptCore
 
 extension Compute.Keyword {
@@ -24,6 +25,6 @@ extension Compute.Keyword.Eval: Compute.KeywordDefinition {
         if let exception = js.exception {
             throw JSONError(exception.toString() ?? "Unknown JavaScript exception")
         }
-        return JSON(result?.toObject() ?? NSNull())
+        return try JSON(jsonObject: result?.toObject() ?? NSNull())
     }
 }

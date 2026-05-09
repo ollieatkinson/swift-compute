@@ -11,6 +11,7 @@ let package = Package(
     products: [
         .library(name: "Brain", targets: ["Brain"]),
         .library(name: "Compute", targets: ["Compute"]),
+        .library(name: "_JSON", targets: ["_JSON"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-algorithms.git", from: "1.2.0"),
@@ -28,9 +29,16 @@ let package = Package(
             name: "Compute",
             dependencies: [
                 "Brain",
+                "_JSON",
                 .product(name: "Algorithms", package: "swift-algorithms"),
                 .product(name: "AnyCoding", package: "AnyCoding"),
                 .product(name: "CustomDump", package: "swift-custom-dump"),
+            ]
+        ),
+        .target(
+            name: "_JSON",
+            dependencies: [
+                .product(name: "AnyCoding", package: "AnyCoding"),
             ]
         ),
         .testTarget(
@@ -41,5 +49,6 @@ let package = Package(
             ]
         ),
         .testTarget(name: "ComputeTests", dependencies: ["Compute"]),
+        .testTarget(name: "_JSONTests", dependencies: ["_JSON"]),
     ]
 )

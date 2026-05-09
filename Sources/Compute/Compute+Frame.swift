@@ -1,3 +1,4 @@
+import _JSON
 extension Compute {
     public struct Frame: Sendable {
         public let context: Compute.Context

@@ -1,3 +1,4 @@
+import _JSON
 import Foundation
 
 extension Compute.Keyword {
@@ -127,20 +128,20 @@ extension Compute.Keyword.HTTP.Request {
     }
 
     private func headerFields(from json: JSON) throws -> [String: String] {
-        guard case .object(let object) = json else {
+        guard let object = json.object else {
             throw JSONError("HTTP headers must be an object")
         }
         return try object.mapValues { try $0.decode(String.self) }
     }
 
     private func bodyData(from json: JSON) throws -> Data {
-        if case .string(let string) = json {
+        if let string = json.string {
             return Data(string.utf8)
         }
-        if case .object = json {
+        if json.object != nil {
             return try JSONSerialization.data(withJSONObject: json.any)
         }
-        if case .array = json {
+        if json.array != nil {
             return try JSONSerialization.data(withJSONObject: json.any)
         }
         return Data(String(describing: json.any).utf8)
@@ -151,7 +152,7 @@ extension Compute.Keyword.HTTP {
     static func bodyJSON(from data: Data) -> JSON {
         guard !data.isEmpty else { return .null }
         if let value = try? JSONSerialization.jsonObject(with: data, options: .fragmentsAllowed) {
-            return JSON(value)
+            return (try? JSON(jsonObject: value)) ?? .null
         }
         if let string = String(data: data, encoding: .utf8) {
             return .string(string)

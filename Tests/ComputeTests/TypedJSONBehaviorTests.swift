@@ -91,7 +91,7 @@ struct TypedJSONBehaviorTests {
             "title": "feature",
         ]
 
-        #expect(try JSON.int(1).decode(JSON.self) == .int(1))
+        #expect(JSON.int(1).decode(JSON.self) == .int(1))
         #expect(try value.decode(Decoded.self) == Decoded(count: 1, ratio: 2, enabled: true, title: "feature"))
     }
 
@@ -104,7 +104,7 @@ struct TypedJSONBehaviorTests {
             "title": "17.1",
         ]
 
-        #expect(JSON(value.any) == value)
+        #expect(try JSON(jsonObject: value.any) == value)
         #expect(JSON.returns("item", []) == ["{returns}": ["item": []]])
     }
 }

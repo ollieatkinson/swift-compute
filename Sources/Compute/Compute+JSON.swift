@@ -1,68 +1,13 @@
+import _JSON
+import Algorithms
+
 extension JSON {
-    func asList() -> [JSON] {
-        switch self {
-        case .null:
-            return []
-        case .array(let values):
-            return values
-        case .bool, .int, .double, .string, .object:
-            return [self]
-        }
-    }
-
-    var count: Int {
-        switch self {
-        case .null:
-            return 0
-        case .bool, .int, .double:
-            return 1
-        case .string(let value):
-            return value.count
-        case .array(let values):
-            return values.count
-        case .object(let object):
-            return object.count
-        }
-    }
-
-    var stableDescription: String {
-        switch self {
-        case .null:
-            return "null"
-        case .bool(let value):
-            return "bool:\(value)"
-        case .int(let value):
-            return "int:\(value)"
-        case .double(let value):
-            return "double:\(value)"
-        case .string(let value):
-            return "string:\(value)"
-        case .array(let values):
-            return "[" + values.map(\.stableDescription).joined(separator: ",") + "]"
-        case .object(let object):
-            return "{" + object.keys.sorted().map { "\($0):\(object[$0]?.stableDescription ?? "nil")" }.joined(separator: ",") + "}"
-        }
-    }
-
     func value(at route: Compute.Route) -> JSON? {
-        var current = self
-        for component in route.components {
-            switch (component, current) {
-            case (.key(let key), .object(let object)):
-                guard let value = object[key] else { return nil }
-                current = value
-            case (.index(let index), .array(let array)):
-                guard array.indices.contains(index) else { return nil }
-                current = array[index]
-            default:
-                return nil
-            }
-        }
-        return current
+        value(at: route.components)
     }
 
     var isComputeInvocation: Bool {
-        guard case .object(let object) = self else { return false }
+        guard let object else { return false }
         return Compute.Invocation(object: object) != nil
     }
 
@@ -70,35 +15,34 @@ extension JSON {
         functions: [String: any AnyReturnsKeyword],
         from route: Compute.Route = .root
     ) -> [Compute.Route] {
-        switch self {
-        case .object(let object):
+        if let object {
             if let invocation = Compute.Invocation(object: object) {
                 guard functions[invocation.keyword] != nil else {
-                    let argumentRoute = route["{returns}", .key(invocation.keyword)]
-                    return invocation.argument.conceptRoutes(functions: functions, from: argumentRoute)
+                    return invocation.argument.conceptRoutes(
+                        functions: functions,
+                        from: route["{returns}", .key(invocation.keyword)]
+                    )
                 }
                 return [route]
             }
-            var routes: [Compute.Route] = []
-            for key in object.keys.sorted() {
-                routes.append(contentsOf: object[key]?.conceptRoutes(
+            return object.sortedEntries.flatMap { key, value in
+                value.conceptRoutes(
                     functions: functions,
                     from: route[.key(key)]
-                ) ?? [])
+                )
             }
-            return routes
-        case .array(let values):
-            var routes: [Compute.Route] = []
-            for (index, value) in values.enumerated() {
-                routes.append(contentsOf: value.conceptRoutes(
+        }
+
+        if let values = array {
+            return values.indexed().flatMap { index, value in
+                value.conceptRoutes(
                     functions: functions,
                     from: route[.index(index)]
-                ))
+                )
             }
-            return routes
-        case .null, .bool, .int, .double, .string:
-            return []
         }
+
+        return []
     }
 
     mutating func set(_ value: JSON, at route: Compute.Route) throws {
@@ -115,13 +59,19 @@ extension JSON {
             return
         }
         let tail = components.dropFirst()
-        switch (head, self) {
-        case (.key(let key), .object(var object)):
+        switch head {
+        case .key(let key):
+            guard var object else {
+                throw JSONError("Cannot set value", path: path)
+            }
             var child = object[key] ?? .object([:])
             try child.set(value, at: tail, path: path)
             object[key] = child
             self = .object(object)
-        case (.index(let index), .array(var array)):
+        case .index(let index):
+            guard var array else {
+                throw JSONError("Cannot set value", path: path)
+            }
             guard array.indices.contains(index) else {
                 throw JSONError("Array index out of bounds", path: path)
             }
@@ -129,8 +79,6 @@ extension JSON {
             try child.set(value, at: tail, path: path)
             array[index] = child
             self = .array(array)
-        default:
-            throw JSONError("Cannot set value", path: path)
         }
     }
 
@@ -146,8 +94,7 @@ extension JSON {
         route: Compute.Route = .root,
         depth: Int
     ) async throws -> JSON {
-        switch self {
-        case .object(let object):
+        if let object {
             if let invocation = Compute.Invocation(object: object) {
                 guard depth < 20 else {
                     throw Compute.Error.recursionLimitExceeded
@@ -207,8 +154,8 @@ extension JSON {
             }
 
             var computed: [String: JSON] = [:]
-            for key in object.keys.sorted() {
-                computed[key] = try await object[key]?.compute(
+            for (key, value) in object.sortedEntries {
+                computed[key] = try await value.compute(
                     context: context,
                     runtime: runtime,
                     route: route[.key(key)],
@@ -216,9 +163,11 @@ extension JSON {
                 )
             }
             return .object(computed)
-        case .array(let values):
+        }
+
+        if let values = array {
             var computed: [JSON] = []
-            for (index, value) in values.enumerated() {
+            for (index, value) in values.indexed() {
                 computed.append(try await value.compute(
                     context: context,
                     runtime: runtime,
@@ -227,9 +176,8 @@ extension JSON {
                 ))
             }
             return .array(computed)
-        case .null, .bool, .int, .double, .string:
-            return self
         }
-    }
 
+        return self
+    }
 }

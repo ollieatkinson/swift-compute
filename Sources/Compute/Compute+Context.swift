@@ -1,3 +1,4 @@
+import _JSON
 import Foundation
 
 public enum Compute {

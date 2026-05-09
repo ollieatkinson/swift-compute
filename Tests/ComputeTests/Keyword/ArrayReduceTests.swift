@@ -86,7 +86,7 @@ private struct AddFunction: AnyReturnsKeyword {
 
     func compute(data input: JSON, frame: Compute.Frame) async throws -> JSON? {
         let input = try await frame.compute(input)
-        guard case .object(let object) = input else {
+        guard let object = input.object else {
             throw JSONError("add expected an object")
         }
         let lhs = try (object["lhs"] ?? .null).decode(Int.self)

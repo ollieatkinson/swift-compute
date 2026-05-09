@@ -1,3 +1,4 @@
+import _JSON
 extension Compute.Keyword {
     public struct Map: Codable, Equatable, Sendable {
         @Computed public var src: JSON

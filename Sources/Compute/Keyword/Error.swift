@@ -1,3 +1,4 @@
+import _JSON
 extension Compute.Keyword {
     public struct Error: Codable, Equatable, Sendable {
         public static let name = "error"

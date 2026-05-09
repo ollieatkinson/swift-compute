@@ -1,3 +1,4 @@
+import _JSON
 import Algorithms
 
 extension Compute.Keyword {
@@ -54,10 +55,9 @@ extension Compute.Keyword.ArraySort.Predicate {
         case let (.some(left), .some(right)):
             ordered = order == .ascending ? left < right : left > right
         default:
-            switch (lhs, rhs) {
-            case let (.string(left), .string(right)):
+            if let left = lhs.string, let right = rhs.string {
                 ordered = order == .ascending ? left < right : left > right
-            default:
+            } else {
                 ordered = nil
             }
         }
@@ -74,13 +74,12 @@ extension Compute.Keyword.ArraySort.Predicate {
 
 private extension JSON {
     var number: Double? {
-        switch self {
-        case .int(let value):
+        if let value = int {
             return Double(value)
-        case .double(let value):
-            return value
-        case .null, .bool, .string, .array, .object:
-            return nil
         }
+        if let value = double {
+            return value
+        }
+        return nil
     }
 }

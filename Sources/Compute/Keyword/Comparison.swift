@@ -1,3 +1,4 @@
+import _JSON
 import Foundation
 
 extension Compute.Keyword {

@@ -1,3 +1,4 @@
+import _JSON
 extension Compute.Keyword {
     public struct ArrayFilter: Codable, Equatable, Sendable {
         @Computed public var array: [JSON]

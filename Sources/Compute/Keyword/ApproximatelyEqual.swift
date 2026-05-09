@@ -1,3 +1,4 @@
+import _JSON
 extension Compute.Keyword {
     public struct ApproximatelyEqual: Codable, Equatable, Sendable {
         @Computed public var lhs: Double

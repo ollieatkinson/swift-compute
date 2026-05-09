@@ -1,3 +1,4 @@
+import _JSON
 import Brain
 import Foundation
 
@@ -419,7 +420,7 @@ extension Compute {
             context: Compute.Context
         ) async throws -> Compute.Signal? {
             let current = try document(from: state, excluding: route)
-            guard case .object(let object) = current.value(at: route) else {
+            guard let object = current.value(at: route)?.object else {
                 return nil
             }
             let step = try await Self.evaluate(object, at: route, runtime: runtime, context: context)
@@ -532,7 +533,7 @@ extension Compute {
             routeDependencies: [Compute.Route: Set<Compute.Dependency>]
         ) -> Set<Compute.Lemma> {
             var inputs: Set<Compute.Lemma> = []
-            if case .object(let object) = value, let invocation = Compute.Invocation(object: object) {
+            if let object = value.object, let invocation = Compute.Invocation(object: object) {
                 if functions[invocation.keyword] != nil {
                     inputs.insert(.source(route))
                 } else {

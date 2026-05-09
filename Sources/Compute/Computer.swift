@@ -1,3 +1,4 @@
+import _JSON
 public struct Computer: Sendable {
     public let functions: [String: any AnyReturnsKeyword]
 
@@ -63,7 +64,7 @@ extension Computer.RegisteredKeyword: Equatable {
 
 extension Computer.RegisteredKeyword {
     public init?(returns data: [String: JSON]?, computer: Computer = .default) {
-        guard case .object(let returns)? = data?["{returns}"] else { return nil }
+        guard let returns = data?["{returns}"]?.object else { return nil }
         guard returns.count == 1, let name = returns.keys.first else { return nil }
         guard let keyword = computer[name] else { return nil }
         self = keyword
@@ -77,7 +78,7 @@ extension Compute {
         let fallback: JSON?
 
         init?(object: [String: JSON]) {
-            guard case .object(let returns)? = object["{returns}"] else { return nil }
+            guard let returns = object["{returns}"]?.object else { return nil }
             guard returns.count == 1, let keyword = returns.keys.first, let argument = returns[keyword] else {
                 return nil
             }

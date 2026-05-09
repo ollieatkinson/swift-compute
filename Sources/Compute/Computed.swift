@@ -1,3 +1,4 @@
+import _JSON
 @propertyWrapper
 public struct Computed<Value: Codable & Sendable>: Codable, Sendable {
     public private(set) var rawValue: JSON

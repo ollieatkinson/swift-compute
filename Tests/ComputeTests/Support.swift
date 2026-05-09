@@ -128,7 +128,7 @@ actor TestReferences: Compute.AsyncReferences {
     }
 
     private nonisolated func key(for reference: JSON, context: [String: JSON]?) throws -> String {
-        guard case .string(let base) = reference else {
+        guard let base = reference.string else {
             throw Compute.Error.unresolvedReference(reference)
         }
         guard let context else {
@@ -141,20 +141,22 @@ actor TestReferences: Compute.AsyncReferences {
     }
 
     private nonisolated func fragment(_ value: JSON) -> String {
-        switch value {
-        case .null:
+        if value.isNull {
             return "null"
-        case .bool(let value):
-            return String(value)
-        case .int(let value):
-            return String(value)
-        case .double(let value):
-            return String(value)
-        case .string(let value):
-            return "\"\(value)\""
-        case .array, .object:
-            return String(describing: value)
         }
+        if let value = value.bool {
+            return String(value)
+        }
+        if let value = value.int {
+            return String(value)
+        }
+        if let value = value.double {
+            return String(value)
+        }
+        if let value = value.string {
+            return "\"\(value)\""
+        }
+        return String(describing: value)
     }
 }
 

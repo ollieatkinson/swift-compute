@@ -151,12 +151,12 @@ struct ExplainTests {
 
         let output = try await value(json, functions: [Compute.Keyword.From.Function(references: references)])
 
-        guard case .object(let payload) = output else {
+        guard let payload = output.object else {
             Issue.record("Expected explain to return an object, got \(output)")
             await references.finish()
             return
         }
-        guard case .string(let explanation)? = payload["explanation"] else {
+        guard let explanation = payload["explanation"]?.string else {
             Issue.record("Expected foundation_model explain output to include a string explanation, got \(output)")
             await references.finish()
             return

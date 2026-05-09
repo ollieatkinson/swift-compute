@@ -1,3 +1,4 @@
+import _JSON
 import CustomDump
 import Foundation
 
@@ -82,6 +83,24 @@ private enum ChangeLog {
         }
     }
 
+    private static func appendState(
+        previous: JSON?,
+        current: JSON,
+        to lines: inout [String]
+    ) {
+        guard let previous else {
+            lines.append("  state:")
+            lines.append(dumped(JSONDump(current), indentation: 4))
+            return
+        }
+        lines.append("  state diff:")
+        if let difference = diff(JSONDump(previous), JSONDump(current)) {
+            lines.append(indent(difference, by: 4))
+        } else {
+            lines.append("    No changes.")
+        }
+    }
+
     private static func dumped<Value>(_ value: Value, indentation: Int) -> String {
         var output = ""
         customDump(value, to: &output)
@@ -111,19 +130,57 @@ private enum ChangeLog {
     }
 
     private static func compact(_ json: JSON) -> String {
-        switch json {
-        case .null:
+        if json.isNull {
             return "null"
-        case .bool(let value):
+        }
+        if let value = json.bool {
             return String(value)
-        case .int(let value):
+        }
+        if let value = json.int {
             return String(value)
-        case .double(let value):
+        }
+        if let value = json.double {
             return String(value)
-        case .string(let value):
+        }
+        if let value = json.string {
             return "\"\(value)\""
-        case .array, .object:
-            return json.stableDescription
+        }
+        return json.stableDescription
+    }
+
+    private struct JSONDump: Equatable, CustomDumpStringConvertible {
+        let value: JSON
+
+        init(_ value: JSON) {
+            self.value = value
+        }
+
+        var customDumpDescription: String {
+            if value.isNull {
+                return "JSON.null"
+            }
+            if let value = value.bool {
+                return "JSON.bool(\(value))"
+            }
+            if let value = value.int {
+                return "JSON.int(\(value))"
+            }
+            if let value = value.double {
+                return "JSON.double(\(value))"
+            }
+            if let value = value.string {
+                return "JSON.string(\(String(reflecting: value)))"
+            }
+            if let values = value.array {
+                return "JSON.array([" + values.map { JSONDump($0).customDumpDescription }.joined(separator: ", ") + "])"
+            }
+            if let object = value.object {
+                let fields = object.sortedEntries.map { key, value in
+                    "\(String(reflecting: key)): \(JSONDump(value).customDumpDescription)"
+                }
+                return "JSON.object([" + fields.joined(separator: ", ") + "])"
+            }
+            return "JSON(\(String(describing: value.rawValue)))"
         }
     }
 }

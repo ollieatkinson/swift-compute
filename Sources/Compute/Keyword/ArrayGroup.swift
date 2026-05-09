@@ -1,3 +1,4 @@
+import _JSON
 import Algorithms
 
 extension Compute.Keyword {

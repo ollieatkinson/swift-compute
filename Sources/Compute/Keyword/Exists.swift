@@ -1,3 +1,4 @@
+import _JSON
 extension Compute.Keyword {
     public struct Exists: Codable, Equatable, Sendable {
         @Computed public var value: JSON?

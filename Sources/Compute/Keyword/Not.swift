@@ -1,3 +1,4 @@
+import _JSON
 extension Compute.Keyword {
     public struct Not: Codable, Equatable, Sendable {
         public let value: JSON

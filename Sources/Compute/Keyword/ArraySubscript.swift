@@ -1,3 +1,4 @@
+import _JSON
 extension Compute.Keyword {
     public struct ArraySubscript: Codable, Equatable, Sendable {
         public static let name = "array_subscript"

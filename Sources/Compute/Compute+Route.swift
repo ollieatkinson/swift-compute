@@ -1,53 +1,13 @@
+import _JSON
 extension Compute {
     public struct Route: Hashable, Sendable, ExpressibleByArrayLiteral {
-        public enum Component: Hashable, Codable, Sendable, ExpressibleByStringLiteral,
-            ExpressibleByIntegerLiteral
-        {
-            case key(String)
-            case index(Int)
-
-            public init(stringLiteral value: String) {
-                self = .key(value)
-            }
-
-            public init(integerLiteral value: Int) {
-                self = .index(value)
-            }
-
-            public init(from decoder: Decoder) throws {
-                let container = try decoder.singleValueContainer()
-                if let index = try? container.decode(Int.self) {
-                    self = .index(index)
-                    return
-                }
-                self = .key(try container.decode(String.self))
-            }
-
-            public func encode(to encoder: Encoder) throws {
-                var container = encoder.singleValueContainer()
-                switch self {
-                case .key(let key):
-                    try container.encode(key)
-                case .index(let index):
-                    try container.encode(index)
-                }
-            }
-
-            var json: JSON {
-                switch self {
-                case .key(let key):
-                    return .string(key)
-                case .index(let index):
-                    return .int(index)
-                }
-            }
-        }
+        public typealias Component = CodingIndex
 
         public static let root = Route()
 
-        public let components: [Component]
+        public let components: JSONPath
 
-        public init(_ components: [Component] = []) {
+        public init(_ components: JSONPath = []) {
             self.components = components
         }
 
@@ -68,14 +28,7 @@ extension Compute {
         }
 
         public var path: [String] {
-            components.map { component in
-                switch component {
-                case .key(let key):
-                    return key
-                case .index(let index):
-                    return String(index)
-                }
-            }
+            components.map(\.stringValue)
         }
     }
 }
@@ -83,13 +36,9 @@ extension Compute {
 extension Compute.Route: Codable {
     public init(from decoder: Decoder) throws {
         var container = try decoder.unkeyedContainer()
-        var components: [Component] = []
+        var components: JSONPath = []
         while !container.isAtEnd {
-            if let index = try? container.decode(Int.self) {
-                components.append(.index(index))
-            } else {
-                components.append(.key(try container.decode(String.self)))
-            }
+            components.append(try container.decode(Component.self))
         }
         self.init(components)
     }
@@ -97,12 +46,7 @@ extension Compute.Route: Codable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.unkeyedContainer()
         for component in components {
-            switch component {
-            case .key(let key):
-                try container.encode(key)
-            case .index(let index):
-                try container.encode(index)
-            }
+            try container.encode(component)
         }
     }
 }

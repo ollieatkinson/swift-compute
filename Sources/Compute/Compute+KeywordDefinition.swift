@@ -1,3 +1,4 @@
+import _JSON
 public protocol AnyReturnsKeyword: Sendable {
     var name: String { get }
 

@@ -1,3 +1,4 @@
+import _JSON
 extension Compute.Keyword {
     public struct Either: Equatable, Sendable {
         public let branches: [This]

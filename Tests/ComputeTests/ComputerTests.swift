@@ -30,7 +30,7 @@ struct ComputerTests {
     }
 
     private func keyword(in json: JSON, using computer: Computer) throws -> Computer.RegisteredKeyword? {
-        guard case .object(let object) = json else {
+        guard let object = json.object else {
             throw JSONError("Expected object")
         }
         return Computer.RegisteredKeyword(returns: object, computer: computer)

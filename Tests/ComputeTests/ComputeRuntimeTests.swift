@@ -465,9 +465,9 @@ struct ComputeRuntimeTests {
 private func fromReferences(in thoughts: [Compute.Thought]) -> [String] {
     thoughts.compactMap { thought in
         guard thought.keyword == "from" else { return nil }
-        guard case .object(let input)? = thought.input else { return nil }
-        guard case .object(let from)? = input["from"] else { return nil }
-        guard case .string(let reference)? = from["reference"] else { return nil }
+        guard let input = thought.input?.object else { return nil }
+        guard let from = input["from"]?.object else { return nil }
+        guard let reference = from["reference"]?.string else { return nil }
         return reference
     }
 }

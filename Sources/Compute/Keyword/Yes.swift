@@ -1,3 +1,4 @@
+import _JSON
 extension Compute.Keyword {
     public struct Yes: Codable, Equatable, Sendable {
         @Computed public var `if`: [Bool]?
