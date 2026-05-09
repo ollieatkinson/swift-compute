@@ -6,7 +6,7 @@ extension Compute.Keyword {
         public static let name = "array_sort"
 
         @Computed public var array: [JSON]
-        public let predicates: [Predicate]?
+        @Computed public var predicates: [Predicate]?
 
         public struct Predicate: Codable, Equatable, Sendable {
             public let key_path: [Compute.Route.Component]?
@@ -28,7 +28,8 @@ extension Compute.Keyword {
 extension Compute.Keyword.ArraySort: Compute.KeywordDefinition {
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let values = try await $array.compute(in: frame)
-        guard let predicates, !predicates.isEmpty else {
+        let predicates = try await $predicates.compute(in: frame) ?? []
+        guard !predicates.isEmpty else {
             return .array(values)
         }
         let sorted = try values.indexed().sorted { lhs, rhs in

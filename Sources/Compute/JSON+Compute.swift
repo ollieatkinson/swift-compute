@@ -2,6 +2,16 @@ import _JSON
 import Algorithms
 
 extension JSON {
+    public static func returns(_ keyword: String, _ argument: JSON, default fallback: JSON? = nil) -> JSON {
+        var object: Object = [
+            "{returns}": .object([keyword: argument]),
+        ]
+        if let fallback {
+            object["default"] = fallback
+        }
+        return .object(object)
+    }
+
     var isComputeInvocation: Bool {
         guard let object else { return false }
         return Compute.Invocation(object: object) != nil
@@ -78,9 +88,7 @@ extension JSON {
         }
     }
 
-    func compute(
-        frame: Compute.Frame
-    ) async throws -> JSON {
+    func compute(in frame: Compute.Frame) async throws -> JSON {
         try await compute(context: frame.context, runtime: frame.runtime, route: frame.route, depth: frame.depth)
     }
 

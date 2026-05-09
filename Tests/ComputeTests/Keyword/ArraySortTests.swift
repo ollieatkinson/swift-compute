@@ -46,4 +46,43 @@ struct ArraySortTests {
             equals: [1, 2, 3]
         )
     }
+
+    @Test func computes_predicate_plan_before_sorting() async throws {
+        try await expect(
+            [
+                "{returns}": [
+                    "array_sort": [
+                        "array": [
+                            ["name": "first", "rank": 1],
+                            ["name": "third", "rank": 3],
+                            ["name": "second", "rank": 2],
+                        ],
+                        "predicates": [
+                            "{returns}": [
+                                "this": [
+                                    "value": [
+                                        [
+                                            "key_path": [
+                                                ["{returns}": ["item": ["sortKey"]]],
+                                            ],
+                                            "order": ["{returns}": ["item": ["sortOrder"]]],
+                                        ],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            in: Compute.Context(item: [
+                "sortKey": "rank",
+                "sortOrder": "descending",
+            ]),
+            equals: [
+                ["name": "third", "rank": 3],
+                ["name": "second", "rank": 2],
+                ["name": "first", "rank": 1],
+            ]
+        )
+    }
 }

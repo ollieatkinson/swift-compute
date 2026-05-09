@@ -64,6 +64,64 @@ struct MapTests {
         )
     }
 
+    @Test func copy_values_use_the_source_item_not_the_outer_item() async throws {
+        try await expect(
+            [
+                "{returns}": [
+                    "map": [
+                        "src": [
+                            "name": "source",
+                        ],
+                        "dst": [:],
+                        "copy": [
+                            [
+                                "value": ["{returns}": ["item": ["name"]]],
+                                "to": ["copied"],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            in: Compute.Context(item: ["name": "outer"]),
+            equals: ["copied": "source"]
+        )
+    }
+
+    @Test func copy_plan_can_be_computed_from_the_source_item() async throws {
+        try await expect(
+            [
+                "{returns}": [
+                    "map": [
+                        "src": [
+                            "name": "source",
+                            "target": "copied",
+                        ],
+                        "dst": [:],
+                        "copy": [
+                            "{returns}": [
+                                "this": [
+                                    "value": [
+                                        [
+                                            "value": ["{returns}": ["item": ["name"]]],
+                                            "to": [
+                                                ["{returns}": ["item": ["target"]]],
+                                            ],
+                                        ],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            in: Compute.Context(item: [
+                "name": "outer",
+                "target": "wrong",
+            ]),
+            equals: ["copied": "source"]
+        )
+    }
+
     @Test func maps_identity_empty_sources_computed_copies_and_indexed_paths() async throws {
         try await expect([
             "{returns}": [

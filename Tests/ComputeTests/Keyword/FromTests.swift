@@ -198,4 +198,29 @@ struct FromTests {
         #expect(try await runtime(json, references: references).value() == true)
         await references.finish()
     }
+
+    @Test func computes_reference_and_context_before_resolving() async throws {
+        let references = TestReferences()
+        await references.set("feature.access.allowed?subject.id=\"example\"", to: true)
+        let json: JSON = [
+            "{returns}": [
+                "from": [
+                    "reference": ["{returns}": ["item": ["reference"]]],
+                    "context": [
+                        "subject.id": ["{returns}": ["item": ["subject"]]],
+                    ],
+                ],
+            ],
+        ]
+
+        #expect(try await runtime(
+            json,
+            in: Compute.Context(item: [
+                "reference": "feature.access.allowed",
+                "subject": "example",
+            ]),
+            references: references
+        ).value() == true)
+        await references.finish()
+    }
 }

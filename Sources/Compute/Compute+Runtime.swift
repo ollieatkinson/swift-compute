@@ -486,7 +486,7 @@ extension Compute {
             context: Compute.Context
         ) async throws -> (keyword: String, kind: Compute.Thought.Kind, input: JSON, output: JSON) {
             let output = try await fallback.compute(
-                frame: Compute.Frame(
+                in: Compute.Frame(
                     context: context,
                     runtime: runtime,
                     route: route["default"],
@@ -627,13 +627,13 @@ extension Compute {
             let frame = Compute.Frame(context: context, runtime: self, route: route, depth: depth)
             let rawOutput: JSON?
             if function is any Compute.ReturnsKeywordDefinition {
-                let computed = try await argument.compute(frame: frame)
+                let computed = try await argument.compute(in: frame)
                 rawOutput = try await value(keyword: keyword, argument: computed, frame: frame)
             } else {
                 rawOutput = try await function.compute(data: argument, frame: frame)
             }
             let output = try await rawOutput?.compute(
-                frame: Compute.Frame(
+                in: Compute.Frame(
                     context: context,
                     runtime: self,
                     route: route.computeObjectRoute(for: keyword),

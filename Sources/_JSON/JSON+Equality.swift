@@ -1,6 +1,42 @@
 public extension JSON {
+    static func == (lhs: JSON, rhs: JSON) -> Bool {
+        lhs.isEqual(to: rhs)
+    }
+
     func isEqual(to other: JSON) -> Bool {
         Self.isEqual(rawValue, to: other.rawValue)
+    }
+
+    func hash(into hasher: inout Hasher) {
+        switch rawValue {
+        case is Null:
+            hasher.combine(0)
+        case let value as Bool:
+            hasher.combine(1)
+            hasher.combine(value)
+        case let value as Int:
+            hasher.combine(2)
+            hasher.combine(value)
+        case let value as Double:
+            hasher.combine(3)
+            hasher.combine(value)
+        case let value as String:
+            hasher.combine(4)
+            hasher.combine(value)
+        case let values as Array:
+            hasher.combine(5)
+            hasher.combine(values)
+        case let object as Object:
+            hasher.combine(6)
+            for (key, value) in object.sortedEntries {
+                hasher.combine(key)
+                hasher.combine(value)
+            }
+        default:
+            hasher.combine(7)
+            hasher.combine(String(reflecting: Swift.type(of: rawValue)))
+            hasher.combine(AnyHashable(rawValue))
+        }
     }
 
     private static func isEqual(_ value: JSONValue, to other: JSONValue) -> Bool {

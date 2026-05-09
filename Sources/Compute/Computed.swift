@@ -79,9 +79,7 @@ public extension Computed {
         item: JSON? = nil,
         appending suffix: Compute.Route.Component...
     ) async throws -> Value {
-        let computed = try await rawValue.compute(
-            frame: field(in: frame, item: item, appending: suffix)
-        )
+        let computed = try await rawValue.compute(in: field(in: frame, item: item, appending: suffix))
         return try Self.decoded(computed)
     }
 }

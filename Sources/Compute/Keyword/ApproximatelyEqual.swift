@@ -3,7 +3,7 @@ extension Compute.Keyword {
     public struct ApproximatelyEqual: Codable, Equatable, Sendable {
         @Computed public var lhs: Double
         @Computed public var rhs: Double
-        public let accuracy: Double
+        @Computed public var accuracy: Double
     }
 }
 
@@ -13,6 +13,7 @@ extension Compute.Keyword.ApproximatelyEqual: Compute.KeywordDefinition {
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let lhs = try await $lhs.compute(in: frame)
         let rhs = try await $rhs.compute(in: frame)
+        let accuracy = try await $accuracy.compute(in: frame)
         return .bool(abs(lhs - rhs) < accuracy)
     }
 }

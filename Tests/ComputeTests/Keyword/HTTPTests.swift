@@ -11,7 +11,7 @@ struct HTTPTests {
                 "http": [
                     "request": [
                         "url": ["{returns}": ["item": ["url"]]],
-                        "method": "post",
+                        "method": ["{returns}": ["item": ["method"]]],
                         "headers": [
                             "Authorization": ["{returns}": ["item": ["token"]]],
                             "Content-Type": "application/json",
@@ -19,13 +19,15 @@ struct HTTPTests {
                         "body": [
                             "name": ["{returns}": ["item": ["name"]]],
                         ],
-                        "timeout": 5,
+                        "timeout": ["{returns}": ["item": ["timeout"]]],
                     ],
                 ],
             ],
         ]
         let context = Compute.Context(item: [
             "name": "Oliver",
+            "method": "post",
+            "timeout": 5,
             "token": "Bearer abc",
             "url": "https://example.com/users",
         ])

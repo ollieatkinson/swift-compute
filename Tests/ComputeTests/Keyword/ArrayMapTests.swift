@@ -174,4 +174,34 @@ struct ArrayMapTests {
             ["int": 3, "copy": 3],
         ])
     }
+
+    @Test func copy_plan_can_be_computed_per_item() async throws {
+        try await expect([
+            "{returns}": [
+                "array_map": [
+                    "over": [
+                        ["name": "first", "target": "alpha"],
+                        ["name": "second", "target": "beta"],
+                    ],
+                    "copy": [
+                        "{returns}": [
+                            "this": [
+                                "value": [
+                                    [
+                                        "value": ["{returns}": ["item": ["name"]]],
+                                        "to": [
+                                            ["{returns}": ["item": ["target"]]],
+                                        ],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ], equals: [
+            ["alpha": "first"],
+            ["beta": "second"],
+        ])
+    }
 }

@@ -16,7 +16,7 @@ extension Compute.Keyword {
 
         @Computed public var value: JSON
         public let mode: Mode?
-        public let context: JSON?
+        @Computed public var context: JSON?
     }
 }
 
@@ -36,9 +36,10 @@ extension Compute.Keyword.Explain: Compute.KeywordDefinition {
                 "thoughts": thoughts,
                 "value": value,
             ]
-            if let explanation = await naturalLanguageExplanation(
+            if let explanation = try await naturalLanguageExplanation(
                 computedValue: value,
-                thoughts: capture.thoughts
+                thoughts: capture.thoughts,
+                frame: frame
             ) {
                 payload["explanation"] = .string(explanation)
             }
@@ -55,10 +56,16 @@ extension Compute.Keyword.Explain: Compute.KeywordDefinition {
 }
 
 private extension Compute.Keyword.Explain {
-    func naturalLanguageExplanation(computedValue: JSON, thoughts: [Compute.Thought]) async -> String? {
+    func naturalLanguageExplanation(
+        computedValue: JSON,
+        thoughts: [Compute.Thought],
+        frame: Compute.Frame
+    ) async throws -> String? {
         guard mode == .foundationModel else { return nil }
 #if canImport(FoundationModels) && (os(iOS) || os(macOS))
         if #available(iOS 26.0, macOS 26.0, *) {
+            guard SystemLanguageModel.default.isAvailable else { return nil }
+            let context = try await $context.compute(in: frame)
             return await FoundationModelPrompt.explanation(
                 expression: $value.rawValue,
                 computedValue: computedValue,
@@ -80,9 +87,6 @@ private enum FoundationModelPrompt {
         thoughts: [Compute.Thought],
         explanationContext: JSON?
     ) async -> String? {
-        let model = SystemLanguageModel.default
-        guard model.isAvailable else { return nil }
-
         do {
             let session = LanguageModelSession(instructions: instructions)
             let response = try await session.respond(to: prompt(

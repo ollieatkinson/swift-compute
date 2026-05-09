@@ -11,11 +11,14 @@ struct ApproximatelyEqualTests {
                     "approximately_equal": [
                         "lhs": ["{returns}": ["item": ["weight"]]],
                         "rhs": 85.0,
-                        "accuracy": 4.0,
+                        "accuracy": ["{returns}": ["item": ["tolerance"]]],
                     ],
                 ],
             ],
-            in: Compute.Context(item: users[2]),
+            in: Compute.Context(item: [
+                "tolerance": 4.0,
+                "weight": 85.8,
+            ]),
             equals: true
         )
     }

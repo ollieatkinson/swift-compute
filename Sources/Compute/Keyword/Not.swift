@@ -21,7 +21,7 @@ extension Compute.Keyword.Not: Compute.KeywordDefinition {
     public static let name = "not"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
-        let value = try await value.compute(frame: frame)
+        let value = try await value.compute(in: frame)
         return .bool(!(try value.decode(Bool.self)))
     }
 }

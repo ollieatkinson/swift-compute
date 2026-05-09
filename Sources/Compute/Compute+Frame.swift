@@ -20,7 +20,7 @@ extension Compute {
 
         public func compute(_ data: JSON, at route: Compute.Route? = nil) async throws -> JSON {
             try await data.compute(
-                frame: Frame(
+                in: Frame(
                     context: context,
                     runtime: runtime,
                     route: route ?? self.route,
