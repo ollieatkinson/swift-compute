@@ -169,13 +169,6 @@ public extension JSON {
         rawValue as? Object
     }
 
-    func asList() -> [JSON] {
-        if isNull {
-            return []
-        }
-        return array ?? [self]
-    }
-
     var count: Int {
         if isNull {
             return 0

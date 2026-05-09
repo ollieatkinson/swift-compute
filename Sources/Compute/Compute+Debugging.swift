@@ -1,6 +1,5 @@
 import _JSON
 import CustomDump
-import Foundation
 
 extension Compute.Runtime {
     public nonisolated func _printChanges(

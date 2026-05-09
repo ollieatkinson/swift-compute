@@ -35,18 +35,10 @@ extension Compute {
 
 extension Compute.Route: Codable {
     public init(from decoder: Decoder) throws {
-        var container = try decoder.unkeyedContainer()
-        var components: JSONPath = []
-        while !container.isAtEnd {
-            components.append(try container.decode(Component.self))
-        }
-        self.init(components)
+        self.init(try JSONPath(from: decoder))
     }
 
     public func encode(to encoder: Encoder) throws {
-        var container = encoder.unkeyedContainer()
-        for component in components {
-            try container.encode(component)
-        }
+        try components.encode(to: encoder)
     }
 }

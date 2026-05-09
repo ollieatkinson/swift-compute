@@ -64,9 +64,8 @@ extension Computer.RegisteredKeyword: Equatable {
 
 extension Computer.RegisteredKeyword {
     public init?(returns data: [String: JSON]?, computer: Computer = .default) {
-        guard let returns = data?["{returns}"]?.object else { return nil }
-        guard returns.count == 1, let name = returns.keys.first else { return nil }
-        guard let keyword = computer[name] else { return nil }
+        guard let data, let invocation = Compute.Invocation(object: data) else { return nil }
+        guard let keyword = computer[invocation.keyword] else { return nil }
         self = keyword
     }
 }
@@ -87,7 +86,7 @@ extension Compute {
             self.fallback = object["default"]
         }
 
-        var returnsJSON: JSON {
+        var json: JSON {
             .object([keyword: argument])
         }
     }

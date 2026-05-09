@@ -1,38 +1,13 @@
-public protocol Castable {
-    func cast<Value>(to type: Value.Type) throws -> Value
-}
-
-public extension Castable {
-    func cast<Value>(to type: Value.Type = Value.self) throws -> Value {
-        guard let value = self as? Value else {
-            throw CastingError(value: self, to: Value.self)
-        }
-        return value
-    }
-
-    func `as`<Value>(_ type: Value.Type = Value.self) throws -> Value {
-        try cast(to: Value.self)
-    }
-}
-
-public struct CastingError: Swift.Error, CustomStringConvertible, @unchecked Sendable {
-    public let value: Any?
-    public let from: Any.Type
-    public let to: Any.Type
+public struct CastingError: Swift.Error, CustomStringConvertible, Sendable {
+    public let description: String
 
     public init<Value>(value: Any?, to type: Value.Type) {
-        self.value = value
-        self.from = Swift.type(of: value)
-        self.to = Value.self
-    }
-
-    public var description: String {
-        "\(CastingError.self)(from: \(from), to: \(to), value: \(value as Any))"
+        self.description = "\(CastingError.self)(from: \(Swift.type(of: value)), to: \(Value.self), value: \(value as Any))"
     }
 }
 
-extension JSON: Castable {
-    public func cast<Value>(to type: Value.Type = Value.self) throws -> Value {
+private extension JSON {
+    func cast<Value>(to type: Value.Type = Value.self) throws -> Value {
         if Value.self == JSON.self {
             return self as! Value
         }

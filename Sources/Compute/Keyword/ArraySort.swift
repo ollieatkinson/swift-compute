@@ -68,7 +68,7 @@ extension Compute.Keyword.ArraySort.Predicate {
         guard let key_path else {
             return json
         }
-        return json.value(at: Compute.Route(key_path)) ?? .null
+        return json.value(at: key_path) ?? .null
     }
 }
 

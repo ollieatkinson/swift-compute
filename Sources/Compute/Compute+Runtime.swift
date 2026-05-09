@@ -145,7 +145,7 @@ extension Compute {
         }
 
         public func value(at route: Compute.Route) async throws -> JSON? {
-            (try await value()).value(at: route)
+            (try await value()).value(at: route.components)
         }
 
         public func decode<Value: Decodable>(
@@ -379,7 +379,7 @@ extension Compute {
         private func publish(_ state: JSON) {
             for route in Array(routeContinuations.keys) {
                 let result: Result<JSON, JSONError>
-                if let value = state.value(at: route) {
+                if let value = state.value(at: route.components) {
                     result = .success(value)
                 } else {
                     result = .failure(JSONError("Missing value", path: route.path))
@@ -420,7 +420,7 @@ extension Compute {
             context: Compute.Context
         ) async throws -> Compute.Signal? {
             let current = try document(from: state, excluding: route)
-            guard let object = current.value(at: route)?.object else {
+            guard let object = current.value(at: route.components)?.object else {
                 return nil
             }
             let step = try await Self.evaluate(object, at: route, runtime: runtime, context: context)
@@ -459,38 +459,40 @@ extension Compute {
                     ) {
                         return (
                             invocation.keyword, await runtime.kind(for: invocation.keyword),
-                            invocation.returnsJSON, output
+                            invocation.json, output
                         )
                     }
                     guard let fallback = invocation.fallback else {
                         return (
                             invocation.keyword, await runtime.kind(for: invocation.keyword),
-                            invocation.returnsJSON, .null
+                            invocation.json, .null
                         )
                     }
-                    let output = try await fallback.compute(
-                        frame: Compute.Frame(
-                            context: context,
-                            runtime: runtime,
-                            route: route["default"],
-                            depth: 0
-                        ))
-                    return ("default", .defaultValue, fallback, output)
+                    return try await defaultValue(fallback, at: route, runtime: runtime, context: context)
                 } catch {
                     guard let fallback = invocation.fallback else {
                         throw error
                     }
-                    let output = try await fallback.compute(
-                        frame: Compute.Frame(
-                            context: context,
-                            runtime: runtime,
-                            route: route["default"],
-                            depth: 0
-                        ))
-                    return ("default", .defaultValue, fallback, output)
+                    return try await defaultValue(fallback, at: route, runtime: runtime, context: context)
                 }
             }
             throw JSONError("Unsupported compute object", path: route.path)
+        }
+
+        private static func defaultValue(
+            _ fallback: JSON,
+            at route: Compute.Route,
+            runtime: Compute.FunctionRuntime,
+            context: Compute.Context
+        ) async throws -> (keyword: String, kind: Compute.Thought.Kind, input: JSON, output: JSON) {
+            let output = try await fallback.compute(
+                frame: Compute.Frame(
+                    context: context,
+                    runtime: runtime,
+                    route: route["default"],
+                    depth: 0
+                ))
+            return ("default", .defaultValue, fallback, output)
         }
 
         private static func graph(
@@ -506,7 +508,7 @@ extension Compute {
             var concepts: [ComputeBrain.Concept] = []
 
             for route in routes {
-                guard let value = document.value(at: route) else { continue }
+                guard let value = document.value(at: route.components) else { continue }
                 state[.route(route)] = .value(value)
                 state[.source(route)] = .value(value)
                 change[.source(route)] = .value(value)

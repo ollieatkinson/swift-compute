@@ -2,10 +2,6 @@ import _JSON
 import Algorithms
 
 extension JSON {
-    func value(at route: Compute.Route) -> JSON? {
-        value(at: route.components)
-    }
-
     var isComputeInvocation: Bool {
         guard let object else { return false }
         return Compute.Invocation(object: object) != nil
@@ -113,42 +109,22 @@ extension JSON {
                     }
                 } catch {
                     if let fallback = invocation.fallback {
-                        let fallbackRoute = route["default"]
-                        let output = try await fallback.compute(
+                        return try await fallback.defaultValue(
                             context: context,
                             runtime: runtime,
-                            route: fallbackRoute,
+                            route: route["default"],
                             depth: depth
                         )
-                        await runtime.record(Compute.Thought(
-                            route: fallbackRoute,
-                            depth: fallbackRoute.components.count,
-                            keyword: "default",
-                            kind: .defaultValue,
-                            input: fallback,
-                            output: output
-                        ))
-                        return output
                     }
                     throw error
                 }
                 if let fallback = invocation.fallback {
-                    let fallbackRoute = route["default"]
-                    let output = try await fallback.compute(
+                    return try await fallback.defaultValue(
                         context: context,
                         runtime: runtime,
-                        route: fallbackRoute,
+                        route: route["default"],
                         depth: depth
                     )
-                    await runtime.record(Compute.Thought(
-                        route: fallbackRoute,
-                        depth: fallbackRoute.components.count,
-                        keyword: "default",
-                        kind: .defaultValue,
-                        input: fallback,
-                        output: output
-                    ))
-                    return output
                 }
                 return .null
             }
@@ -179,5 +155,28 @@ extension JSON {
         }
 
         return self
+    }
+
+    private func defaultValue(
+        context: Compute.Context,
+        runtime: Compute.FunctionRuntime,
+        route: Compute.Route,
+        depth: Int
+    ) async throws -> JSON {
+        let output = try await compute(
+            context: context,
+            runtime: runtime,
+            route: route,
+            depth: depth
+        )
+        await runtime.record(Compute.Thought(
+            route: route,
+            depth: route.components.count,
+            keyword: "default",
+            kind: .defaultValue,
+            input: self,
+            output: output
+        ))
+        return output
     }
 }

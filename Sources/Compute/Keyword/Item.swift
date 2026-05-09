@@ -11,24 +11,11 @@ extension Compute.Keyword {
 
 extension Compute.Keyword.Item: Codable {
     public init(from decoder: Decoder) throws {
-        var container = try decoder.unkeyedContainer()
-        var path: [Compute.Route.Component] = []
-        while !container.isAtEnd {
-            path.append(try container.decode(Compute.Route.Component.self))
-        }
-        self.init(path)
+        self.init(try [Compute.Route.Component](from: decoder))
     }
 
     public func encode(to encoder: Encoder) throws {
-        var container = encoder.unkeyedContainer()
-        for component in path {
-            switch component {
-            case .key(let key):
-                try container.encode(key)
-            case .index(let index):
-                try container.encode(index)
-            }
-        }
+        try path.encode(to: encoder)
     }
 }
 
@@ -37,6 +24,6 @@ extension Compute.Keyword.Item: Compute.KeywordDefinition {
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let source = frame.context.item ?? .null
-        return source.value(at: Compute.Route(path)) ?? .null
+        return source.value(at: path) ?? .null
     }
 }
