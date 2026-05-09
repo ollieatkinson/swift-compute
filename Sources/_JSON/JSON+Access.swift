@@ -1,7 +1,11 @@
 public struct CastingError: Swift.Error, CustomStringConvertible, Sendable {
     public let description: String
+    public let valueType: Any.Type
+    public let type: Any.Type
 
     public init<Value>(value: Any?, to type: Value.Type) {
+        self.valueType = Swift.type(of: value)
+        self.type = type
         self.description = "\(CastingError.self)(from: \(Swift.type(of: value)), to: \(Value.self), value: \(value as Any))"
     }
 }
