@@ -123,17 +123,15 @@ let explanation = try await runtime.value()
 
 ## Built-in Keywords
 
-The default computer includes keywords for:
+The default computer includes these `{returns}` keywords:
 
-- boolean checks with `yes`, `not`, and `either`
-- comparisons with `comparison`
-- explanations with `explain`
-- explicit failures with `error`
-- collection helpers like `count`, `contains`, `map`, `array_map`, `array_filter`, `array_group`, `array_reduce`, `array_slice`, `array_sort`, `array_subscript`, and `array_zip`
-- dates with `date` and durations with `seconds`
-- item lookup with `item`
-- text formatting with `text`
-- HTTP values with `http`
+- context and literal values: `this`, `item`
+- boolean logic and presence checks: `yes`, `not`, `either`, `exists`
+- comparisons: `comparison` with `match`, `equal`, `less`, `greater`, `less_or_equal`, and `greater_or_equal`, plus `approximately_equal`
+- collection and object helpers: `count`, `contains`, `map`, `array_map`, `array_filter`, `array_group`, `array_reduce`, `array_slice`, `array_sort`, `array_subscript`, and `array_zip`
+- date and time helpers: `date`, `seconds`
+- text and network values: `text`, `http`
+- diagnostics and explanation: `error`, `explain`
 
 Reference values can be added with `Compute.Keyword.From.Function(references:)`. JavaScript evaluation can be added explicitly with `Compute.Keyword.Eval.function`.
 
