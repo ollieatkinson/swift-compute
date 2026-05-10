@@ -2,9 +2,9 @@ import _JSON
 import Algorithms
 
 extension JSON {
-    public static func returns(_ keyword: String, _ argument: JSON, default fallback: JSON? = nil) -> JSON {
+    public static func returns(_ keyword: String, _ data: JSON, default fallback: JSON? = nil) -> JSON {
         var object: Object = [
-            "{returns}": .object([keyword: argument]),
+            "{returns}": .object([keyword: data]),
         ]
         if let fallback {
             object["default"] = fallback
@@ -24,7 +24,7 @@ extension JSON {
         if let object {
             if let invocation = Compute.Invocation(object: object) {
                 guard functions[invocation.keyword] != nil else {
-                    return invocation.argument.conceptRoutes(
+                    return invocation.data.conceptRoutes(
                         functions: functions,
                         from: route["{returns}", .key(invocation.keyword)]
                     )
@@ -108,7 +108,7 @@ extension JSON {
                 do {
                     if let value = try await runtime.compute(
                         keyword: invocation.keyword,
-                        argument: invocation.argument,
+                        data: invocation.data,
                         context: context,
                         route: functionRoute,
                         depth: depth

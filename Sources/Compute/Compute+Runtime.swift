@@ -317,7 +317,7 @@ extension Compute {
                     depth: 0
                 )
                 subscriptions[dependency] = Task { [weak self] in
-                    for await result in function.subject(data: dependency.argument, frame: frame, bufferingPolicy: .unbounded) {
+                    for await result in function.subject(data: dependency.data, frame: frame, bufferingPolicy: .unbounded) {
                         if Task.isCancelled { return }
                         guard let self else { return }
                         await self.apply(result, to: dependency)
@@ -451,7 +451,7 @@ extension Compute {
                 do {
                     if let output = try await runtime.compute(
                         keyword: invocation.keyword,
-                        argument: invocation.argument,
+                        data: invocation.data,
                         context: context,
                         route: functionRoute,
                         depth: 0,
@@ -593,7 +593,7 @@ extension Compute {
 extension Compute {
     public struct Dependency: Sendable, Equatable, Hashable {
         public let keyword: String
-        public let argument: JSON
+        public let data: JSON
     }
 }
 
@@ -617,7 +617,7 @@ extension Compute {
 
         func compute(
             keyword: String,
-            argument: JSON,
+            data: JSON,
             context: Compute.Context,
             route: Compute.Route,
             depth: Int,
@@ -627,10 +627,10 @@ extension Compute {
             let frame = Compute.Frame(context: context, runtime: self, route: route, depth: depth)
             let rawOutput: JSON?
             if function is any Compute.ReturnsKeywordDefinition {
-                let computed = try await argument.compute(in: frame)
-                rawOutput = try await value(keyword: keyword, argument: computed, frame: frame)
+                let computed = try await data.compute(in: frame)
+                rawOutput = try await value(keyword: keyword, data: computed, frame: frame)
             } else {
-                rawOutput = try await function.compute(data: argument, frame: frame)
+                rawOutput = try await function.compute(data: data, frame: frame)
             }
             let output: JSON?
             if function is any Compute.OpaqueOutputKeyword {
@@ -652,7 +652,7 @@ extension Compute {
                         depth: depth + 1,
                         keyword: keyword,
                         kind: kind(for: keyword),
-                        input: JSON.returns(keyword, argument),
+                        input: JSON.returns(keyword, data),
                         output: output
                     ))
             }
@@ -671,17 +671,17 @@ extension Compute {
             }
         }
 
-        func value(keyword: String, argument: JSON, frame: Compute.Frame) async throws -> JSON? {
+        func value(keyword: String, data: JSON, frame: Compute.Frame) async throws -> JSON? {
             guard let function = functions[keyword] else { return nil }
             if function is any Compute.ReturnsKeywordDefinition {
-                let dependency = Compute.Dependency(keyword: keyword, argument: argument)
+                let dependency = Compute.Dependency(keyword: keyword, data: data)
                 let route = dependencyOwner(frame.route.computeObjectRoute(for: keyword))
                 tracked[route, default: []].insert(dependency)
                 if let result = results[dependency] {
                     return try result.get()
                 }
             }
-            return try await function.compute(data: argument, frame: frame)
+            return try await function.compute(data: data, frame: frame)
         }
 
         func registeredFunctions() -> [String: any AnyReturnsKeyword] {
