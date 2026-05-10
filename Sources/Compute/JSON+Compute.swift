@@ -116,7 +116,7 @@ extension JSON {
                         return value
                     }
                 } catch {
-                    if let fallback = invocation.fallback {
+                    if let fallback = invocation.default {
                         return try await fallback.defaultValue(
                             context: context,
                             runtime: runtime,
@@ -126,7 +126,7 @@ extension JSON {
                     }
                     throw error
                 }
-                if let fallback = invocation.fallback {
+                if let fallback = invocation.default {
                     return try await fallback.defaultValue(
                         context: context,
                         runtime: runtime,

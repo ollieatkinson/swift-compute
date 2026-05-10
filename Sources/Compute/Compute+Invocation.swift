@@ -4,7 +4,7 @@ extension Compute {
     struct Invocation: Sendable, Equatable {
         let keyword: String
         let data: JSON
-        let fallback: JSON?
+        let `default`: JSON?
 
         init?(object: [String: JSON]) {
             guard let returns = object["{returns}"]?.object else { return nil }
@@ -13,7 +13,7 @@ extension Compute {
             }
             self.keyword = keyword
             self.data = data
-            self.fallback = object["default"]
+            self.default = object["default"]
         }
 
         var json: JSON {

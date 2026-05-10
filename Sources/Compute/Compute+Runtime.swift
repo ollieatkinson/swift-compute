@@ -462,7 +462,7 @@ extension Compute {
                             invocation.json, output
                         )
                     }
-                    guard let fallback = invocation.fallback else {
+                    guard let fallback = invocation.default else {
                         return (
                             invocation.keyword, await runtime.kind(for: invocation.keyword),
                             invocation.json, .null
@@ -470,7 +470,7 @@ extension Compute {
                     }
                     return try await defaultValue(fallback, at: route, runtime: runtime, context: context)
                 } catch {
-                    guard let fallback = invocation.fallback else {
+                    guard let fallback = invocation.default else {
                         throw error
                     }
                     return try await defaultValue(fallback, at: route, runtime: runtime, context: context)
