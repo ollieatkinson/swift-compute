@@ -215,6 +215,78 @@ struct ComputeRuntimeEdgeCaseTests {
         await places.finish()
         await runtime.cancel()
     }
+
+    @Test func raising_returned_compute_depth_drops_old_nested_thoughts() async throws {
+        let entry = AsyncReturnsProbe(["{returns}": ["place": "ruby.slippers"]])
+        let places = DepthAsyncReturnsProbe([1: "Oz"])
+        let runtime = try runtime(
+            ["{returns}": ["entry": "story"]],
+            functions: [
+                entry.function(name: "entry"),
+                places.function(name: "place"),
+            ]
+        )
+        var stream = runtime.run().makeAsyncIterator()
+
+        await expectNext(&stream, equals: .success("Oz"))
+        let nested = await runtime.thoughts
+        #expect(Set(nested.map(\.keyword)) == Set(["entry", "place"]))
+        #expect(nested.first { $0.keyword == "place" }?.output == "Oz")
+        #expect(nested.first { $0.keyword == "entry" }?.output == "Oz")
+        await places.waitForSubscriptionCount(1, at: 1)
+
+        await entry.set("Kansas")
+        await expectNext(&stream, equals: .success("Kansas"))
+        let raised = await runtime.thoughts
+        #expect(raised.map(\.keyword) == ["entry"])
+        #expect(raised.first?.output == "Kansas")
+        await places.waitForSubscriptionCount(0, at: 1)
+
+        await places.set("Emerald City", at: 1)
+        #expect(try await runtime.value() == "Kansas")
+
+        await entry.finish()
+        await places.finish()
+        await runtime.cancel()
+    }
+
+    @Test func returned_compute_dependencies_are_replaced_when_shape_changes_at_same_depth() async throws {
+        let entry = AsyncReturnsProbe(["{returns}": ["place": "ruby.slippers"]])
+        let places = DepthAsyncReturnsProbe([1: "Oz"])
+        let colors = DepthAsyncReturnsProbe([1: "Red"])
+        let runtime = try runtime(
+            ["{returns}": ["entry": "story"]],
+            functions: [
+                entry.function(name: "entry"),
+                places.function(name: "place"),
+                colors.function(name: "color"),
+            ]
+        )
+        var stream = runtime.run().makeAsyncIterator()
+
+        await expectNext(&stream, equals: .success("Oz"))
+        #expect(Set(await runtime.thoughts.map(\.keyword)) == Set(["entry", "place"]))
+        await places.waitForSubscriptionCount(1, at: 1)
+        #expect(await colors.subscriptionCount(at: 1) == 0)
+
+        await entry.set(["{returns}": ["color": "ruby.slippers"]])
+        await expectNext(&stream, equals: .success("Red"))
+        let replaced = await runtime.thoughts
+        #expect(Set(replaced.map(\.keyword)) == Set(["entry", "color"]))
+        #expect(replaced.first { $0.keyword == "color" }?.output == "Red")
+        #expect(replaced.first { $0.keyword == "place" } == nil)
+        await places.waitForSubscriptionCount(0, at: 1)
+        await colors.waitForSubscriptionCount(1, at: 1)
+
+        await colors.set("Blue", at: 1)
+        await expectNext(&stream, equals: .success("Blue"))
+        #expect(Set(await runtime.thoughts.map(\.keyword)) == Set(["entry", "color"]))
+
+        await entry.finish()
+        await places.finish()
+        await colors.finish()
+        await runtime.cancel()
+    }
 }
 
 private func setAsyncReturnedChain(
