@@ -20,7 +20,7 @@ extension Compute.Keyword {
     }
 }
 
-extension Compute.Keyword.Explain: Compute.KeywordDefinition {
+extension Compute.Keyword.Explain: Compute.KeywordDefinition, Compute.OpaqueOutputKeywordDefinition {
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let capture = await frame.runtime.capture {
@@ -133,7 +133,7 @@ private enum FoundationModelPrompt {
         \(computedValue.promptDescription)
 
         Runtime evidence:
-        \(JSON.array(thoughts.map(\.modelExplanationJSON)).promptDescription)
+        \(JSON.array(thoughts.map(\.explanationJSON)).promptDescription)
 
         One sentence:
         """
@@ -149,27 +149,14 @@ private extension Compute.Thought {
             "kind": .string(kind.rawValue),
             "route": .array(route.path.map(JSON.string)),
         ]
-        if let output {
-            object["output"] = .string(output.explanationSummary)
-        }
-        if let error {
-            object["error"] = .string(error.description)
-        }
-        return .object(object)
-    }
-
-    var modelExplanationJSON: JSON {
-        var object: [String: JSON] = [
-            "depth": .int(depth),
-            "keyword": .string(keyword),
-            "kind": .string(kind.rawValue),
-            "route": .array(route.path.map(JSON.string)),
-        ]
         if let input {
             object["input"] = input
         }
         if let output {
             object["output"] = output
+        }
+        if let error {
+            object["error"] = .string(error.description)
         }
         return .object(object)
     }

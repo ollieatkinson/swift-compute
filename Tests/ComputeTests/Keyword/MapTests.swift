@@ -122,6 +122,23 @@ struct MapTests {
         )
     }
 
+    @Test func copy_paths_can_target_array_values_from_the_end() async throws {
+        try await expect([
+            "{returns}": [
+                "map": [
+                    "src": "updated",
+                    "dst": [1, 2, 3],
+                    "copy": [
+                        [
+                            "value": ["{returns}": ["item": []]],
+                            "to": [-1],
+                        ],
+                    ],
+                ],
+            ],
+        ], equals: [1, 2, "updated"])
+    }
+
     @Test func maps_identity_empty_sources_computed_copies_and_indexed_paths() async throws {
         try await expect([
             "{returns}": [

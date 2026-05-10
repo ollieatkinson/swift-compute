@@ -10,6 +10,9 @@ extension Compute {
         static var name: String { get }
         func compute(in frame: Compute.Frame) async throws -> JSON?
     }
+
+    protocol OpaqueOutputKeywordDefinition: KeywordDefinition {}
+    protocol OpaqueOutputKeyword: AnyReturnsKeyword {}
 }
 
 extension Compute.Keyword {
@@ -25,6 +28,8 @@ extension Compute.Keyword {
         }
     }
 }
+
+extension Compute.Keyword.Function: Compute.OpaqueOutputKeyword where K: Compute.OpaqueOutputKeywordDefinition {}
 
 extension Compute.KeywordDefinition {
     public static var function: Compute.Keyword.Function<Self> {

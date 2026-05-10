@@ -78,7 +78,7 @@ extension JSON {
             guard var array else {
                 throw JSONError("Cannot set value", path: path)
             }
-            guard array.indices.contains(index) else {
+            guard let index = array.resolvedIndex(index) else {
                 throw JSONError("Array index out of bounds", path: path)
             }
             var child = array[index]
@@ -179,7 +179,7 @@ extension JSON {
         )
         await runtime.record(Compute.Thought(
             route: route,
-            depth: route.components.count,
+            depth: depth,
             keyword: "default",
             kind: .defaultValue,
             input: self,

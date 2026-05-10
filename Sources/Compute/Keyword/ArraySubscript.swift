@@ -15,7 +15,7 @@ extension Compute.Keyword.ArraySubscript: Compute.KeywordDefinition {
         let reversed = try await $reversed.compute(in: frame) ?? false
         let source = reversed ? Array(values.reversed()) : values
         let index = try await $index.compute(in: frame)
-        guard source.indices.contains(index) else {
+        guard let index = source.resolvedIndex(index) else {
             return .null
         }
         return source[index]

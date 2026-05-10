@@ -92,7 +92,8 @@ extension Compute.Keyword.Less: Compute.KeywordDefinition {
     public static let name = "less"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
-        try await computedOperands(lhs: $lhs, rhs: $rhs, in: frame).orderedComparison(string: <, number: <)
+        try await computedOperands(lhs: $lhs, rhs: $rhs, in: frame)
+            .orderedComparison(string: <, number: <)
     }
 }
 
@@ -100,7 +101,8 @@ extension Compute.Keyword.Greater: Compute.KeywordDefinition {
     public static let name = "greater"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
-        try await computedOperands(lhs: $lhs, rhs: $rhs, in: frame).orderedComparison(string: >, number: >)
+        try await computedOperands(lhs: $lhs, rhs: $rhs, in: frame)
+            .orderedComparison(string: >, number: >)
     }
 }
 
@@ -108,7 +110,8 @@ extension Compute.Keyword.LessOrEqual: Compute.KeywordDefinition {
     public static let name = "less_or_equal"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
-        try await computedOperands(lhs: $lhs, rhs: $rhs, in: frame).orderedComparison(string: <=, number: <=)
+        try await computedOperands(lhs: $lhs, rhs: $rhs, in: frame)
+            .orderedComparison(string: <=, number: <=)
     }
 }
 
@@ -116,6 +119,7 @@ extension Compute.Keyword.GreaterOrEqual: Compute.KeywordDefinition {
     public static let name = "greater_or_equal"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
-        try await computedOperands(lhs: $lhs, rhs: $rhs, in: frame).orderedComparison(string: >=, number: >=)
+        try await computedOperands(lhs: $lhs, rhs: $rhs, in: frame)
+            .orderedComparison(string: >=, number: >=)
     }
 }

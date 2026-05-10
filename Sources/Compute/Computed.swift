@@ -44,12 +44,11 @@ public struct Computed<Value: Codable & Sendable>: Codable, Sendable {
             throw JSONError("Computed property is missing a route")
         }
         let context = item.map(frame.context.with(item:)) ?? frame.context
-        let depth = item == nil ? frame.depth : frame.depth + 1
         return Compute.Frame(
             context: context,
             runtime: frame.runtime,
             route: frame.route.appending(contentsOf: route + suffix),
-            depth: depth
+            depth: frame.depth
         )
     }
 

@@ -91,6 +91,30 @@ struct ComputeRuntimeEdgeCaseTests {
         await references.finish()
     }
 
+    @Test func async_returned_compute_depth_nineteen_is_allowed_then_twenty_hits_the_limit() async throws {
+        let allowed = TestReferences()
+        await setAsyncReturnedChain(maxReturnedComputeDepth: 19, in: allowed)
+
+        #expect(try await runtime(
+            ["{returns}": ["from": ["reference": "level_0"]]],
+            references: allowed
+        ).value() == true)
+
+        await allowed.finish()
+
+        let limited = TestReferences()
+        await setAsyncReturnedChain(maxReturnedComputeDepth: 20, in: limited)
+
+        await expectJSONError(containing: "recursionLimitExceeded") {
+            _ = try await runtime(
+                ["{returns}": ["from": ["reference": "level_0"]]],
+                references: limited
+            ).value()
+        }
+
+        await limited.finish()
+    }
+
     @Test func generated_compute_loops_hit_the_recursion_limit() async throws {
         let loop = GeneratedLoopFunction()
 
@@ -127,6 +151,23 @@ struct ComputeRuntimeEdgeCaseTests {
         await flag.finish()
         await runtime.cancel()
     }
+}
+
+private func setAsyncReturnedChain(
+    maxReturnedComputeDepth: Int,
+    in references: TestReferences
+) async {
+    precondition(maxReturnedComputeDepth >= 0)
+    for depth in 0..<maxReturnedComputeDepth {
+        await references.set("level_\(depth)", to: [
+            "{returns}": [
+                "from": [
+                    "reference": .string("level_\(depth + 1)"),
+                ],
+            ],
+        ])
+    }
+    await references.set("level_\(maxReturnedComputeDepth)", to: true)
 }
 
 private actor AsyncReturnsProbe {

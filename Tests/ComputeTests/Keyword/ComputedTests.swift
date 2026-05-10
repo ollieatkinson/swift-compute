@@ -61,7 +61,7 @@ struct ComputedTests {
                     .key("{returns}"),
                     .key("route_probe"),
                 ],
-                depth: 1,
+                depth: 0,
                 item: scopedItem,
                 input: "one"
             ),

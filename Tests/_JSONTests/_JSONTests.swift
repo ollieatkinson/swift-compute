@@ -37,6 +37,24 @@ struct _JSONTests {
         #expect(value["users"].array?.count == 1)
     }
 
+    @Test func negative_indexes_read_and_write_from_the_end_of_arrays() throws {
+        var value: JSON = [
+            "items": ["a", "b", "c"],
+        ]
+
+        #expect(try value[["items", -1] as JSONPath, as: String.self] == "c")
+        #expect(try value.value(at: ["items", -2] as JSONPath)?.decode(String.self) == "b")
+
+        value[["items", -1] as JSONPath] = "last"
+        #expect(try value[["items", 2] as JSONPath, as: String.self] == "last")
+
+        value[["items", 5] as JSONPath] = "padded"
+        #expect(value["items"].array?.count == 6)
+        #expect(value[["items", 3] as JSONPath].isNull)
+        #expect(try value[["items", 5] as JSONPath, as: String.self] == "padded")
+        #expect(value.value(at: ["items", -7] as JSONPath) == nil)
+    }
+
     @Test func codable_decode_uses_foundation_json_values_at_the_boundary() throws {
         struct User: Decodable, Equatable {
             let name: String

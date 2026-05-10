@@ -430,7 +430,7 @@ extension Compute {
             await runtime.record(
                 Compute.Thought(
                     route: route,
-                    depth: route.components.count,
+                    depth: 0,
                     keyword: step.keyword,
                     kind: step.kind,
                     input: step.input,
@@ -632,22 +632,27 @@ extension Compute {
             } else {
                 rawOutput = try await function.compute(data: argument, frame: frame)
             }
-            let output = try await rawOutput?.compute(
-                in: Compute.Frame(
-                    context: context,
-                    runtime: self,
-                    route: route.computeObjectRoute(for: keyword),
-                    depth: depth + 1
-                ))
+            let output: JSON?
+            if function is any Compute.OpaqueOutputKeyword {
+                output = rawOutput
+            } else {
+                output = try await rawOutput?.compute(
+                    in: Compute.Frame(
+                        context: context,
+                        runtime: self,
+                        route: route.computeObjectRoute(for: keyword),
+                        depth: depth + 1
+                    ))
+            }
             if recordThought, let output {
                 let thoughtRoute = route.computeObjectRoute(for: keyword)
                 thoughts.append(
                     Compute.Thought(
                         route: thoughtRoute,
-                        depth: thoughtRoute.components.count,
+                        depth: depth + 1,
                         keyword: keyword,
                         kind: kind(for: keyword),
-                        input: .object([keyword: argument]),
+                        input: JSON.returns(keyword, argument),
                         output: output
                     ))
             }

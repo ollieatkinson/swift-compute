@@ -30,17 +30,28 @@ struct ExplainTests {
             "summary": "true",
             "thoughts": [
                 [
-                    "depth": 7,
+                    "depth": 1,
+                    "input": ["{returns}": ["item": ["age"]]],
                     "keyword": "item",
                     "kind": "compute",
-                    "output": "36",
+                    "output": 36,
                     "route": ["{returns}", "explain", "value", "{returns}", "comparison", "greater_or_equal", "lhs"],
                 ],
                 [
-                    "depth": 3,
+                    "depth": 1,
+                    "input": [
+                        "{returns}": [
+                            "comparison": [
+                                "greater_or_equal": [
+                                    "lhs": ["{returns}": ["item": ["age"]]],
+                                    "rhs": 36,
+                                ],
+                            ],
+                        ],
+                    ],
                     "keyword": "comparison",
                     "kind": "compute",
-                    "output": "true",
+                    "output": true,
                     "route": ["{returns}", "explain", "value"],
                 ],
             ],
@@ -69,6 +80,76 @@ struct ExplainTests {
             "ok": false,
             "thoughts": [],
             "value": nil,
+        ])
+    }
+
+    @Test func explains_array_filter_values_with_item_scoped_predicates() async throws {
+        let json: JSON = [
+            "{returns}": [
+                "explain": [
+                    "mode": "trace",
+                    "value": [
+                        "{returns}": [
+                            "array_filter": [
+                                "array": [
+                                    [
+                                        "has_ticket": true,
+                                        "name": "Dorothy",
+                                        "steps_on_road": 21,
+                                        "under_sleep_spell": false,
+                                    ],
+                                    [
+                                        "has_ticket": true,
+                                        "name": "Scarecrow",
+                                        "steps_on_road": 9,
+                                        "under_sleep_spell": false,
+                                    ],
+                                    [
+                                        "has_ticket": false,
+                                        "name": "Tin Woodman",
+                                        "steps_on_road": 18,
+                                        "under_sleep_spell": false,
+                                    ],
+                                ],
+                                "predicate": [
+                                    "{returns}": [
+                                        "yes": [
+                                            "if": [
+                                                ["{returns}": ["item": ["has_ticket"]]],
+                                                [
+                                                    "{returns}": [
+                                                        "comparison": [
+                                                            "greater_or_equal": [
+                                                                "lhs": ["{returns}": ["item": ["steps_on_road"]]],
+                                                                "rhs": 10,
+                                                            ],
+                                                        ],
+                                                    ],
+                                                ],
+                                            ],
+                                            "unless": [
+                                                ["{returns}": ["item": ["under_sleep_spell"]]],
+                                            ],
+                                        ],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]
+
+        let output = try await value(json)
+
+        #expect(output["ok"] == true)
+        #expect(output["value"] == [
+            [
+                "has_ticket": true,
+                "name": "Dorothy",
+                "steps_on_road": 21,
+                "under_sleep_spell": false,
+            ],
         ])
     }
 

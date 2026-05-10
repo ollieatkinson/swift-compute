@@ -200,42 +200,42 @@ struct ComputeRuntimeTests {
         #expect(thoughts == [
             Compute.Thought(
                 route: ["{returns}", "yes", "if", 0, "{returns}", "comparison", "greater", "lhs"],
-                depth: 8,
+                depth: 1,
                 keyword: "item",
                 kind: .compute,
-                input: ["item": ["age"]],
+                input: ["{returns}": ["item": ["age"]]],
                 output: 36
             ),
             Compute.Thought(
                 route: ["{returns}", "yes", "unless", 0, "{returns}", "comparison", "equal", "lhs"],
-                depth: 8,
+                depth: 1,
                 keyword: "item",
                 kind: .compute,
-                input: ["item": ["isClearToFly"]],
+                input: ["{returns}": ["item": ["isClearToFly"]]],
                 output: false
             ),
             Compute.Thought(
                 route: ["{returns}", "yes", "if", 0],
-                depth: 4,
+                depth: 1,
                 keyword: "comparison",
                 kind: .compute,
-                input: greaterInput,
+                input: ["{returns}": greaterInput],
                 output: true
             ),
             Compute.Thought(
                 route: ["{returns}", "yes", "if", 1],
-                depth: 4,
+                depth: 1,
                 keyword: "not",
                 kind: .compute,
-                input: ["not": false],
+                input: ["{returns}": ["not": false]],
                 output: true
             ),
             Compute.Thought(
                 route: ["{returns}", "yes", "unless", 0],
-                depth: 4,
+                depth: 1,
                 keyword: "comparison",
                 kind: .compute,
-                input: equalInput,
+                input: ["{returns}": equalInput],
                 output: false
             ),
             Compute.Thought(
@@ -466,7 +466,8 @@ private func fromReferences(in thoughts: [Compute.Thought]) -> [String] {
     thoughts.compactMap { thought in
         guard thought.keyword == "from" else { return nil }
         guard let input = thought.input?.object else { return nil }
-        guard let from = input["from"]?.object else { return nil }
+        let from = input["from"]?.object ?? input["{returns}"]?.object?["from"]?.object
+        guard let from else { return nil }
         guard let reference = from["reference"]?.string else { return nil }
         return reference
     }

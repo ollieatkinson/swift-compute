@@ -33,7 +33,7 @@ public extension JSON {
                 }
                 current = value
             case .index(let index):
-                guard let array = current.array, array.indices.contains(index) else {
+                guard let array = current.array, let index = array.resolvedIndex(index) else {
                     return nil
                 }
                 current = array[index]
@@ -120,21 +120,43 @@ public extension JSON {
 
     subscript(index: Int) -> JSON {
         get {
-            guard let array, array.indices.contains(index) else {
+            guard let array, let index = array.resolvedIndex(index) else {
                 return .null
             }
             return array[index]
         }
         set {
-            guard index >= 0 else {
-                return
-            }
             var array = array ?? []
-            if index >= array.endIndex {
-                array.append(contentsOf: repeatElement(.null, count: index - array.endIndex + 1))
+            let resolvedIndex: Int
+            if index < 0 {
+                guard let index = array.resolvedIndex(index) else {
+                    return
+                }
+                resolvedIndex = index
+            } else {
+                if index >= array.endIndex {
+                    array.append(contentsOf: repeatElement(.null, count: index - array.endIndex + 1))
+                }
+                resolvedIndex = index
             }
-            array[index] = newValue
+            array[resolvedIndex] = newValue
             self = JSON(array)
         }
+    }
+}
+
+package extension Array where Element == JSON {
+    func resolvedIndex(_ index: Int) -> Int? {
+        if indices.contains(index) {
+            return index
+        }
+        guard index < 0, !isEmpty else {
+            return nil
+        }
+        let resolved = count + index
+        guard indices.contains(resolved) else {
+            return nil
+        }
+        return resolved
     }
 }
