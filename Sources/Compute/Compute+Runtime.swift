@@ -246,7 +246,11 @@ extension Compute {
                 throw JSONError(error)
             }
             return try await finish(
-                commit, runtime: runtime, subscribe: subscribe, publishWhenSettled: true)
+                commit,
+                runtime: runtime,
+                subscribe: subscribe,
+                publishWhenSettled: true
+            )
         }
 
         public var thoughts: [Compute.Thought] {
@@ -293,9 +297,8 @@ extension Compute {
             var changed = false
             for (route, dependencies) in tracked {
                 let old = routeDependencies[route] ?? []
-                let next = old.union(dependencies)
-                if next != old {
-                    routeDependencies[route] = next
+                if dependencies != old {
+                    routeDependencies[route] = dependencies.isEmpty ? nil : dependencies
                     changed = true
                 }
             }
@@ -307,6 +310,7 @@ extension Compute {
             for (dependency, task) in subscriptions where !next.contains(dependency) {
                 task.cancel()
                 subscriptions[dependency] = nil
+                results[dependency] = nil
             }
             for dependency in next where subscriptions[dependency] == nil {
                 guard let function = functions[dependency.keyword] as? any Compute.ReturnsKeywordDefinition else { continue }
@@ -314,7 +318,7 @@ extension Compute {
                     context: context ?? Compute.Context(),
                     runtime: functionRuntime(),
                     route: .root,
-                    depth: 0
+                    depth: dependency.depth
                 )
                 subscriptions[dependency] = Task { [weak self] in
                     for await result in function.subject(data: dependency.data, frame: frame, bufferingPolicy: .unbounded) {
@@ -328,8 +332,9 @@ extension Compute {
 
         private func cancelSubscriptionsIfIdle() {
             guard observedRoutes.isEmpty else { return }
-            for subscription in subscriptions.values {
+            for (dependency, subscription) in subscriptions {
                 subscription.cancel()
+                results[dependency] = nil
             }
             subscriptions.removeAll()
         }
@@ -363,6 +368,7 @@ extension Compute {
                 subscription.cancel()
             }
             subscriptions.removeAll()
+            results.removeAll()
             observedRoutes.removeAll()
             for continuations in routeContinuations.values {
                 for routeContinuation in continuations.values {
@@ -423,6 +429,7 @@ extension Compute {
             guard let object = current.value(at: route.components)?.object else {
                 return nil
             }
+            await runtime.trackDependencies(for: route)
             let step = try await Self.evaluate(object, at: route, runtime: runtime, context: context)
             var nextState = state
             nextState[.route(route)] = .value(step.output)
@@ -594,6 +601,7 @@ extension Compute {
     public struct Dependency: Sendable, Equatable, Hashable {
         public let keyword: String
         public let data: JSON
+        public let depth: Int
     }
 }
 
@@ -674,7 +682,7 @@ extension Compute {
         func value(keyword: String, data: JSON, frame: Compute.Frame) async throws -> JSON? {
             guard let function = functions[keyword] else { return nil }
             if function is any Compute.ReturnsKeywordDefinition {
-                let dependency = Compute.Dependency(keyword: keyword, data: data)
+                let dependency = Compute.Dependency(keyword: keyword, data: data, depth: frame.depth)
                 let route = dependencyOwner(frame.route.computeObjectRoute(for: keyword))
                 tracked[route, default: []].insert(dependency)
                 if let result = results[dependency] {
@@ -682,6 +690,12 @@ extension Compute {
                 }
             }
             return try await function.compute(data: data, frame: frame)
+        }
+
+        func trackDependencies(for route: Compute.Route) {
+            if tracked[route] == nil {
+                tracked[route] = []
+            }
         }
 
         func registeredFunctions() -> [String: any AnyReturnsKeyword] {

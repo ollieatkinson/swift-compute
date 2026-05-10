@@ -151,6 +151,70 @@ struct ComputeRuntimeEdgeCaseTests {
         await flag.finish()
         await runtime.cancel()
     }
+
+    @Test func async_dependencies_are_scoped_by_returned_compute_depth() async throws {
+        let places = DepthAsyncReturnsProbe([
+            0: "Kansas",
+            1: "Oz",
+        ])
+        let runtime = try runtime(
+            [
+                "direct": ["{returns}": ["place": "ruby.slippers"]],
+                "returned": [
+                    "{returns}": [
+                        "return_data": ["{returns}": ["place": "ruby.slippers"]],
+                    ],
+                ],
+            ],
+            functions: [
+                places.function(name: "place"),
+                ReturnDataFunction(),
+            ]
+        )
+        var stream = runtime.run().makeAsyncIterator()
+
+        await expectNext(&stream, equals: .success([
+            "direct": "Kansas",
+            "returned": "Oz",
+        ]))
+        await places.set("Munchkinland", at: 0)
+        await expectNext(&stream, equals: .success([
+            "direct": "Munchkinland",
+            "returned": "Oz",
+        ]))
+        await places.set("Emerald City", at: 1)
+        await expectNext(&stream, equals: .success([
+            "direct": "Munchkinland",
+            "returned": "Emerald City",
+        ]))
+
+        await places.finish()
+        await runtime.cancel()
+    }
+
+    @Test func returned_compute_dependencies_are_cleared_when_depth_is_raised() async throws {
+        let entry = AsyncReturnsProbe(["{returns}": ["place": "ruby.slippers"]])
+        let places = DepthAsyncReturnsProbe([1: "Oz"])
+        let runtime = try runtime(
+            ["{returns}": ["entry": "story"]],
+            functions: [
+                entry.function(name: "entry"),
+                places.function(name: "place"),
+            ]
+        )
+        var stream = runtime.run().makeAsyncIterator()
+
+        await expectNext(&stream, equals: .success("Oz"))
+        await places.waitForSubscriptionCount(1, at: 1)
+
+        await entry.set("Kansas")
+        await expectNext(&stream, equals: .success("Kansas"))
+        await places.waitForSubscriptionCount(0, at: 1)
+
+        await entry.finish()
+        await places.finish()
+        await runtime.cancel()
+    }
 }
 
 private func setAsyncReturnedChain(
@@ -244,6 +308,124 @@ private actor AsyncReturnsProbe {
         ) -> AsyncStream<Result<JSON, JSONError>> {
             probe.values(bufferingPolicy: bufferingPolicy)
         }
+    }
+}
+
+private actor DepthAsyncReturnsProbe {
+    private var current: [Int: JSON]
+    private var continuations: [Int: [UUID: AsyncStream<Result<JSON, JSONError>>.Continuation]] = [:]
+    private var subscriptionCountWaiters: [Int: [Int: [CheckedContinuation<Void, Never>]]] = [:]
+
+    init(_ current: [Int: JSON]) {
+        self.current = current
+    }
+
+    func set(_ value: JSON, at depth: Int) {
+        current[depth] = value
+        guard let continuations = continuations[depth]?.values else { return }
+        for continuation in continuations {
+            continuation.yield(.success(value))
+        }
+    }
+
+    func finish() {
+        for continuations in continuations.values {
+            for continuation in continuations.values {
+                continuation.finish()
+            }
+        }
+        continuations.removeAll()
+    }
+
+    func subscriptionCount(at depth: Int) -> Int {
+        continuations[depth]?.count ?? 0
+    }
+
+    func waitForSubscriptionCount(_ count: Int, at depth: Int) async {
+        if subscriptionCount(at: depth) == count {
+            return
+        }
+        await withCheckedContinuation { continuation in
+            subscriptionCountWaiters[depth, default: [:]][count, default: []].append(continuation)
+        }
+    }
+
+    nonisolated func function(name: String) -> Function {
+        Function(name: name, probe: self)
+    }
+
+    fileprivate func value(at depth: Int) -> JSON {
+        current[depth] ?? .null
+    }
+
+    fileprivate nonisolated func values(
+        at depth: Int,
+        bufferingPolicy: Compute.ReturnsKeywordDefinition.BufferingPolicy
+    ) -> AsyncStream<Result<JSON, JSONError>> {
+        AsyncStream(bufferingPolicy: bufferingPolicy) { continuation in
+            let id = UUID()
+            let task = Task { [self] in
+                await self.add(continuation, id: id, at: depth)
+            }
+            continuation.onTermination = { @Sendable [self] _ in
+                task.cancel()
+                Task {
+                    await self.remove(id: id, at: depth)
+                }
+            }
+        }
+    }
+
+    private func add(
+        _ continuation: AsyncStream<Result<JSON, JSONError>>.Continuation,
+        id: UUID,
+        at depth: Int
+    ) {
+        continuations[depth, default: [:]][id] = continuation
+        continuation.yield(.success(value(at: depth)))
+        notifySubscriptionCountWaiters(at: depth)
+    }
+
+    private func remove(id: UUID, at depth: Int) {
+        continuations[depth]?[id] = nil
+        notifySubscriptionCountWaiters(at: depth)
+    }
+
+    private func notifySubscriptionCountWaiters(at depth: Int) {
+        let count = subscriptionCount(at: depth)
+        guard let waiters = subscriptionCountWaiters[depth]?[count] else { return }
+        subscriptionCountWaiters[depth]?[count] = nil
+        if subscriptionCountWaiters[depth]?.isEmpty == true {
+            subscriptionCountWaiters[depth] = nil
+        }
+        for waiter in waiters {
+            waiter.resume()
+        }
+    }
+
+    struct Function: Compute.ReturnsKeywordDefinition {
+        let name: String
+        let probe: DepthAsyncReturnsProbe
+
+        func compute(data input: JSON, frame: Compute.Frame) async throws -> JSON? {
+            await probe.value(at: frame.depth)
+        }
+
+        func subject(
+            data input: JSON,
+            frame: Compute.Frame,
+            bufferingPolicy: Compute.ReturnsKeywordDefinition.BufferingPolicy
+        ) -> AsyncStream<Result<JSON, JSONError>> {
+            probe.values(at: frame.depth, bufferingPolicy: bufferingPolicy)
+        }
+    }
+}
+
+private struct ReturnDataFunction: AnyReturnsKeyword {
+    let name = "return_data"
+
+    func compute(data input: JSON, frame: Compute.Frame) async throws -> JSON? {
+        input
     }
 }
 
