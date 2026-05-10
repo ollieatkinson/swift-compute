@@ -6,7 +6,7 @@ extension Compute.Keyword {
         public static let name = "array_group"
 
         @Computed public var array: [JSON]
-        @Computed public var into: Into?
+        public let into: Into?
         public let by: By?
 
         public struct By: Codable, Equatable, Sendable {
@@ -37,7 +37,6 @@ extension Compute.Keyword.ArrayGroup: Compute.KeywordDefinition {
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let values = try await $array.compute(in: frame)
-        let into = try await $into.compute(in: frame)
         switch try GroupingMode(into: into, by: by) {
         case .into(let into):
             let plan = try await IntoPlan(into, frame: frame)

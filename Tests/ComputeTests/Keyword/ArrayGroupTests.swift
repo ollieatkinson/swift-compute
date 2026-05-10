@@ -66,28 +66,4 @@ struct ArrayGroupTests {
         ], equals: [[1, 2], [3, 4]])
     }
 
-    @Test func computes_into_plan_before_grouping() async throws {
-        try await expect([
-            "{returns}": [
-                "array_group": [
-                    "array": [1, 2, 3, 4, 5],
-                    "into": [
-                        "{returns}": [
-                            "this": [
-                                "value": [
-                                    "counts": [
-                                        ["{returns}": ["item": ["count"]]],
-                                    ],
-                                    "overflow": ["{returns}": ["item": ["overflow"]]],
-                                ],
-                            ],
-                        ],
-                    ],
-                ],
-            ],
-        ], in: Compute.Context(item: [
-            "count": 2,
-            "overflow": "patterned",
-        ]), equals: [[1, 2], [3, 4]])
-    }
 }
