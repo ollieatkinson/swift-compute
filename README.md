@@ -130,6 +130,7 @@ The default computer includes keywords for:
 - explanations with `explain`
 - explicit failures with `error`
 - collection helpers like `count`, `contains`, `map`, `array_map`, `array_filter`, `array_group`, `array_reduce`, `array_slice`, `array_sort`, `array_subscript`, and `array_zip`
+- dates with `date` and durations with `seconds`
 - item lookup with `item`
 - text formatting with `text`
 - HTTP values with `http`
