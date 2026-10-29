@@ -11,8 +11,10 @@ extension Compute {
         func compute(in frame: Compute.Frame) async throws -> JSON?
     }
 
-    protocol OpaqueOutputKeywordDefinition: KeywordDefinition {}
-    protocol OpaqueOutputKeyword: AnyReturnsKeyword {}
+    /// Opts a keyword definition out of recursively evaluating its returned data.
+    public protocol OpaqueOutputKeywordDefinition: KeywordDefinition {}
+    /// Opts a custom function out of recursively evaluating its returned data.
+    public protocol OpaqueOutputKeyword: AnyReturnsKeyword {}
 }
 
 extension Compute.Keyword {
