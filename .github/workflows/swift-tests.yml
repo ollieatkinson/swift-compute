@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_27.2.0-Release.Candidate.app/Contents/Developer
+        run: sudo xcode-select -s /Applications/Xcode_27.2_Release_Candidate.app/Contents/Developer
 
       - name: Show Swift version
         run: swift --version
