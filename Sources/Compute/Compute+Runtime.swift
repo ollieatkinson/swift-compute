@@ -240,9 +240,13 @@ extension Compute {
                 } else {
                     commit = try await brain.settle(thinking: thinking(with: runtime))
                 }
-            } catch BrainError.thoughtLimitExceeded {
-                throw Compute.Error.recursionLimitExceeded
             } catch {
+                // An initial failed read still identifies a live dependency.
+                // Keep observing it so a later value can recover this runtime.
+                await synchronizeDependencies(runtime: runtime, subscribe: subscribe)
+                if case BrainError.thoughtLimitExceeded = error {
+                    throw Compute.Error.recursionLimitExceeded
+                }
                 throw JSONError(error)
             }
             return try await finish(
@@ -265,6 +269,7 @@ extension Compute {
         ) async throws -> Compute.Step {
             latestThoughts = await runtime.takeThoughts()
             if let error = latestThoughts.compactMap(\.error).first {
+                await synchronizeDependencies(runtime: runtime, subscribe: subscribe)
                 throw error
             }
 
@@ -274,6 +279,14 @@ extension Compute {
                 thoughts: latestThoughts,
                 remainingThoughts: commit.remainingThoughts
             )
+            await synchronizeDependencies(runtime: runtime, subscribe: subscribe)
+            if publishWhenSettled, !step.isThinking {
+                publish(step.state)
+            }
+            return step
+        }
+
+        private func synchronizeDependencies(runtime: Compute.FunctionRuntime, subscribe: Bool) async {
             let tracked = await runtime.dependenciesByRoute()
             if merge(tracked) {
                 let graph = Self.graph(
@@ -284,13 +297,9 @@ extension Compute {
                 routeConcepts = graph.routeConcepts
                 await brain.update(concepts: graph.concepts)
             }
-            if subscribe || !observedRoutes.isEmpty {
+            if !Task.isCancelled, subscribe || !observedRoutes.isEmpty {
                 resubscribe(to: Array(routeDependencies.values.flatMap { $0 }))
             }
-            if publishWhenSettled, !step.isThinking {
-                publish(step.state)
-            }
-            return step
         }
 
         private func merge(_ tracked: [Compute.Route: Set<Compute.Dependency>]) -> Bool {
