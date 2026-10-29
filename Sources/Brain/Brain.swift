@@ -71,6 +71,7 @@ public actor Brain<Lemma, Signal>: Sendable where Lemma: Hashable & Sendable, Si
     private var conceptOrder: [Lemma]
     private var observers: [Lemma: Set<Lemma>]
     private var stateContinuations: [UUID: AsyncStream<State>.Continuation] = [:]
+    private var conceptVersion: UInt64 = 0
 
     public init(
         _ concepts: [Concept],
@@ -112,6 +113,17 @@ public actor Brain<Lemma, Signal>: Sendable where Lemma: Hashable & Sendable, Si
     public func update(concepts: [Concept]) async {
         await gate.lock()
         setConcepts(concepts)
+        await gate.unlock()
+    }
+
+    /// Dependency metadata may arrive after a newer evaluation has installed
+    /// its graph. Version the small graph write without serializing evaluation.
+    package func update(concepts: [Concept], version: UInt64) async {
+        await gate.lock()
+        if version >= conceptVersion {
+            conceptVersion = version
+            setConcepts(concepts)
+        }
         await gate.unlock()
     }
 
