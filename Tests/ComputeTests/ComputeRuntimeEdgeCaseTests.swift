@@ -287,6 +287,42 @@ struct ComputeRuntimeEdgeCaseTests {
         await colors.finish()
         await runtime.cancel()
     }
+
+    @Test func removed_dependencies_stay_removed_across_repeated_shape_changes() async throws {
+        let entry = AsyncReturnsProbe(["{returns}": ["place": "ruby.slippers"]])
+        let places = DepthAsyncReturnsProbe([1: "Oz"])
+        let colors = DepthAsyncReturnsProbe([1: "Red"])
+        let runtime = try runtime(["{returns}": ["entry": "story"]], functions: [
+            entry.function(name: "entry"), places.function(name: "place"), colors.function(name: "color"),
+        ])
+        defer { await runtime.cancel() }
+        var stream = runtime.run().makeAsyncIterator()
+        await expectNext(&stream, equals: .success("Oz"))
+
+        for round in 1...10 {
+            await entry.set(["{returns}": ["color": "ruby.slippers"]])
+            await expectNext(&stream, equals: .success("Red"))
+            await places.waitForSubscriptionCount(0, at: 1)
+            await colors.waitForSubscriptionCount(1, at: 1)
+            await places.set(.string("Retired place \(round)"), at: 1)
+            await colors.set(.string("Blue \(round)"), at: 1)
+            await expectNext(&stream, equals: .success(.string("Blue \(round)")))
+
+            await entry.set(.string("Kansas \(round)"))
+            await expectNext(&stream, equals: .success(.string("Kansas \(round)")))
+            await colors.waitForSubscriptionCount(0, at: 1)
+
+            await entry.set(["{returns}": ["place": "ruby.slippers"]])
+            await expectNext(&stream, equals: .success(.string("Retired place \(round)")))
+            await colors.waitForSubscriptionCount(0, at: 1)
+            await places.waitForSubscriptionCount(1, at: 1)
+            await colors.set("Red", at: 1)
+        }
+        #expect(await entry.readCount() == 1)
+        await entry.finish()
+        await places.finish()
+        await colors.finish()
+    }
 }
 
 private func setAsyncReturnedChain(
@@ -308,6 +344,7 @@ private func setAsyncReturnedChain(
 
 private actor AsyncReturnsProbe {
     private var current: JSON
+    private var reads = 0
     private var continuations: [UUID: AsyncStream<Result<JSON, JSONError>>.Continuation] = [:]
 
     init(_ current: JSON) {
@@ -333,8 +370,11 @@ private actor AsyncReturnsProbe {
     }
 
     fileprivate func value() -> JSON {
-        current
+        reads += 1
+        return current
     }
+
+    func readCount() -> Int { reads }
 
     fileprivate nonisolated func values(
         bufferingPolicy: Compute.ReturnsKeywordDefinition.BufferingPolicy

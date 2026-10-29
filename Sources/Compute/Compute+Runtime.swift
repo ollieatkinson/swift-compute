@@ -103,6 +103,13 @@ extension Compute {
         private var subscriptions: [Compute.Dependency: Task<Void, Never>] = [:]
         private var observedRoutes: Set<Compute.Route> = []
         private var routeContinuations: [Compute.Route: [UUID: RouteContinuation]] = [:]
+        private var evaluationVersion: UInt64 = 0
+        // A newer completion supersedes an older completion; starting async work
+        // does not block or suppress the last completed value.
+        private var finishedEvaluationVersion: UInt64 = 0
+        private var cancelledThroughVersion: UInt64 = 0
+        private var dependencyVersions: [Compute.Route: UInt64] = [:]
+        private var dependencyGraphVersion: UInt64 = 0
 
         public init(
             document: JSON,
@@ -157,9 +164,10 @@ extension Compute {
 
         @discardableResult
         public func step(_ count: Int = 1) async throws -> Compute.Step {
+            let version = beginEvaluation()
             let runtime = functionRuntime()
             let commit = try await brain.commit(thoughts: count, thinking: thinking(with: runtime))
-            return try await finish(commit, runtime: runtime, subscribe: false, publishWhenSettled: true)
+            return try await finish(commit, runtime: runtime, subscribe: false, publishWhenSettled: true, version: version)
         }
 
         public nonisolated func run(at route: Compute.Route = .root) -> AsyncStream<
@@ -195,12 +203,17 @@ extension Compute {
             id: UUID,
             route: Compute.Route
         ) async {
+            guard !Task.isCancelled else { return }
             routeContinuations[route, default: [:]][id] = RouteContinuation(continuation: continuation)
             observedRoutes.insert(route)
+            let version = beginEvaluation()
             do {
-                try await settle(subscribe: true, reset: true)
+                try await settle(subscribe: true, reset: true, version: version)
             } catch {
-                yield(.failure(JSONError(error)), to: route)
+                if version > cancelledThroughVersion, version >= finishedEvaluationVersion, !Task.isCancelled {
+                    finishedEvaluationVersion = version
+                    yield(.failure(JSONError(error)), to: route)
+                }
             }
         }
 
@@ -214,7 +227,8 @@ extension Compute {
         }
 
         @discardableResult
-        private func settle(subscribe: Bool, reset: Bool = false) async throws -> Compute.Step {
+        private func settle(subscribe: Bool, reset: Bool = false, version: UInt64? = nil) async throws -> Compute.Step {
+            let version = version ?? beginEvaluation()
             let graph: Graph?
             if reset {
                 let resetGraph = Self.graph(
@@ -243,7 +257,7 @@ extension Compute {
             } catch {
                 // An initial failed read still identifies a live dependency.
                 // Keep observing it so a later value can recover this runtime.
-                await synchronizeDependencies(runtime: runtime, subscribe: subscribe)
+                await synchronizeDependencies(runtime: runtime, subscribe: subscribe, version: version)
                 if case BrainError.thoughtLimitExceeded = error {
                     throw Compute.Error.recursionLimitExceeded
                 }
@@ -253,7 +267,8 @@ extension Compute {
                 commit,
                 runtime: runtime,
                 subscribe: subscribe,
-                publishWhenSettled: true
+                publishWhenSettled: true,
+                version: version
             )
         }
 
@@ -261,50 +276,74 @@ extension Compute {
             latestThoughts
         }
 
+        private func beginEvaluation() -> UInt64 {
+            evaluationVersion &+= 1
+            return evaluationVersion
+        }
+
         private func finish(
             _ commit: BrainCommit<Compute.Lemma, Compute.Signal>,
             runtime: Compute.FunctionRuntime,
             subscribe: Bool,
-            publishWhenSettled: Bool
+            publishWhenSettled: Bool,
+            version: UInt64
         ) async throws -> Compute.Step {
-            latestThoughts = await runtime.takeThoughts()
-            if let error = latestThoughts.compactMap(\.error).first {
-                await synchronizeDependencies(runtime: runtime, subscribe: subscribe)
+            let thoughts = await runtime.takeThoughts()
+            if let error = thoughts.compactMap(\.error).first {
+                await synchronizeDependencies(runtime: runtime, subscribe: subscribe, version: version)
                 throw error
             }
 
             let state = try document(from: commit.state)
             let step = Compute.Step(
                 state: state,
-                thoughts: latestThoughts,
+                thoughts: thoughts,
                 remainingThoughts: commit.remainingThoughts
             )
-            await synchronizeDependencies(runtime: runtime, subscribe: subscribe)
+            await synchronizeDependencies(runtime: runtime, subscribe: subscribe, version: version)
+            guard version > cancelledThroughVersion, version >= finishedEvaluationVersion else { return step }
+            finishedEvaluationVersion = version
+            if !thoughts.isEmpty { latestThoughts = thoughts }
             if publishWhenSettled, !step.isThinking {
                 publish(step.state)
             }
             return step
         }
 
-        private func synchronizeDependencies(runtime: Compute.FunctionRuntime, subscribe: Bool) async {
-            let tracked = await runtime.dependenciesByRoute()
-            if merge(tracked) {
+        private func synchronizeDependencies(runtime: Compute.FunctionRuntime, subscribe: Bool, version: UInt64) async {
+            let (tracked, resolved) = await runtime.dependencySnapshot()
+            guard version > cancelledThroughVersion, !Task.isCancelled else { return }
+            let changed = merge(tracked, version: version)
+            // Prime the read-to-observe handoff before starting subjects. A
+            // delayed initial replay must not replace a newer one-shot read
+            // performed merely because that dependency had not been cached.
+            for (route, dependencies) in tracked where dependencyVersions[route] == version {
+                for dependency in dependencies where results[dependency] == nil {
+                    if let result = resolved[dependency] { results[dependency] = result }
+                }
+            }
+            if changed {
                 let graph = Self.graph(
                     document: document,
                     functions: functions,
                     routeDependencies: routeDependencies
                 )
                 routeConcepts = graph.routeConcepts
-                await brain.update(concepts: graph.concepts)
+                dependencyGraphVersion &+= 1
+                await brain.update(concepts: graph.concepts, version: dependencyGraphVersion)
             }
-            if !Task.isCancelled, subscribe || !observedRoutes.isEmpty {
+            if version > cancelledThroughVersion, !Task.isCancelled, subscribe || !observedRoutes.isEmpty {
                 resubscribe(to: Array(routeDependencies.values.flatMap { $0 }))
             }
         }
 
-        private func merge(_ tracked: [Compute.Route: Set<Compute.Dependency>]) -> Bool {
+        private func merge(_ tracked: [Compute.Route: Set<Compute.Dependency>], version: UInt64) -> Bool {
             var changed = false
             for (route, dependencies) in tracked {
+                // Independent routes may finish in either order. Only a newer
+                // evaluation of this same route supersedes its dependencies.
+                guard version >= dependencyVersions[route, default: 0] else { continue }
+                dependencyVersions[route] = version
                 let old = routeDependencies[route] ?? []
                 if dependencies != old {
                     routeDependencies[route] = dependencies.isEmpty ? nil : dependencies
@@ -349,6 +388,9 @@ extension Compute {
         }
 
         private func apply(_ result: Result<JSON, JSONError>, to dependency: Compute.Dependency) async {
+            // Cancellation can occur between the source's check and this actor hop.
+            guard !Task.isCancelled, subscriptions[dependency] != nil else { return }
+            guard results[dependency] != result else { return }
             results[dependency] = result
             let signal: Compute.Signal
             switch result {
@@ -358,20 +400,27 @@ extension Compute {
                 signal = .failure(error)
             }
             await brain.stage([.dependency(dependency): signal])
+            guard !Task.isCancelled, subscriptions[dependency] != nil else { return }
+            let version = beginEvaluation()
             do {
-                try await settle(subscribe: true)
+                try await settle(subscribe: true, version: version)
             } catch {
-                await publishFailure(JSONError(error))
+                if version > cancelledThroughVersion, version >= finishedEvaluationVersion, !Task.isCancelled {
+                    finishedEvaluationVersion = version
+                    publishFailure(JSONError(error))
+                }
             }
         }
 
-        private func publishFailure(_ error: JSONError) async {
+        private func publishFailure(_ error: JSONError) {
             for route in observedRoutes {
                 yield(.failure(error), to: route)
             }
         }
 
         public func cancel() async {
+            evaluationVersion &+= 1
+            cancelledThroughVersion = evaluationVersion
             let running = Array(subscriptions.values)
             for subscription in subscriptions.values {
                 subscription.cancel()
@@ -438,7 +487,7 @@ extension Compute {
             guard let object = current.value(at: route.components)?.object else {
                 return nil
             }
-            await runtime.trackDependencies(for: route)
+            await runtime.trackDependencies(for: route, state: state)
             let step = try await Self.evaluate(object, at: route, runtime: runtime, context: context)
             var nextState = state
             nextState[.route(route)] = .value(step.output)
@@ -619,6 +668,8 @@ extension Compute {
         private let functions: [String: any AnyReturnsKeyword]
         private let results: [Compute.Dependency: Result<JSON, JSONError>]
         private let dependencyOwner: @Sendable (Compute.Route) -> Compute.Route
+        private var dependencyState: [Compute.Lemma: Compute.Signal] = [:]
+        private var resolved: [Compute.Dependency: Result<JSON, JSONError>] = [:]
         private var tracked: [Compute.Route: Set<Compute.Dependency>] = [:]
         private var thoughts: [Compute.Thought] = []
 
@@ -695,13 +746,32 @@ extension Compute {
                 let route = dependencyOwner(frame.route.computeObjectRoute(for: keyword))
                 tracked[route, default: []].insert(dependency)
                 if let result = results[dependency] {
+                    // The Brain may have accepted a newer staged value since
+                    // this evaluation captured its cache. Read the same state
+                    // that triggered this route, rather than consuming its
+                    // change with an older cached input.
+                    if let signal = dependencyState[.dependency(dependency)] {
+                        switch signal {
+                        case .value(let value): return value
+                        case .failure(let error): throw error
+                        }
+                    }
                     return try result.get()
+                }
+                do {
+                    let value = try await function.compute(data: data, frame: frame)
+                    if let value { resolved[dependency] = .success(value) }
+                    return value
+                } catch {
+                    resolved[dependency] = .failure(JSONError(error))
+                    throw error
                 }
             }
             return try await function.compute(data: data, frame: frame)
         }
 
-        func trackDependencies(for route: Compute.Route) {
+        func trackDependencies(for route: Compute.Route, state: [Compute.Lemma: Compute.Signal]) {
+            dependencyState = state
             if tracked[route] == nil {
                 tracked[route] = []
             }
@@ -716,8 +786,11 @@ extension Compute {
             return function is any Compute.ReturnsKeywordDefinition ? .returns : .compute
         }
 
-        func dependenciesByRoute() -> [Compute.Route: Set<Compute.Dependency>] {
-            tracked
+        func dependencySnapshot() -> (
+            tracked: [Compute.Route: Set<Compute.Dependency>],
+            resolved: [Compute.Dependency: Result<JSON, JSONError>]
+        ) {
+            (tracked, resolved)
         }
 
         func record(_ thought: Compute.Thought) {

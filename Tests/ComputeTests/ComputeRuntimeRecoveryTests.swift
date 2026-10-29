@@ -29,4 +29,34 @@ import Testing
         await references.set("name", to: "Dorothy")
         await expectNext(&values, equals: .success(["card": ["text": "Dorothy"]]))
     }
+
+    @Test func concurrent_independent_branches_keep_both_replacement_dependencies() async throws {
+        let references = TestReferences()
+        await references.set("left", to: ["{returns}": ["from": ["reference": "old_left"]]])
+        await references.set("right", to: ["{returns}": ["from": ["reference": "old_right"]]])
+        await references.set("old_left", to: "L0")
+        await references.set("old_right", to: "R0")
+        await references.set("new_left", to: "L1")
+        await references.set("new_right", to: "R1")
+        let runtime = try runtime([
+            "left": ["{returns}": ["from": ["reference": "left"]]],
+            "right": ["{returns}": ["from": ["reference": "right"]]],
+        ], references: references)
+        defer { await runtime.cancel() }
+        var values = runtime.run().makeAsyncIterator()
+        await expectNext(&values, equals: .success(["left": "L0", "right": "R0"]))
+
+        async let left: Void = references.set("left", to: ["{returns}": ["from": ["reference": "new_left"]]])
+        async let right: Void = references.set("right", to: ["{returns}": ["from": ["reference": "new_right"]]])
+        _ = await (left, right)
+        var bothReplaced = false
+        while let value = try await values.next()?.get() {
+            if value == ["left": "L1", "right": "R1"] { bothReplaced = true; break }
+        }
+        try #require(bothReplaced)
+        await references.set("new_left", to: "L2")
+        await expectNext(&values, equals: .success(["left": "L2", "right": "R1"]))
+        await references.set("new_right", to: "R2")
+        await expectNext(&values, equals: .success(["left": "L2", "right": "R2"]))
+    }
 }
