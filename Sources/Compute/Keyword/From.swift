@@ -66,6 +66,12 @@ protocol ReferenceKeyword: AnyReturnsKeyword {}
 extension Compute.Keyword.From.Function: ReferenceKeyword {}
 
 extension Compute.Keyword.From {
+    func scoped(to inherited: [String: JSON]?) -> Self {
+        guard let inherited else { return self }
+        return Self(reference: reference,
+            context: inherited.merging(context ?? [:]) { _, explicit in explicit })
+    }
+
     var diagnosticName: String {
         let name = reference.string ?? reference.diagnosticJSON
         guard let context else { return name }
