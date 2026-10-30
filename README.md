@@ -163,6 +163,13 @@ Custom keywords can be added by conforming to `Compute.KeywordDefinition` or `An
 
 `explain` evaluates a value and returns an object containing `ok`, `value`, `summary`, and displayable `thoughts`. Set `mode` to `"foundation_model"` to add a natural-language `explanation` using Apple's on-device Foundation Models framework when it is available on iOS or macOS. `context` is optional user-facing context that helps the model explain what the computed value affects. On unsupported platforms, unavailable models, or generation failure, `explain` falls back to the trace-only payload. If the explained value fails, `explain` returns `ok: false` with an `error` string instead of throwing.
 
+`literal` returns JSON unchanged, including nested expressions. For example,
+`{"{returns}": {"literal": {"value": {"{returns}": {"from": {"reference": "later"}}}}}}`
+returns the inner `from` expression as data. This is useful for deferred payloads
+and values that have already been evaluated by another runtime. `get` can select
+from a literal without evaluating the selected data again. An explicit null is
+preserved; omitting `value` is an error.
+
 ## Philosophy
 
 Compute is designed as an affordance for decoupling rule authorship from rule execution.
