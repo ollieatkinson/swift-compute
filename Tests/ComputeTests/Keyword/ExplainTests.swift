@@ -77,6 +77,7 @@ struct ExplainTests {
 
         #expect(try await value(json) == [
             "error": "not available",
+            "failure": ["message": "not available", "path": []],
             "ok": false,
             "thoughts": [],
             "value": nil,

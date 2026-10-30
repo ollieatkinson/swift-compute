@@ -90,6 +90,13 @@ The document can come from a backend. The values behind `subject.age` and `acces
 
 Wrap a decision in `explain` when the caller needs both the computed value and a displayable trace. The explained `value` is the complete compute document, including its `{returns}` wrapper.
 
+Custom keywords can add domain evidence with `await frame.record(Compute.Thought(...))`,
+using the current frame's route and depth. `explain` captures it alongside the
+value from that evaluation. Recorded input/output stays data: recording neither
+evaluates embedded expressions nor creates a dependency.
+Failed explanations also include a Codable `JSONError` under `failure`, retaining
+its message and path alongside the existing displayable `error` string.
+
 ```swift
 let document: JSON = [
     "{returns}": [
