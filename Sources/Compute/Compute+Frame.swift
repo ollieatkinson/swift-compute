@@ -43,5 +43,12 @@ extension Compute {
                 references: references
             )
         }
+
+        /// Adds evidence from a custom keyword to this evaluation's trace.
+        /// Recording does not evaluate the evidence or create a dependency.
+        /// Use this frame's route/depth when describing work in this frame.
+        public func record(_ thought: Compute.Thought) async {
+            await runtime.record(thought)
+        }
     }
 }

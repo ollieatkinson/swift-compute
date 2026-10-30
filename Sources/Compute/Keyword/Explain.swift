@@ -47,6 +47,7 @@ extension Compute.Keyword.Explain: Compute.KeywordDefinition, Compute.OpaqueOutp
         case .failure(let error):
             return [
                 "error": .string(error.description),
+                "failure": try JSON(data: JSONEncoder().encode(error)),
                 "ok": false,
                 "thoughts": thoughts,
                 "value": .null,
