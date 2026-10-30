@@ -705,9 +705,10 @@ extension Compute {
                 input = data
             }
             var outputReferences = references
-            if function is any ReferenceKeyword {
-                let request = try JSON.decoded(Compute.Keyword.From.self, from: input)
+            if let function = function as? any ReferenceKeyword {
+                let authored = try JSON.decoded(Compute.Keyword.From.self, from: input)
                     .scoped(to: references.last?.request.context)
+                let request = try await function.request(for: authored.reference, context: authored.context)
                 // Effective bindings are also part of the subscription key.
                 // Sibling uses of one template can address different entities.
                 var effective: JSON.Object = ["reference": request.reference]
