@@ -698,7 +698,7 @@ extension Compute {
             guard let function = functions[keyword] else { return nil }
             let frame = Compute.Frame(context: context, runtime: self, route: route, depth: depth,
                 references: references)
-            let input: JSON
+            var input: JSON
             if function is any Compute.ReturnsKeywordDefinition {
                 input = try await data.compute(in: frame)
             } else {
@@ -707,6 +707,10 @@ extension Compute {
             var outputReferences = references
             if function is any ReferenceKeyword {
                 let request = try JSON.decoded(Compute.Keyword.From.self, from: input)
+                    .scoped(to: references.last?.request.context)
+                // Effective bindings are also part of the subscription key.
+                // Sibling uses of one template can address different entities.
+                input = try JSON.encoded(request)
                 let entry = (request: request, context: context)
                 let repeated = references.contains {
                     $0.request == request && $0.context == context
