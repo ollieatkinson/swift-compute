@@ -5,17 +5,21 @@ extension Compute {
         let runtime: Compute.FunctionRuntime
         public let route: Compute.Route
         public let depth: Int
+        // Immutable branch ancestry; sibling evaluations never share a mutable stack.
+        let references: [(request: Compute.Keyword.From, context: Compute.Context)]
 
         init(
             context: Compute.Context,
             runtime: Compute.FunctionRuntime,
             route: Compute.Route,
-            depth: Int
+            depth: Int,
+            references: [(request: Compute.Keyword.From, context: Compute.Context)]
         ) {
             self.context = context
             self.runtime = runtime
             self.route = route
             self.depth = depth
+            self.references = references
         }
 
         public func compute(_ data: JSON, at route: Compute.Route? = nil) async throws -> JSON {
@@ -24,7 +28,8 @@ extension Compute {
                     context: context,
                     runtime: runtime,
                     route: route ?? self.route,
-                    depth: depth
+                    depth: depth,
+                    references: references
                 )
             )
         }
@@ -34,7 +39,8 @@ extension Compute {
                 context: context,
                 runtime: runtime,
                 route: self.route.appending(contentsOf: route),
-                depth: depth
+                depth: depth,
+                references: references
             )
         }
     }

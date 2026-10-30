@@ -48,7 +48,8 @@ public struct Computed<Value: Codable & Sendable>: Codable, Sendable {
             context: context,
             runtime: frame.runtime,
             route: frame.route.appending(contentsOf: route + suffix),
-            depth: frame.depth
+            depth: frame.depth,
+            references: frame.references
         )
     }
 

@@ -144,6 +144,13 @@ JSON.returns("get", [
 
 Reference values can be added with `Compute.Keyword.From.Function(references:)`. JavaScript evaluation can be added explicitly with `Compute.Keyword.Eval.function`.
 
+`from` detects repeated reference requests along one resolution path and reports
+their names and explicit context, for example `Reference cycle: first -> second -> first`.
+Different request contexts, changing local items, and repeated reads in sibling branches remain independent.
+Live cycles keep their upstream observations and can recover when a source changes;
+an authored `default` can also handle the diagnostic. The existing recursion limit
+still bounds long returned-compute chains and arbitrary generated compute loops.
+
 Custom keywords can be added by conforming to `Compute.KeywordDefinition` or `AnyReturnsKeyword`, declaring a `name`, and passing them into `Compute.Runtime`.
 
 `contains` checks whether a string contains a substring, or whether an array contains a value.

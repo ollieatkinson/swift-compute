@@ -366,7 +366,8 @@ extension Compute {
                     context: context ?? Compute.Context(),
                     runtime: functionRuntime(),
                     route: .root,
-                    depth: dependency.depth
+                    depth: dependency.depth,
+                    references: []
                 )
                 subscriptions[dependency] = Task { [weak self] in
                     for await result in function.subject(data: dependency.data, frame: frame, bufferingPolicy: .unbounded) {
@@ -520,7 +521,8 @@ extension Compute {
                         context: context,
                         route: functionRoute,
                         depth: 0,
-                        recordThought: false
+                        recordThought: false,
+                        references: []
                     ) {
                         return (
                             invocation.keyword, await runtime.kind(for: invocation.keyword),
@@ -555,7 +557,8 @@ extension Compute {
                     context: context,
                     runtime: runtime,
                     route: route["default"],
-                    depth: 0
+                    depth: 0,
+                    references: []
                 ))
             return ("default", .defaultValue, fallback, output)
         }
@@ -689,16 +692,36 @@ extension Compute {
             context: Compute.Context,
             route: Compute.Route,
             depth: Int,
-            recordThought: Bool = true
+            recordThought: Bool = true,
+            references: [(request: Compute.Keyword.From, context: Compute.Context)]
         ) async throws -> JSON? {
             guard let function = functions[keyword] else { return nil }
-            let frame = Compute.Frame(context: context, runtime: self, route: route, depth: depth)
+            let frame = Compute.Frame(context: context, runtime: self, route: route, depth: depth,
+                references: references)
+            let input: JSON
+            if function is any Compute.ReturnsKeywordDefinition {
+                input = try await data.compute(in: frame)
+            } else {
+                input = data
+            }
+            var outputReferences = references
+            if function is any ReferenceKeyword {
+                let request = try JSON.decoded(Compute.Keyword.From.self, from: input)
+                let entry = (request: request, context: context)
+                let repeated = references.contains {
+                    $0.request == request && $0.context == context
+                }
+                guard !repeated else {
+                    let chain = (references + [entry]).map { $0.request.diagnosticName }.joined(separator: " -> ")
+                    throw JSONError("Reference cycle: \(chain)", path: route.path)
+                }
+                outputReferences.append(entry)
+            }
             let rawOutput: JSON?
             if function is any Compute.ReturnsKeywordDefinition {
-                let computed = try await data.compute(in: frame)
-                rawOutput = try await value(keyword: keyword, data: computed, frame: frame)
+                rawOutput = try await value(keyword: keyword, data: input, frame: frame)
             } else {
-                rawOutput = try await function.compute(data: data, frame: frame)
+                rawOutput = try await function.compute(data: input, frame: frame)
             }
             let output: JSON?
             if function is any Compute.OpaqueOutputKeyword {
@@ -709,7 +732,8 @@ extension Compute {
                         context: context,
                         runtime: self,
                         route: route.computeObjectRoute(for: keyword),
-                        depth: depth + 1
+                        depth: depth + 1,
+                        references: outputReferences
                     ))
             }
             if recordThought, let output {

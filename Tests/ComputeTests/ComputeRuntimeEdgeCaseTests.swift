@@ -77,11 +77,11 @@ struct ComputeRuntimeEdgeCaseTests {
         #expect(try await runtime(document).value() == true)
     }
 
-    @Test func async_returned_compute_loops_hit_the_recursion_limit() async throws {
+    @Test func async_returned_reference_loops_report_the_reference_cycle() async throws {
         let references = TestReferences()
         await references.set("loop", to: ["{returns}": ["from": ["reference": "loop"]]])
 
-        await expectJSONError(containing: "recursionLimitExceeded") {
+        await expectJSONError(containing: "Reference cycle: loop -> loop") {
             _ = try await runtime(
                 ["{returns}": ["from": ["reference": "loop"]]],
                 references: references
