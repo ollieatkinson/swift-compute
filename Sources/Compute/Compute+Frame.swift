@@ -6,14 +6,14 @@ extension Compute {
         public let route: Compute.Route
         public let depth: Int
         // Immutable branch ancestry; sibling evaluations never share a mutable stack.
-        let references: [Compute.ReferenceEvaluation]
+        let references: [(request: Compute.Keyword.From, context: Compute.Context)]
 
         init(
             context: Compute.Context,
             runtime: Compute.FunctionRuntime,
             route: Compute.Route,
             depth: Int,
-            references: [Compute.ReferenceEvaluation]
+            references: [(request: Compute.Keyword.From, context: Compute.Context)]
         ) {
             self.context = context
             self.runtime = runtime

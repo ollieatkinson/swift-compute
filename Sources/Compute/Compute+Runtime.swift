@@ -693,7 +693,7 @@ extension Compute {
             route: Compute.Route,
             depth: Int,
             recordThought: Bool = true,
-            references: [Compute.ReferenceEvaluation]
+            references: [(request: Compute.Keyword.From, context: Compute.Context)]
         ) async throws -> JSON? {
             guard let function = functions[keyword] else { return nil }
             let frame = Compute.Frame(context: context, runtime: self, route: route, depth: depth,
@@ -707,12 +707,15 @@ extension Compute {
             var outputReferences = references
             if function is any ReferenceKeyword {
                 let request = try JSON.decoded(Compute.Keyword.From.self, from: input)
-                let evaluation = Compute.ReferenceEvaluation(request: request, context: context)
-                guard !references.contains(evaluation) else {
-                    let chain = (references + [evaluation]).map(\.diagnosticName).joined(separator: " -> ")
+                let entry = (request: request, context: context)
+                let repeated = references.contains {
+                    $0.request == request && $0.context == context
+                }
+                guard !repeated else {
+                    let chain = (references + [entry]).map { $0.request.diagnosticName }.joined(separator: " -> ")
                     throw JSONError("Reference cycle: \(chain)", path: route.path)
                 }
-                outputReferences.append(evaluation)
+                outputReferences.append(entry)
             }
             let rawOutput: JSON?
             if function is any Compute.ReturnsKeywordDefinition {
