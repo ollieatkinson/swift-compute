@@ -710,7 +710,9 @@ extension Compute {
                     .scoped(to: references.last?.request.context)
                 // Effective bindings are also part of the subscription key.
                 // Sibling uses of one template can address different entities.
-                input = try JSON.encoded(request)
+                var effective: JSON.Object = ["reference": request.reference]
+                if let context = request.context { effective["context"] = .object(context) }
+                input = .object(effective)
                 let entry = (request: request, context: context)
                 let repeated = references.contains {
                     $0.request == request && $0.context == context

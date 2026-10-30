@@ -2,6 +2,14 @@ import Compute
 import Testing
 
 @Suite(.timeLimit(.minutes(1))) struct ReferenceContextTests {
+    @Test func context_preserves_explicit_json_null() async throws {
+        let references = TestReferences()
+        await references.set("name?user=null", to: "Present null")
+        let runtime = try runtime(.returns("from", ["reference": "name", "context": ["user": .null]]), references: references)
+        defer { await runtime.cancel(); await references.finish() }
+        #expect(try await runtime.value() == "Present null")
+    }
+
     @Test func returned_references_inherit_context_and_explicit_bindings_override_it() async throws {
         let references = TestReferences()
         await references.set("template?user=\"Dorothy\"", to: [
