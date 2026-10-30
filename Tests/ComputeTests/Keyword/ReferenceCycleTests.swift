@@ -2,6 +2,48 @@ import Compute
 import Testing
 
 @Suite(.timeLimit(.minutes(1))) struct ReferenceCycleTests {
+    @Test(arguments: [false, true], [false, true])
+    func recursive_templates_can_advance_through_local_items(live: Bool, withDefault: Bool) async throws {
+        let walk: JSON = .returns("from", ["reference": "walk"],
+            default: withDefault ? "Premature fallback" : nil)
+        let template: JSON = .returns("either", [
+            [
+                "condition": .returns("exists", ["value": .returns("item", ["child"])]),
+                "value": .returns("map", ["src": .returns("item", ["child"]), "dst": walk]),
+            ],
+            ["value": .returns("item", ["name"])],
+        ])
+        let references = TestReferences()
+        await references.set("walk", to: template)
+        let function: any AnyReturnsKeyword
+        if live {
+            function = Compute.Keyword.From.Function(references: references)
+        } else {
+            function = Compute.Keyword.From.Function(references: FixedReferences(values: ["walk": template]))
+        }
+        let runtime = Compute.Runtime(document: walk,
+            context: Compute.Context(item: ["child": ["child": ["name": "Leaf"]]]),
+            functions: [function])
+        defer { await runtime.cancel(); await references.finish() }
+        #expect(try await runtime.value() == "Leaf")
+    }
+
+    @Test func revisiting_a_reference_and_local_item_still_reports_a_cycle() async throws {
+        let references = FixedReferences(values: [
+            "first": .returns("map", ["src": ["step": "child"],
+                "dst": .returns("from", ["reference": "second"])]),
+            "second": .returns("map", ["src": ["step": "start"],
+                "dst": .returns("from", ["reference": "first"])]),
+        ])
+        let runtime = Compute.Runtime(document: .returns("from", ["reference": "first"]),
+            context: Compute.Context(item: ["step": "start"]),
+            functions: [Compute.Keyword.From.Function(references: references)])
+        defer { await runtime.cancel() }
+        await expectJSONError(containing: "Reference cycle: first -> second -> first") {
+            _ = try await runtime.value()
+        }
+    }
+
     @Test func synchronous_references_name_the_full_resolution_chain() async throws {
         let references = FixedReferences(values: [
             "entry": .returns("from", ["reference": "first"]),
