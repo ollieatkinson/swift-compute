@@ -157,6 +157,11 @@ References inside a returned template inherit the enclosing request's effective
 context; their explicit bindings take precedence. The effective bindings also
 identify live dependencies, so sibling uses of one template can read different
 entities without sharing the wrong cached value.
+Providers can implement `References.request(for:context:)` to normalize their own
+reference format and supply its effective bindings. The default preserves the
+request. Normalization runs before dependency sharing, cycle detection and nested
+scope propagation; it should deterministically describe identity without fetching
+the value or opening a subscription. Compute does not prescribe a reference schema.
 Different request contexts, changing local items, and repeated reads in sibling branches remain independent.
 Live cycles keep their upstream observations and can recover when a source changes;
 an authored `default` can also handle the diagnostic. The existing recursion limit
