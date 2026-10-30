@@ -128,10 +128,19 @@ The default computer includes these `{returns}` keywords:
 - context and literal values: `this`, `item`
 - boolean logic and presence checks: `yes`, `not`, `either`, `exists`
 - comparisons: `comparison` with `match`, `equal`, `less`, `greater`, `less_or_equal`, and `greater_or_equal`, plus `approximately_equal`
-- collection and object helpers: `count`, `contains`, `map`, `array_map`, `array_filter`, `array_group`, `array_reduce`, `array_slice`, `array_sort`, `array_subscript`, and `array_zip`
+- collection and object helpers: `count`, `contains`, `get`, `map`, `array_map`, `array_filter`, `array_group`, `array_reduce`, `array_slice`, `array_sort`, `array_subscript`, and `array_zip`
 - date and time helpers: `date`, `seconds`
 - text and network values: `text`, `http`
 - diagnostics and explanation: `error`, `explain`
+
+`get` evaluates its `value`, then selects a literal `path` of string keys and integer indices (negative indices count from the end). An empty path returns the evaluated value. Missing paths, invalid containers and out-of-bounds indices fail; explicit nulls remain values. The selected output is not evaluated again, preserving deferred expressions returned by opaque keywords.
+
+```swift
+JSON.returns("get", [
+    "value": .returns("from", ["reference": "programme.card"]),
+    "path": ["title", "text"],
+])
+```
 
 Reference values can be added with `Compute.Keyword.From.Function(references:)`. JavaScript evaluation can be added explicitly with `Compute.Keyword.Eval.function`.
 
