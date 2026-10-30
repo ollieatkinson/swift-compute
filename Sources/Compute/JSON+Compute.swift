@@ -98,7 +98,7 @@ extension JSON {
         runtime: Compute.FunctionRuntime,
         route: Compute.Route = .root,
         depth: Int,
-        references: [Compute.Keyword.From]
+        references: [Compute.ReferenceEvaluation]
     ) async throws -> JSON {
         if let object {
             if let invocation = Compute.Invocation(object: object) {
@@ -177,7 +177,7 @@ extension JSON {
         runtime: Compute.FunctionRuntime,
         route: Compute.Route,
         depth: Int,
-        references: [Compute.Keyword.From]
+        references: [Compute.ReferenceEvaluation]
     ) async throws -> JSON {
         let output = try await compute(
             context: context,

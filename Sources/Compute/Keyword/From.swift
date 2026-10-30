@@ -60,6 +60,17 @@ extension Compute.Keyword.From.Function: Compute.ReturnsKeywordDefinition where 
     }
 }
 
+extension Compute {
+    // A template may revisit the same request while advancing through local
+    // items. Only a repeated request in the same evaluation context is a cycle.
+    struct ReferenceEvaluation: Equatable, Sendable {
+        let request: Keyword.From
+        let context: Context
+
+        var diagnosticName: String { request.diagnosticName }
+    }
+}
+
 // Only reference providers have stable semantic request identity. Arbitrary
 // streaming keywords may legitimately return different data at each depth.
 protocol ReferenceKeyword: AnyReturnsKeyword {}
