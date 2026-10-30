@@ -59,3 +59,25 @@ extension Compute.Keyword.From.Function: Compute.ReturnsKeywordDefinition where 
         }
     }
 }
+
+// Only reference providers have stable semantic request identity. Arbitrary
+// streaming keywords may legitimately return different data at each depth.
+protocol ReferenceKeyword: AnyReturnsKeyword {}
+extension Compute.Keyword.From.Function: ReferenceKeyword {}
+
+extension Compute.Keyword.From {
+    var diagnosticName: String {
+        let name = reference.string ?? reference.diagnosticJSON
+        guard let context else { return name }
+        return "\(name) \(JSON.object(context).diagnosticJSON)"
+    }
+}
+
+private extension JSON {
+    var diagnosticJSON: String {
+        guard let data = try? data(options: [.fragmentsAllowed, .sortedKeys]) else {
+            return String(describing: self)
+        }
+        return String(decoding: data, as: UTF8.self)
+    }
+}
