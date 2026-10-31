@@ -94,6 +94,9 @@ Custom keywords can add domain evidence with `await frame.record(Compute.Thought
 using the current frame's route and depth. `explain` captures it alongside the
 value from that evaluation. Recorded input/output stays data: recording neither
 evaluates embedded expressions nor creates a dependency.
+Recorded errors are diagnostic evidence. Throw an error to fail execution;
+`explain` and keyword defaults can handle that failure without the recorded
+evidence failing the runtime again.
 Failed explanations also include a Codable `JSONError` under `failure`, retaining
 its message and path alongside the existing displayable `error` string.
 
