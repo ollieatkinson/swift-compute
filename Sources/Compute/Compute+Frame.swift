@@ -46,6 +46,7 @@ extension Compute {
 
         /// Adds evidence from a custom keyword to this evaluation's trace.
         /// Recording does not evaluate the evidence or create a dependency.
+        /// A recorded error is diagnostic evidence; throw to fail execution.
         /// Use this frame's route/depth when describing work in this frame.
         public func record(_ thought: Compute.Thought) async {
             await runtime.record(thought)

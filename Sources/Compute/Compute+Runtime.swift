@@ -289,11 +289,8 @@ extension Compute {
             version: UInt64
         ) async throws -> Compute.Step {
             let thoughts = await runtime.takeThoughts()
-            if let error = thoughts.compactMap(\.error).first {
-                await synchronizeDependencies(runtime: runtime, subscribe: subscribe, version: version)
-                throw error
-            }
-
+            // Execution errors propagate through the Brain. Recorded errors
+            // can describe failures already handled by explain or a fallback.
             let state = try document(from: commit.state)
             let step = Compute.Step(
                 state: state,
