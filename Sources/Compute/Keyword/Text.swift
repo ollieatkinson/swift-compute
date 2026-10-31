@@ -10,6 +10,7 @@ extension Compute.Keyword {
             public let joining: Joining?
             public let splitting: Splitting?
             public let date: DateText?
+            public let number: NumberText?
         }
 
         public struct Splitting: Codable, Equatable, Sendable {
@@ -21,6 +22,12 @@ extension Compute.Keyword {
             @Computed public var value: Foundation.Date
             @Computed public var format: String
             @Computed public var time_zone: String?
+        }
+
+        public struct NumberText: Codable, Equatable, Sendable {
+            @Computed public var value: Double
+            @Computed public var currency: String?
+            @Computed public var locale: String?
         }
 
         public struct Joining: Codable, Equatable, Sendable {
@@ -53,6 +60,19 @@ extension Compute.Keyword.Text: Compute.KeywordDefinition {
             formatter.timeZone = timeZone
             formatter.dateFormat = pattern
             return .string(formatter.string(from: value))
+        }
+        if let number = from.number {
+            guard #available(macOS 12, iOS 15, tvOS 15, watchOS 8, *) else {
+                throw JSONError("Number text requires Foundation format styles")
+            }
+            let value = try await number.$value.compute(in: frame)
+            guard value.isFinite else { throw JSONError("Expected a finite number") }
+            let locale = Locale(identifier: try await number.$locale.compute(in: frame) ?? "en_US_POSIX")
+            if let currency = try await number.$currency.compute(in: frame) {
+                guard !currency.isEmpty else { throw JSONError("Expected a currency code") }
+                return .string(value.formatted(.currency(code: currency).locale(locale)))
+            }
+            return .string(value.formatted(.number.locale(locale)))
         }
         throw JSONError("Expected text formatter")
     }
