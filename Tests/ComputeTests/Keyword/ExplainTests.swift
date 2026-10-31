@@ -7,6 +7,30 @@ import FoundationModels
 
 @Suite(.serialized)
 struct ExplainTests {
+    @Test(arguments: [false, true])
+    func recorded_errors_do_not_override_the_value_or_the_explanations_failure_payload(throwing: Bool) async throws {
+        let operation = RecordingError(throwing: throwing)
+        let input: JSON = .returns(operation.name, [:])
+        let explained = try await value(.returns("explain", ["value": input]), functions: [operation])
+        #expect(explained.object?["ok"] == .bool(!throwing))
+        #expect(explained["thoughts"].array?.contains { $0["error"] == "Unavailable at user.name" } == true)
+        if throwing {
+            #expect(explained["failure"] == ["message": "Unavailable", "path": ["user", "name"]])
+            await #expect(throws: JSONError("Unavailable", path: ["user", "name"])) {
+                try await value(input, functions: [operation])
+            }
+        } else {
+            #expect(explained["value"] == 42)
+            #expect(try await value(input, functions: [operation]) == 42)
+        }
+    }
+
+    @Test func a_keyword_fallback_can_handle_a_thrown_error_that_was_also_recorded() async throws {
+        let operation = RecordingError(throwing: true)
+        let input: JSON = ["{returns}": [operation.name: [:]], "default": 42]
+        #expect(try await value(input, functions: [operation]) == 42)
+    }
+
     @Test func returns_the_computed_value_with_displayable_thoughts() async throws {
         let json: JSON = [
             "{returns}": [
@@ -249,4 +273,16 @@ struct ExplainTests {
         await references.finish()
     }
 #endif
+}
+
+private struct RecordingError: AnyReturnsKeyword {
+    let throwing: Bool
+    var name: String { "recording_error" }
+    func compute(data: JSON, frame: Compute.Frame) async throws -> JSON? {
+        let error = JSONError("Unavailable", path: ["user", "name"])
+        await frame.record(Compute.Thought(route: frame.route, depth: frame.depth,
+            keyword: name, kind: .error, input: data, error: error))
+        if throwing { throw error }
+        return 42
+    }
 }
