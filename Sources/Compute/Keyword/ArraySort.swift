@@ -25,7 +25,7 @@ extension Compute.Keyword {
     }
 }
 
-extension Compute.Keyword.ArraySort: Compute.KeywordDefinition {
+extension Compute.Keyword.ArraySort: Compute.OpaqueOutputKeywordDefinition {
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let values = try await $array.compute(in: frame)
         let predicates = try await $predicates.compute(in: frame) ?? []

@@ -9,7 +9,7 @@ extension Compute.Keyword {
     }
 }
 
-extension Compute.Keyword.ArraySubscript: Compute.KeywordDefinition {
+extension Compute.Keyword.ArraySubscript: Compute.OpaqueOutputKeywordDefinition {
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let values = try await $of.compute(in: frame)
         let reversed = try await $reversed.compute(in: frame) ?? false

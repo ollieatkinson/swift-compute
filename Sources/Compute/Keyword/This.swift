@@ -6,7 +6,7 @@ extension Compute.Keyword {
     }
 }
 
-extension Compute.Keyword.This: Compute.KeywordDefinition {
+extension Compute.Keyword.This: Compute.OpaqueOutputKeywordDefinition {
     public static let name = "this"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
