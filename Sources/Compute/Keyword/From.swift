@@ -15,11 +15,21 @@ extension Compute.Keyword {
 
 extension Compute {
     public protocol References: Sendable {
+        /// Canonical identity and effective context, before subscription sharing,
+        /// cycle detection and propagation to references returned by this one.
+        func request(for reference: JSON, context: [String: JSON]?) async throws -> Keyword.From
         func value(for reference: JSON, context: [String: JSON]?) async throws -> JSON
     }
 
     public protocol AsyncReferences: References {
         func values(for reference: JSON, context: [String: JSON]?) -> AsyncStream<Result<JSON, JSONError>>
+    }
+}
+
+public extension Compute.References {
+    /// Providers without aliases or embedded context retain their existing request.
+    func request(for reference: JSON, context: [String: JSON]?) async throws -> Compute.Keyword.From {
+        .init(reference: reference, context: context)
     }
 }
 
@@ -62,8 +72,14 @@ extension Compute.Keyword.From.Function: Compute.ReturnsKeywordDefinition where 
 
 // Only reference providers have stable semantic request identity. Arbitrary
 // streaming keywords may legitimately return different data at each depth.
-protocol ReferenceKeyword: AnyReturnsKeyword {}
-extension Compute.Keyword.From.Function: ReferenceKeyword {}
+protocol ReferenceKeyword: AnyReturnsKeyword {
+    func request(for reference: JSON, context: [String: JSON]?) async throws -> Compute.Keyword.From
+}
+extension Compute.Keyword.From.Function: ReferenceKeyword {
+    func request(for reference: JSON, context: [String: JSON]?) async throws -> Compute.Keyword.From {
+        try await references.request(for: reference, context: context)
+    }
+}
 
 extension Compute.Keyword.From {
     func scoped(to inherited: [String: JSON]?) -> Self {
