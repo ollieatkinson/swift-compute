@@ -35,7 +35,7 @@ public struct Computed<Value: Codable & Sendable>: Codable, Sendable {
         return .key(key.stringValue)
     }
 
-    fileprivate func field(
+    func field(
         in frame: Compute.Frame,
         item: JSON? = nil,
         appending suffix: [Compute.Route.Component] = []

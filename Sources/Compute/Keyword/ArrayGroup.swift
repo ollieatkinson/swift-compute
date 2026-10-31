@@ -33,7 +33,7 @@ extension Compute.Keyword {
     }
 }
 
-extension Compute.Keyword.ArrayGroup: Compute.KeywordDefinition {
+extension Compute.Keyword.ArrayGroup: Compute.OpaqueOutputKeywordDefinition {
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let values = try await $array.compute(in: frame)

@@ -15,7 +15,7 @@ extension Compute.Keyword.Either: Codable {
     }
 }
 
-extension Compute.Keyword.Either: Compute.KeywordDefinition {
+extension Compute.Keyword.Either: Compute.OpaqueOutputKeywordDefinition {
     public static let name = "either"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {

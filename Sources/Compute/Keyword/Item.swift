@@ -19,7 +19,7 @@ extension Compute.Keyword.Item: Codable {
     }
 }
 
-extension Compute.Keyword.Item: Compute.KeywordDefinition {
+extension Compute.Keyword.Item: Compute.OpaqueOutputKeywordDefinition {
     public static let name = "item"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {

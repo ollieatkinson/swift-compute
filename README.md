@@ -174,6 +174,29 @@ Custom keywords can be added by conforming to `Compute.KeywordDefinition` or `An
 
 `contains` checks whether a string contains a substring, or whether an array contains a value.
 
+`map` and `array_map` can copy paths directly, preserving missing fields and explicit `null`:
+
+```json
+{
+  "{returns}": {
+    "map": {
+      "src": {"{returns}": {"item": []}},
+      "dst": {},
+      "copy": [
+        {"from": ["t"], "to": ["title"], "required": true},
+        {"from": ["sy"], "to": ["synopsis"]}
+      ]
+    }
+  }
+}
+```
+
+A copy uses either `from` or `value`. Missing optional paths are skipped; `required: true` fails on a missing path. A present `null` is always copied. A `value` template runs once in the source item's scope; computed copy plans remain supported.
+
+HTTP response bodies and values selected by `item`, `this`, `either`, `map` and the array helpers are data. They are not implicitly executed again when they contain `{returns}`. Authored input expressions still evaluate normally, and `from` still evaluates definitions returned by its provider. This removes the previous second evaluation of selected data.
+
+`text.from.splitting` accepts `value` and a non-empty `separator`. `text.from.date` accepts a computed date `value`, a Foundation date `format`, and optional `time_zone` (UTC by default). Formatting uses a Gregorian calendar and POSIX locale. `date.offset` adds a computed number of seconds to an epoch or ISO date before use, for example to format the next UTC day without native mapping code.
+
 `array_reduce` evaluates `next` once per element. During each iteration, the local `item` context contains `item`, `index`, and `accumulator`.
 
 `explain` evaluates a value and returns an object containing `ok`, `value`, `summary`, and displayable `thoughts`. Set `mode` to `"foundation_model"` to add a natural-language `explanation` using Apple's on-device Foundation Models framework when it is available on iOS or macOS. `context` is optional user-facing context that helps the model explain what the computed value affects. On unsupported platforms, unavailable models, or generation failure, `explain` falls back to the trace-only payload. If the explained value fails, `explain` returns `ok: false` with an `error` string instead of throwing.
