@@ -204,6 +204,8 @@ formatting omits `currency`. The default locale is `en_US_POSIX`, so evaluation
 does not inherit a process's display locale. This uses immutable
 [Foundation format styles](https://developer.apple.com/documentation/foundation/floatingpointformatstyle/currency)
 (macOS 12 / iOS 15 or later); older systems report an unsupported-format error.
+Native date values also retain their type through generic JSON slots in templates
+and explanations, so `date` can compose with `this`, `map` and `text`.
 
 `array_reduce` evaluates `next` once per element. During each iteration, the local `item` context contains `item`, `index`, and `accumulator`.
 

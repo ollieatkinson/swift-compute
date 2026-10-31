@@ -5,6 +5,12 @@ public extension JSON {
     init(from decoder: Decoder) throws {
         if let decoder = decoder as? AnyDecoderProtocol {
             let value = Self.unwrapped(decoder.value)
+            // Compute uses native dates between keywords (for example date ->
+            // map -> text). Preserve that existing atom through generic JSON slots.
+            if let date = value as? Date {
+                self.init(date)
+                return
+            }
             if value == nil || value is NSNull || value is Null {
                 self = .null
                 return
