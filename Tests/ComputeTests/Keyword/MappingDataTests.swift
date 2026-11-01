@@ -29,8 +29,9 @@ import Testing
         }
     }
 
-    @Test func http_and_mapping_keep_expression_shaped_response_data_inert() async throws {
-        let data: JSON = ["id": "p1", "title": JSON.returns("error", ["message": "Untrusted response data"])]
+    @Test(arguments: ["error", "missing"])
+    func http_and_mapping_keep_expression_shaped_response_data_inert(keyword: String) async throws {
+        let data: JSON = ["id": "p1", "title": JSON.returns(keyword, ["message": "Untrusted response data"])]
         let http = Compute.Keyword.HTTP.Function { _ in
             .init(data: try JSONEncoder().encode(data), status: 200)
         }

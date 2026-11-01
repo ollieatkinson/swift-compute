@@ -17,23 +17,13 @@ extension JSON {
         return Compute.Invocation(object: object) != nil
     }
 
-    func conceptRoutes(
-        functions: [String: any AnyReturnsKeyword],
-        from route: Compute.Route = .root
-    ) -> [Compute.Route] {
+    func conceptRoutes(from route: Compute.Route = .root) -> [Compute.Route] {
         if let object {
-            if let invocation = Compute.Invocation(object: object) {
-                guard functions[invocation.keyword] != nil else {
-                    return invocation.data.conceptRoutes(
-                        functions: functions,
-                        from: route["{returns}", .key(invocation.keyword)]
-                    )
-                }
-                return [route]
-            }
+            // Syntax identifies an invocation; execution validates capability.
+            // Opaque output and literal boundaries remain the evaluator's job.
+            if Compute.Invocation(object: object) != nil { return [route] }
             return object.sortedEntries.flatMap { key, value in
                 value.conceptRoutes(
-                    functions: functions,
                     from: route[.key(key)]
                 )
             }
@@ -42,7 +32,6 @@ extension JSON {
         if let values = array {
             return values.indexed().flatMap { index, value in
                 value.conceptRoutes(
-                    functions: functions,
                     from: route[.index(index)]
                 )
             }

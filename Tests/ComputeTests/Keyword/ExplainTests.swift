@@ -246,7 +246,7 @@ struct ExplainTests {
                                     ],
                                 ],
                                 "unless": [
-                                    "{returns}": ["from": ["reference": "server.flight.manual_review_required"]],
+                                    ["{returns}": ["from": ["reference": "server.flight.manual_review_required"]]],
                                 ],
                             ],
                         ],
