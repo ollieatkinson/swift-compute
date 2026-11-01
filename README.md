@@ -197,6 +197,16 @@ HTTP response bodies and values selected by `item`, `this`, `either`, `map` and 
 
 `text.from.splitting` accepts `value` and a non-empty `separator`. `text.from.date` accepts a computed date `value`, a Foundation date `format`, and optional `time_zone` (UTC by default). Formatting uses a Gregorian calendar and POSIX locale. `date.offset` adds a computed number of seconds to an epoch or ISO date before use, for example to format the next UTC day without native mapping code.
 
+`text.from.number` formats a computed numeric `value`, with optional `currency`
+and `locale`. For example, `{"value": 72.5, "currency": "GBP", "locale": "en_GB"}`
+produces `£72.50`. Currency precision follows Foundation's currency rules; decimal
+formatting omits `currency`. The default locale is `en_US_POSIX`, so evaluation
+does not inherit a process's display locale. This uses immutable
+[Foundation format styles](https://developer.apple.com/documentation/foundation/floatingpointformatstyle/currency)
+(macOS 12 / iOS 15 or later); older systems report an unsupported-format error.
+Native date values also retain their type through generic JSON slots in templates
+and explanations, so `date` can compose with `this`, `map` and `text`.
+
 `array_reduce` evaluates `next` once per element. During each iteration, the local `item` context contains `item`, `index`, and `accumulator`.
 
 `explain` evaluates a value and returns an object containing `ok`, `value`, `summary`, and displayable `thoughts`. Set `mode` to `"foundation_model"` to add a natural-language `explanation` using Apple's on-device Foundation Models framework when it is available on iOS or macOS. `context` is optional user-facing context that helps the model explain what the computed value affects. On unsupported platforms, unavailable models, or generation failure, `explain` falls back to the trace-only payload. If the explained value fails, `explain` returns `ok: false` with an `error` string instead of throwing.
