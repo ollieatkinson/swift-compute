@@ -77,8 +77,13 @@ public extension JSON {
         try String(decoding: data(options: options.union(.prettyPrinted)), as: UTF8.self)
     }
 
+    /// Freezes a Codable value into JSON. Dates use Unix seconds, byte data uses
+    /// arrays, and numbers follow the same normalization as init(data:).
     static func encoded(_ value: some Encodable) throws -> JSON {
-        try JSON(jsonObject: AnyEncoder().encode(value))
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .secondsSince1970
+        encoder.dataEncodingStrategy = .deferredToData
+        return try JSON(data: encoder.encode(value))
     }
 
     static func decoded<Value: Decodable>(
@@ -103,7 +108,9 @@ public extension JSON {
 
 extension JSON {
     static func unwrapped(_ value: Any?) -> Any? {
-        (value as? _AnyOptional)?.jsonFlattened ?? value
+        guard let value else { return nil }
+        if let optional = value as? _AnyOptional { return optional.jsonFlattened }
+        return value
     }
 }
 
@@ -149,11 +156,30 @@ private extension JSON {
         if CFGetTypeID(value) == CFBooleanGetTypeID() {
             return JSON(value.boolValue)
         }
-        let double = value.doubleValue
-        if double.rounded() == double, let int = Int(exactly: value.int64Value) {
-            return JSON(int)
+        // Decimal JSON literals can carry exact integers that doubleValue
+        // would round before conversion, even when objCType is "d".
+        if let decimal = value as? NSDecimalNumber {
+            if decimal != .notANumber,
+                decimal.compare(NSDecimalNumber(value: Int.min)) != .orderedAscending,
+                decimal.compare(NSDecimalNumber(value: Int.max)) != .orderedDescending,
+                let integer = Int(exactly: decimal.int64Value),
+                decimal.compare(NSDecimalNumber(value: integer)) == .orderedSame {
+                return JSON(integer)
+            }
+            return JSON(decimal.doubleValue)
         }
-        return JSON(double)
+        // Keep integer precision above 2^53. Floating values need a checked
+        // conversion: NSNumber.int64Value can clamp or wrap out-of-range input.
+        switch String(cString: value.objCType) {
+        case "f", "d":
+            let double = value.doubleValue
+            if let int = Int(exactly: double) { return JSON(int) }
+            return JSON(double)
+        case "C", "S", "I", "L", "Q":
+            return unsignedInteger(value.uint64Value)
+        default:
+            return integer(value.int64Value)
+        }
     }
 }
 
@@ -163,8 +189,6 @@ private protocol _AnyOptional {
 
 extension Optional: _AnyOptional {
     var jsonFlattened: Any? {
-        flatMap { value in
-            (value as? _AnyOptional)?.jsonFlattened ?? value
-        }
+        flatMap(JSON.unwrapped)
     }
 }
