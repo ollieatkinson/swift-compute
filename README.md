@@ -137,7 +137,7 @@ The default computer includes these `{returns}` keywords:
 
 - context and literal values: `this`, `item`
 - boolean logic and presence checks: `yes`, `not`, `either`, `exists`
-- comparisons: `comparison` with `match`, `equal`, `less`, `greater`, `less_or_equal`, and `greater_or_equal`, plus `approximately_equal`
+- comparisons: `comparison` with `is`, `match`, `equal`, `less`, `greater`, `less_or_equal`, and `greater_or_equal`, plus `approximately_equal`
 - collection and object helpers: `count`, `contains`, `get`, `map`, `array_map`, `array_filter`, `array_group`, `array_reduce`, `array_slice`, `array_sort`, `array_subscript`, and `array_zip`
 - date and time helpers: `date`, `seconds`
 - text and network values: `text`, `http`
@@ -151,6 +151,22 @@ JSON.returns("get", [
     "path": ["title", "text"],
 ])
 ```
+
+`comparison.is` checks an evaluated value's structural type without converting
+it. Its `type` is one of `array`, `boolean`, `null`, `number`, `object` or `string`:
+
+```json
+{"{returns}": {"comparison": {"is": {
+  "type": "string",
+  "value": {"{returns}": {"item": ["name"]}}
+}}}}
+```
+
+Use it with `yes.if` to guard an operation such as regex matching when a value
+must already be a string. Existing computed String conversion rules remain in
+place. Native atoms outside these JSON representations, such as dates, match none
+of the six kinds. Unknown kind names or missing type-query operands report an
+error rather than silently becoming a false comparison.
 
 Reference values can be added with `Compute.Keyword.From.Function(references:)`. JavaScript evaluation can be added explicitly with `Compute.Keyword.Eval.function`.
 
