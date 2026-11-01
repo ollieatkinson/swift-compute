@@ -74,6 +74,11 @@ public extension JSON {
         case let value as String:
             var container = encoder.singleValueContainer()
             try container.encode(value)
+        case let value as Date:
+            // Pass through the container so the caller's date strategy applies
+            // to native date atoms as it does to ordinary Codable date fields.
+            var container = encoder.singleValueContainer()
+            try container.encode(value)
         case let values as Array:
             var container = encoder.unkeyedContainer()
             for value in values {

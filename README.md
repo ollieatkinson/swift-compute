@@ -267,6 +267,18 @@ The aim is not to make every system depend on one central service with one compl
 
 This follows the broader Thousand Years idea of building tools that help people and systems express their own domains more independently.
 
+## JSON encoding
+
+`JSON.encoded(value)` freezes an `Encodable` value through Foundation's JSON
+encoder. Empty objects and arrays remain distinct from null, nested containers
+work normally, and encoding errors propagate. Dates use seconds since 1970,
+URLs use their Codable string representation, and byte data uses arrays.
+Numbers normalize as they do in `JSON(data:)`; native runtime atoms keep their
+types until this encoding boundary. A native date wrapped in `JSON` also respects
+the date strategy when passed to a caller-configured `JSONEncoder`.
+Wire decoding keeps signed integer precision and checks floating-point ranges
+before converting to `Int`, avoiding NSNumber's clamping or unsigned wrapping.
+
 ## Development
 
 Run the test suite with:
