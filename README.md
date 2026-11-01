@@ -154,6 +154,20 @@ JSON.returns("get", [
 
 Reference values can be added with `Compute.Keyword.From.Function(references:)`. JavaScript evaluation can be added explicitly with `Compute.Keyword.Eval.function`.
 
+An evaluated `{returns}` invocation must name a registered function. For example,
+`comparison.less` is a comparison case, while a standalone `less` keyword is not
+registered. Unsupported invocations report their keyword and route instead of
+silently becoming null. An authored `default` can handle that error; inactive
+branches remain lazy. Quoted values and opaque HTTP/mapping results retain their
+JSON markers as data until explicitly evaluated.
+
+Optional computed inputs distinguish absence from malformed data. An omitted or
+null `condition` retains its existing default, and false remains false. A present
+value that cannot decode as the declared wrapped type throws with its field
+route: malformed `Bool?`, `[Bool]?` and numeric inputs no longer disappear into
+nil/default values. This uses the existing in-memory decoder and its conversion
+rules; native JSON/date atoms and public keyword schemas are unchanged.
+
 `from` detects repeated reference requests along one resolution path and reports
 their names and explicit context, for example `Reference cycle: first -> second -> first`.
 References inside a returned template inherit the enclosing request's effective

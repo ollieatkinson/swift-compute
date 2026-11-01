@@ -52,22 +52,25 @@ public struct Computed<Value: Codable & Sendable>: Codable, Sendable {
             references: frame.references
         )
     }
+}
 
-    private static func decoded(_ value: JSON) throws -> Value {
-        if value == .null, let optional = Value.self as? OptionalProtocol.Type {
-            return optional.nilValue as! Value
-        }
-        return try value.decode(Value.self)
+private func decodeComputedValue<Value: Decodable>(_ value: JSON, as type: Value.Type) throws -> Value {
+    if let optional = Value.self as? OptionalProtocol.Type {
+        return try optional.decoded(value) as! Value
     }
+    return try value.decode(Value.self)
 }
 
 private protocol OptionalProtocol {
-    static var nilValue: Any { get }
+    static func decoded(_ value: JSON) throws -> Self
 }
 
-extension Optional: OptionalProtocol {
-    static var nilValue: Any {
-        Optional<Wrapped>.none as Any
+extension Optional: OptionalProtocol where Wrapped: Decodable {
+    static func decoded(_ value: JSON) throws -> Self {
+        if value.isNull { return nil }
+        // Decode the present wrapped value directly. AnyDecoder's Optional
+        // conversion otherwise turns a malformed value into an absent input.
+        return .some(try decodeComputedValue(value, as: Wrapped.self))
     }
 }
 
@@ -79,8 +82,10 @@ public extension Computed {
         item: JSON? = nil,
         appending suffix: Compute.Route.Component...
     ) async throws -> Value {
-        let computed = try await rawValue.compute(in: field(in: frame, item: item, appending: suffix))
-        return try Self.decoded(computed)
+        let field = try field(in: frame, item: item, appending: suffix)
+        let computed = try await rawValue.compute(in: field)
+        do { return try decodeComputedValue(computed, as: Value.self) }
+        catch { throw JSONError(error, path: field.route.path) }
     }
 }
 

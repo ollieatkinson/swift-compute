@@ -565,7 +565,7 @@ extension Compute {
             functions: [String: any AnyReturnsKeyword],
             routeDependencies: [Compute.Route: Set<Compute.Dependency>]
         ) -> Graph {
-            let routes = document.conceptRoutes(functions: functions)
+            let routes = document.conceptRoutes()
                 .sortedForComputeEvaluation()
             let routeConcepts = Set(routes)
             var state: ComputeBrain.State = [:]
@@ -692,7 +692,9 @@ extension Compute {
             recordThought: Bool = true,
             references: [(request: Compute.Keyword.From, context: Compute.Context)]
         ) async throws -> JSON? {
-            guard let function = functions[keyword] else { return nil }
+            guard let function = functions[keyword] else {
+                throw JSONError("Unregistered Compute keyword \(keyword)", path: route.path)
+            }
             let frame = Compute.Frame(context: context, runtime: self, route: route, depth: depth,
                 references: references)
             var input: JSON
@@ -782,7 +784,9 @@ extension Compute {
         }
 
         func value(keyword: String, data: JSON, frame: Compute.Frame) async throws -> JSON? {
-            guard let function = functions[keyword] else { return nil }
+            guard let function = functions[keyword] else {
+                throw JSONError("Unregistered Compute keyword \(keyword)", path: frame.route.path)
+            }
             if function is any Compute.ReturnsKeywordDefinition {
                 let dependency = Compute.Dependency(keyword: keyword, data: data, depth: frame.depth)
                 let route = dependencyOwner(frame.route.computeObjectRoute(for: keyword))
