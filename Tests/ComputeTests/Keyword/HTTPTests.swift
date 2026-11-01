@@ -5,6 +5,23 @@ import Testing
 @Suite(.serialized)
 struct HTTPTests {
 
+    @Test(arguments: [false, true])
+    func default_subject_reuses_the_resolved_success_or_failure_without_repeating_http(failing: Bool) async throws {
+        let requests = HTTPRequestProbe()
+        let http = Compute.Keyword.HTTP.Function { request in
+            let response = await requests.response(for: request)
+            if failing { throw JSONError("Offline") }
+            return response
+        }
+        let runtime = Compute.Runtime(document: .returns("http_handoff", [
+            "request": ["url": "https://example.com/once", "method": "POST"],
+        ]), functions: [http, HTTPHandoff(http: http)])
+        defer { await runtime.cancel() }
+        #expect(try await runtime.value() == true)
+        let urls = await requests.urls
+        #expect(urls == ["https://example.com/once"])
+    }
+
     @Test func performs_resolved_requests_as_an_async_returns_keyword() async throws {
         let json: JSON = [
             "{returns}": [
@@ -60,7 +77,9 @@ struct HTTPTests {
         await references.set("users_url", to: "https://example.com/users")
         let requests = HTTPRequestProbe()
         let http = Compute.Keyword.HTTP.Function { request in
-            await requests.response(for: request)
+            let response = await requests.response(for: request)
+            if request.url?.path == "/offline" { throw JSONError("Offline") }
+            return response
         }
         let json: JSON = [
             "{returns}": [
@@ -89,10 +108,15 @@ struct HTTPTests {
             "url": "https://example.com/people",
         ]))
 
+        await references.set("users_url", to: "https://example.com/offline")
+        await expectNext(&stream, equals: .failure(JSONError("Offline")))
+        await references.set("users_url", to: "https://example.com/people")
+        await expectNext(&stream, equals: .success([
+            "body": ["ok": true], "headers": [:], "status": 200, "url": "https://example.com/people",
+        ]))
         let urls = await requests.urls
-        #expect(urls.first == "https://example.com/users")
-        #expect(urls.contains("https://example.com/people"))
-        #expect(urls.last == "https://example.com/people")
+        #expect(urls == ["https://example.com/users", "https://example.com/people",
+            "https://example.com/offline", "https://example.com/people"])
 
         await references.finish()
         await runtime.cancel()
@@ -119,6 +143,20 @@ struct HTTPTests {
             "headers": [:],
             "status": 202,
         ])
+    }
+}
+
+private struct HTTPHandoff: Compute.OpaqueOutputKeyword {
+    let name = "http_handoff"
+    let http: Compute.Keyword.HTTP.Function
+    func compute(data: JSON, frame: Compute.Frame) async throws -> JSON? {
+        let initial: Result<JSON, JSONError>
+        do { initial = .success(try await frame.compute(.returns("http", data))) }
+        catch { initial = .failure(JSONError(error)) }
+        var replay = http.subject(data: data, frame: frame, bufferingPolicy: .bufferingNewest(1)).makeAsyncIterator()
+        #expect(await replay.next() == initial)
+        #expect(await replay.next() == nil)
+        return true
     }
 }
 
