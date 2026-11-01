@@ -9,6 +9,11 @@ extension Compute.Keyword {
         public var greater: Greater?
         public var less_or_equal: LessOrEqual?
         public var greater_or_equal: GreaterOrEqual?
+        public var `is`: Is?
+
+        private enum CodingKeys: String, CodingKey {
+            case match, equal, less, greater, less_or_equal, greater_or_equal, `is`
+        }
     }
 
     public struct Match: Codable, Equatable, Sendable {
@@ -42,6 +47,22 @@ extension Compute.Keyword {
     }
 }
 
+extension Compute.Keyword.Comparison {
+    public init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        match = try values.decodeIfPresent(Compute.Keyword.Match.self, forKey: .match)
+        equal = try values.decodeIfPresent(Compute.Keyword.Equal.self, forKey: .equal)
+        less = try values.decodeIfPresent(Compute.Keyword.Less.self, forKey: .less)
+        greater = try values.decodeIfPresent(Compute.Keyword.Greater.self, forKey: .greater)
+        less_or_equal = try values.decodeIfPresent(Compute.Keyword.LessOrEqual.self, forKey: .less_or_equal)
+        greater_or_equal = try values.decodeIfPresent(Compute.Keyword.GreaterOrEqual.self, forKey: .greater_or_equal)
+        // The in-memory decoder's decodeIfPresent can swallow invalid input.
+        // A supplied type query must validate its required operands and kind.
+        self.is = try values.contains(.is) && !values.decodeNil(forKey: .is)
+            ? values.decode(Compute.Keyword.Is.self, forKey: .is) : nil
+    }
+}
+
 extension Compute.Keyword.Comparison: Compute.KeywordDefinition {
     public static let name = "comparison"
 
@@ -63,6 +84,9 @@ extension Compute.Keyword.Comparison: Compute.KeywordDefinition {
         }
         if let greater_or_equal {
             return try await greater_or_equal.compute(in: frame)
+        }
+        if let predicate = self.is {
+            return try await predicate.compute(in: frame)
         }
         return .bool(false)
     }
