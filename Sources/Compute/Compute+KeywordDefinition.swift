@@ -42,11 +42,16 @@ extension Compute.KeywordDefinition {
 extension Compute {
     public protocol ReturnsKeywordDefinition: AnyReturnsKeyword {
         typealias BufferingPolicy = AsyncStream<Result<JSON, JSONError>>.Continuation.BufferingPolicy
+        /// Pure request normalization, after input evaluation and before live
+        /// dependency sharing. Include effective scope in the returned identity.
+        func request(data: JSON, frame: Compute.Frame) async throws -> JSON
         func subject(data: JSON, frame: Compute.Frame, bufferingPolicy: BufferingPolicy) -> AsyncStream<Result<JSON, JSONError>>
     }
 }
 
 extension Compute.ReturnsKeywordDefinition {
+    public func request(data: JSON, frame: Compute.Frame) async throws -> JSON { data }
+
     public func subject(data: JSON, frame: Compute.Frame, bufferingPolicy: BufferingPolicy) -> AsyncStream<Result<JSON, JSONError>> {
         let (stream, continuation) = AsyncStream.makeStream(
             of: Result<JSON, JSONError>.self,

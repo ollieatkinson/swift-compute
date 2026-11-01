@@ -696,24 +696,26 @@ extension Compute {
             let frame = Compute.Frame(context: context, runtime: self, route: route, depth: depth,
                 references: references)
             var input: JSON
-            if function is any Compute.ReturnsKeywordDefinition {
-                input = try await data.compute(in: frame)
+            if let function = function as? any Compute.ReturnsKeywordDefinition {
+                input = try await function.request(data: data.compute(in: frame), frame: frame)
             } else {
                 input = data
             }
             var outputReferences = references
+            var outputContext = context
             if let function = function as? any ReferenceKeyword {
                 let authored = try JSON.decoded(Compute.Keyword.From.self, from: input)
-                    .scoped(to: references.last?.request.context)
+                    .scoped(to: frame.scope)
                 let request = try await function.request(for: authored.reference, context: authored.context)
                 // Effective bindings are also part of the subscription key.
                 // Sibling uses of one template can address different entities.
                 var effective: JSON.Object = ["reference": request.reference]
                 if let context = request.context { effective["context"] = .object(context) }
                 input = .object(effective)
-                let entry = (request: request, context: context)
+                if context.referenceContext != nil { outputContext.referenceContext = request.context }
+                let entry = (request: request, context: outputContext)
                 let repeated = references.contains {
-                    $0.request == request && $0.context == context
+                    $0.request == request && $0.context == outputContext
                 }
                 guard !repeated else {
                     let chain = (references + [entry]).map { $0.request.diagnosticName }.joined(separator: " -> ")
@@ -733,7 +735,7 @@ extension Compute {
             } else {
                 output = try await rawOutput?.compute(
                     in: Compute.Frame(
-                        context: context,
+                        context: outputContext,
                         runtime: self,
                         route: route.computeObjectRoute(for: keyword),
                         depth: depth + 1,

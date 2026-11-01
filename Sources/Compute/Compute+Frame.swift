@@ -8,6 +8,18 @@ extension Compute {
         // Immutable branch ancestry; sibling evaluations never share a mutable stack.
         let references: [(request: Compute.Keyword.From, context: Compute.Context)]
 
+        /// Effective reference defaults at this branch. Explicit `from` context
+        /// and canonical provider bindings may narrow them further.
+        public var scope: [String: JSON]? { context.referenceContext ?? references.last?.request.context }
+
+        /// An immutable branch scope. Siblings retain their original bindings,
+        /// item, route, depth, reference ancestry and dependency owner.
+        public func scoped(to bindings: [String: JSON]) -> Frame {
+            var context = context
+            context.referenceContext = (scope ?? [:]).merging(bindings) { _, narrower in narrower }
+            return Frame(context: context, runtime: runtime, route: route, depth: depth, references: references)
+        }
+
         init(
             context: Compute.Context,
             runtime: Compute.FunctionRuntime,
