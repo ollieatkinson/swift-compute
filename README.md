@@ -279,6 +279,11 @@ the date strategy when passed to a caller-configured `JSONEncoder`.
 Wire decoding keeps signed integer precision and checks floating-point ranges
 before converting to `Int`, avoiding NSNumber's clamping or unsigned wrapping.
 
+Decoding an existing `JSON` as `JSON` is an identity operation, including through
+generic `decode`/`decoded` calls and computed JSON slots. It preserves native
+atoms and opaque data without a Foundation conversion or another decoder pass.
+Other destination types continue through their existing Codable decoder.
+
 ## Development
 
 Run the test suite with:
