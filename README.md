@@ -222,6 +222,11 @@ does not inherit a process's display locale. This uses immutable
 (macOS 12 / iOS 15 or later); older systems report an unsupported-format error.
 Native date values also retain their type through generic JSON slots in templates
 and explanations, so `date` can compose with `this`, `map` and `text`.
+`date.from.iso` accepts internet timestamps with or without fractional seconds,
+including `Z` and numeric timezone offsets. It preserves the instant and fraction
+before applying `date.offset`; callers do not need to rewrite a timestamp string.
+Parsing uses Foundation's value-based ISO format style where available, retaining
+the package's existing deployment range with a local formatter fallback.
 
 `array_reduce` evaluates `next` once per element. During each iteration, the local `item` context contains `item`, `index`, and `accumulator`.
 
