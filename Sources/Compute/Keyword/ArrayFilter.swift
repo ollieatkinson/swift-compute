@@ -6,7 +6,7 @@ extension Compute.Keyword {
     }
 }
 
-extension Compute.Keyword.ArrayFilter: Compute.KeywordDefinition {
+extension Compute.Keyword.ArrayFilter: Compute.OpaqueOutputKeywordDefinition {
     public static let name = "array_filter"
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {

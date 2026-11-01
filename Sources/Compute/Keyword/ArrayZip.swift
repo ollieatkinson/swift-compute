@@ -10,7 +10,7 @@ extension Compute.Keyword {
     }
 }
 
-extension Compute.Keyword.ArrayZip: Compute.KeywordDefinition {
+extension Compute.Keyword.ArrayZip: Compute.OpaqueOutputKeywordDefinition {
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
         let arrays = try await $together.compute(in: frame)
         guard let count = arrays.map(\.count).min(), count > 0 else {

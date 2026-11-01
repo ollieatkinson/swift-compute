@@ -7,6 +7,7 @@ extension Compute.Keyword {
 
         @Computed public var since: Since?
         @Computed public var from: From?
+        @Computed public var offset: TimeInterval?
 
         public struct Since: Codable, Equatable, Sendable {
             @Computed public var epoch: TimeInterval?
@@ -21,13 +22,13 @@ extension Compute.Keyword {
 extension Compute.Keyword.Date: Compute.KeywordDefinition {
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
         if let since = try await $since.compute(in: frame), let epoch = try await since.$epoch.compute(in: frame["since"]) {
-            return JSON(Foundation.Date(timeIntervalSince1970: epoch))
+            return JSON(Foundation.Date(timeIntervalSince1970: epoch).addingTimeInterval(try await $offset.compute(in: frame) ?? 0))
         }
 
     out:
         if let from = try await $from.compute(in: frame), let iso = try await from.$iso.compute(in: frame["from"]) {
             guard let date = Self.isoDateFormatter.date(from: iso) else { break out }
-            return JSON(date)
+            return JSON(date.addingTimeInterval(try await $offset.compute(in: frame) ?? 0))
         }
 
         throw JSONError(
