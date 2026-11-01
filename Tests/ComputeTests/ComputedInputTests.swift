@@ -1,7 +1,30 @@
 import Compute
+import Foundation
 import Testing
 
 @Suite(.timeLimit(.minutes(1))) struct ComputedInputTests {
+    @Test func required_and_optional_json_slots_preserve_native_data_and_null_semantics() async throws {
+        let date = Date(timeIntervalSince1970: 1_704_067_200.25)
+        let opaque = JSONError("Source data", path: ["opaque"])
+        let payload: JSON = ["date": JSON(date), "error": JSON(opaque),
+            "nested": [true, 1, "1", .null, [], [:]],
+            "deferred": .returns("unregistered", [:])]
+        let item = JSON.returns("item", [])
+        for document in [JSON.returns("this", ["value": item]), .returns("map", ["src": item, "dst": item])] {
+            let runtime = Compute.Runtime(document: document, context: Compute.Context(item: payload))
+            defer { await runtime.cancel() }
+            let result = try await runtime.value()
+            #expect(result == payload)
+            #expect(result["date"].rawValue as? Date == date && result["error"].rawValue as? JSONError == opaque)
+        }
+        let null = Compute.Runtime(document: .returns("this", ["value": item]), context: Compute.Context(item: .null))
+        defer { await null.cancel() }
+        #expect(try await null.value() == .null)
+        let optional = Compute.Runtime(document: .returns("map", ["src": ["base": true], "dst": .null]))
+        defer { await optional.cancel() }
+        #expect(try await optional.value() == ["base": true])
+    }
+
     @Test(arguments: ["this", "either"])
     func malformed_present_conditions_fail_at_the_field_instead_of_selecting_a_branch(keyword: String) async throws {
         for condition: JSON in [["unexpected": true], "not-a-boolean"] {

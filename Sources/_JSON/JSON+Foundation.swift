@@ -90,7 +90,7 @@ public extension JSON {
         _ type: Value.Type = Value.self,
         from value: JSON
     ) throws -> Value {
-        try AnyDecoder().decode(Value.self, from: value.any)
+        try value.decode(type)
     }
 
     static func decoded(_ type: JSON.Type = JSON.self, from value: JSON) -> JSON {
@@ -98,7 +98,10 @@ public extension JSON {
     }
 
     func decode<Value: Decodable>(_ type: Value.Type = Value.self) throws -> Value {
-        try AnyDecoder().decode(Value.self, from: any)
+        // Generic overload resolution cannot select the concrete JSON identity
+        // overload. The exact type check makes this cast an identity operation.
+        if Value.self == JSON.self { return self as! Value }
+        return try AnyDecoder().decode(Value.self, from: any)
     }
 
     func decode(_ type: JSON.Type = JSON.self) -> JSON {
