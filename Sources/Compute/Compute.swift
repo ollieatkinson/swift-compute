@@ -8,6 +8,7 @@ public enum Compute {
 
     public struct Context: Equatable, Sendable {
         public var item: JSON?
+        var referenceContext: [String: JSON]?
 
         public init(item: JSON? = nil) {
             self.item = item

@@ -166,6 +166,17 @@ request. Normalization runs before dependency sharing, cycle detection and neste
 scope propagation; it should deterministically describe identity without fetching
 the value or opening a subscription. Compute does not prescribe a reference schema.
 Different request contexts, changing local items, and repeated reads in sibling branches remain independent.
+Custom keywords can project independent rows with `frame.scoped(to: bindings)`.
+This copies the branch's effective reference defaults while retaining its item,
+route, depth and reference ancestry. `frame.scope` exposes those defaults to other
+provider-backed keywords. Explicit `from` context and canonical native bindings
+still win, including in returned templates. Sibling branches retain their own
+bindings and live dependencies; this adds no authored keyword or reference schema.
+Streaming keywords whose identity depends on branch scope should implement
+`ReturnsKeywordDefinition.request(data:frame:)`. It receives evaluated input and
+returns the effective request used by both execution and subscription sharing.
+The default returns the input unchanged; normalization must not fetch values or
+open subscriptions.
 Live cycles keep their upstream observations and can recover when a source changes;
 an authored `default` can also handle the diagnostic. The existing recursion limit
 still bounds long returned-compute chains and arbitrary generated compute loops.
