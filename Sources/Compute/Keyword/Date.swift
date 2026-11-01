@@ -27,20 +27,29 @@ extension Compute.Keyword.Date: Compute.KeywordDefinition {
 
     out:
         if let from = try await $from.compute(in: frame), let iso = try await from.$iso.compute(in: frame["from"]) {
-            guard let date = Self.isoDateFormatter.date(from: iso) else { break out }
+            guard let date = Self.date(from: iso) else { break out }
             return JSON(date.addingTimeInterval(try await $offset.compute(in: frame) ?? 0))
         }
 
         throw JSONError(
             """
-            Not a valid date, must be a time interval from epoch or an RFC 8601 date string with fractional seconds
+            Not a valid date, must be a time interval from epoch or an ISO 8601 timestamp with a time zone
             """
         )
     }
 
-    private static var isoDateFormatter: ISO8601DateFormatter {
+    private static func date(from source: String) -> Foundation.Date? {
+        if #available(macOS 12, iOS 15, tvOS 15, watchOS 8, *) {
+            let fractional = Foundation.Date.ISO8601FormatStyle(timeZoneSeparator: .colon, includingFractionalSeconds: true)
+            if let date = (try? fractional.parse(source))
+                ?? (try? Foundation.Date.ISO8601FormatStyle(timeZoneSeparator: .colon).parse(source)) {
+                return date
+            }
+        }
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
+        if let date = formatter.date(from: source) { return date }
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: source)
     }
 }
