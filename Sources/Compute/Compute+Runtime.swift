@@ -769,6 +769,18 @@ extension Compute {
             }
         }
 
+        /// A default one-shot subject replays the read already used to settle
+        /// this dependency. Custom streaming subjects still open their source.
+        func result(for dependency: Compute.Dependency) -> Result<JSON, JSONError>? {
+            if let signal = dependencyState[.dependency(dependency)] {
+                switch signal {
+                case .value(let value): return .success(value)
+                case .failure(let error): return .failure(error)
+                }
+            }
+            return results[dependency] ?? resolved[dependency]
+        }
+
         func value(keyword: String, data: JSON, frame: Compute.Frame) async throws -> JSON? {
             guard let function = functions[keyword] else { return nil }
             if function is any Compute.ReturnsKeywordDefinition {

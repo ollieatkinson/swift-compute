@@ -57,9 +57,14 @@ extension Compute.ReturnsKeywordDefinition {
             of: Result<JSON, JSONError>.self,
             bufferingPolicy: bufferingPolicy
         )
-        let task = Task {
+        let task = Task { @concurrent in
             do {
-                if let value = try await compute(data: data, frame: frame) {
+                let dependency = Compute.Dependency(keyword: name, data: data, depth: frame.depth)
+                let initial = await frame.runtime.result(for: dependency)
+                try Task.checkCancellation()
+                if let initial {
+                    continuation.yield(initial)
+                } else if let value = try await compute(data: data, frame: frame) {
                     continuation.yield(.success(value))
                 }
             } catch {

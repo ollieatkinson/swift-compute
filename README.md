@@ -177,6 +177,11 @@ Streaming keywords whose identity depends on branch scope should implement
 returns the effective request used by both execution and subscription sharing.
 The default returns the input unchanged; normalization must not fetch values or
 open subscriptions.
+The default one-shot subject replays an already resolved initial success or
+failure instead of executing the request again during read-to-observe setup.
+Starting HTTP observation therefore no longer repeats the initial request;
+changing its input starts new work. Custom streaming subjects still establish
+their live source observation.
 Live cycles keep their upstream observations and can recover when a source changes;
 an authored `default` can also handle the diagnostic. The existing recursion limit
 still bounds long returned-compute chains and arbitrary generated compute loops.
