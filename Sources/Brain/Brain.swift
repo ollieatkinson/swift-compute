@@ -218,6 +218,9 @@ public actor Brain<Lemma, Signal>: Sendable where Lemma: Hashable & Sendable, Si
         limit: Int? = nil,
         thinking: Thinking
     ) async throws -> BrainCommit<Lemma, Signal> {
+        // The caller may have been cancelled while waiting for the gate. Do
+        // not consume staged changes or reset the graph for that evaluation.
+        try Task.checkCancellation()
         if let resetState, let resetConcepts {
             resetUnlocked(to: resetState, concepts: resetConcepts, staging: stagedChanges)
         } else if !stagedChanges.isEmpty {
