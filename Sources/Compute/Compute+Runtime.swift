@@ -110,6 +110,11 @@ extension Compute {
         private var cancelledThroughVersion: UInt64 = 0
         private var dependencyVersions: [Compute.Route: UInt64] = [:]
         private var dependencyGraphVersion: UInt64 = 0
+        private var dependencyGraphNeedsUpdate = false
+        private var liveEvaluation: Task<Void, Never>?
+        private var liveEvaluationVersion: UInt64 = 0
+        private var liveChanges: ComputeBrain.State = [:]
+        private var liveReset = false
 
         public init(
             document: JSON,
@@ -138,6 +143,7 @@ extension Compute {
         }
 
         deinit {
+            liveEvaluation?.cancel()
             for subscription in subscriptions.values {
                 subscription.cancel()
             }
@@ -206,15 +212,7 @@ extension Compute {
             guard !Task.isCancelled else { return }
             routeContinuations[route, default: [:]][id] = RouteContinuation(continuation: continuation)
             observedRoutes.insert(route)
-            let version = beginEvaluation()
-            do {
-                try await settle(subscribe: true, reset: true, version: version)
-            } catch {
-                if version > cancelledThroughVersion, version >= finishedEvaluationVersion, !Task.isCancelled {
-                    finishedEvaluationVersion = version
-                    yield(.failure(JSONError(error)), to: route)
-                }
-            }
+            startLiveEvaluation(reset: true)
         }
 
         private func removeRouteContinuation(id: UUID, route: Compute.Route) {
@@ -241,7 +239,7 @@ extension Compute {
             } else {
                 graph = nil
             }
-            let runtime = functionRuntime()
+            let runtime = functionRuntime(liveVersion: subscribe ? version : nil)
             let commit: BrainCommit<Compute.Lemma, Compute.Signal>
             do {
                 if let graph {
@@ -298,7 +296,8 @@ extension Compute {
                 remainingThoughts: commit.remainingThoughts
             )
             await synchronizeDependencies(runtime: runtime, subscribe: subscribe, version: version)
-            guard version > cancelledThroughVersion, version >= finishedEvaluationVersion else { return step }
+            guard version > cancelledThroughVersion, version >= finishedEvaluationVersion,
+                !Task.isCancelled else { return step }
             finishedEvaluationVersion = version
             if !thoughts.isEmpty { latestThoughts = thoughts }
             if publishWhenSettled, !step.isThinking {
@@ -319,19 +318,39 @@ extension Compute {
                     if let result = resolved[dependency] { results[dependency] = result }
                 }
             }
-            if changed {
-                let graph = Self.graph(
-                    document: document,
-                    functions: functions,
-                    routeDependencies: routeDependencies
-                )
-                routeConcepts = graph.routeConcepts
-                dependencyGraphVersion &+= 1
-                await brain.update(concepts: graph.concepts, version: dependencyGraphVersion)
-            }
+            if changed { dependencyGraphNeedsUpdate = true }
+            await updateDependencyGraph()
             if version > cancelledThroughVersion, !Task.isCancelled, subscribe || !observedRoutes.isEmpty {
                 resubscribe(to: Array(routeDependencies.values.flatMap { $0 }))
             }
+        }
+
+        private func updateDependencyGraph() async {
+            guard dependencyGraphNeedsUpdate else { return }
+            dependencyGraphNeedsUpdate = false
+            let graph = Self.graph(document: document, functions: functions,
+                routeDependencies: routeDependencies)
+            routeConcepts = graph.routeConcepts
+            dependencyGraphVersion &+= 1
+            await brain.update(concepts: graph.concepts, version: dependencyGraphVersion)
+        }
+
+        /// Observe a resolved input before evaluating the expression it returned.
+        /// Otherwise a pending descendant prevents its parent from ever going live.
+        private func resolved(
+            _ result: Result<JSON, JSONError>,
+            dependency: Compute.Dependency,
+            route: Compute.Route,
+            version: UInt64
+        ) {
+            guard version == liveEvaluationVersion, version > cancelledThroughVersion,
+                version >= dependencyVersions[route, default: 0], !Task.isCancelled else { return }
+            dependencyVersions[route] = version
+            if results[dependency] == nil { results[dependency] = result }
+            if routeDependencies[route, default: []].insert(dependency).inserted {
+                dependencyGraphNeedsUpdate = true
+            }
+            subscribe(to: dependency)
         }
 
         private func merge(_ tracked: [Compute.Route: Set<Compute.Dependency>], version: UInt64) -> Bool {
@@ -358,26 +377,35 @@ extension Compute {
                 results[dependency] = nil
             }
             for dependency in next where subscriptions[dependency] == nil {
-                guard let function = functions[dependency.keyword] as? any Compute.ReturnsKeywordDefinition else { continue }
-                let frame = Compute.Frame(
-                    context: context ?? Compute.Context(),
-                    runtime: functionRuntime(),
-                    route: .root,
-                    depth: dependency.depth,
-                    references: []
-                )
-                subscriptions[dependency] = Task { [weak self] in
-                    for await result in function.subject(data: dependency.data, frame: frame, bufferingPolicy: .unbounded) {
-                        if Task.isCancelled { return }
-                        guard let self else { return }
-                        await self.apply(result, to: dependency)
-                    }
+                subscribe(to: dependency)
+            }
+        }
+
+        private func subscribe(to dependency: Compute.Dependency) {
+            guard subscriptions[dependency] == nil,
+                let function = functions[dependency.keyword] as? any Compute.ReturnsKeywordDefinition else { return }
+            let frame = Compute.Frame(
+                context: context ?? Compute.Context(),
+                runtime: functionRuntime(),
+                route: .root,
+                depth: dependency.depth,
+                references: []
+            )
+            subscriptions[dependency] = Task { [weak self] in
+                for await result in function.subject(data: dependency.data, frame: frame, bufferingPolicy: .unbounded) {
+                    if Task.isCancelled { return }
+                    guard let self else { return }
+                    await self.apply(result, to: dependency)
                 }
             }
         }
 
         private func cancelSubscriptionsIfIdle() {
             guard observedRoutes.isEmpty else { return }
+            liveEvaluation?.cancel()
+            liveEvaluation = nil
+            liveChanges.removeAll()
+            liveReset = false
             for (dependency, subscription) in subscriptions {
                 subscription.cancel()
                 results[dependency] = nil
@@ -397,17 +425,41 @@ extension Compute {
             case .failure(let error):
                 signal = .failure(error)
             }
-            await brain.stage([.dependency(dependency): signal])
-            guard !Task.isCancelled, subscriptions[dependency] != nil else { return }
+            startLiveEvaluation(staging: [.dependency(dependency): signal])
+        }
+
+        private func startLiveEvaluation(reset: Bool = false, staging changes: ComputeBrain.State = [:]) {
+            liveEvaluation?.cancel()
+            liveChanges.merge(changes) { _, new in new }
+            liveReset = liveReset || reset
             let version = beginEvaluation()
+            liveEvaluationVersion = version
+            liveEvaluation = Task { [weak self] in
+                guard let self else { return }
+                await self.evaluateLive(version: version)
+            }
+        }
+
+        private func evaluateLive(version: UInt64) async {
             do {
-                try await settle(subscribe: true, version: version)
+                try Task.checkCancellation()
+                await updateDependencyGraph()
+                try Task.checkCancellation()
+                let changes = liveChanges
+                liveChanges.removeAll(keepingCapacity: true)
+                await brain.stage(changes)
+                try Task.checkCancellation()
+                let reset = liveReset
+                try await settle(subscribe: true, reset: reset, version: version)
+                if version == liveEvaluationVersion { liveReset = false }
             } catch {
-                if version > cancelledThroughVersion, version >= finishedEvaluationVersion, !Task.isCancelled {
+                if version == liveEvaluationVersion, version > cancelledThroughVersion,
+                    version >= finishedEvaluationVersion, !Task.isCancelled {
                     finishedEvaluationVersion = version
                     publishFailure(JSONError(error))
                 }
             }
+            if version == liveEvaluationVersion { liveEvaluation = nil }
         }
 
         private func publishFailure(_ error: JSONError) {
@@ -419,6 +471,11 @@ extension Compute {
         public func cancel() async {
             evaluationVersion &+= 1
             cancelledThroughVersion = evaluationVersion
+            let runningEvaluation = liveEvaluation
+            liveEvaluation?.cancel()
+            liveEvaluation = nil
+            liveChanges.removeAll()
+            liveReset = false
             let running = Array(subscriptions.values)
             for subscription in subscriptions.values {
                 subscription.cancel()
@@ -436,6 +493,7 @@ extension Compute {
             for task in running {
                 await task.value
             }
+            await runningEvaluation?.value
         }
 
         private func publish(_ state: JSON) {
@@ -460,11 +518,17 @@ extension Compute {
             routeContinuations[route] = continuations
         }
 
-        private func functionRuntime() -> Compute.FunctionRuntime {
+        private func functionRuntime(liveVersion: UInt64? = nil) -> Compute.FunctionRuntime {
             let routes = routeConcepts
-            return Compute.FunctionRuntime(functions: functions, results: results) { route in
-                route.nearestAncestor(in: routes) ?? route
-            }
+            let didResolve: Compute.FunctionRuntime.Resolved?
+            if let version = liveVersion {
+                didResolve = { [weak self] route, dependency, result in
+                    await self?.resolved(result, dependency: dependency, route: route, version: version)
+                }
+            } else { didResolve = nil }
+            return Compute.FunctionRuntime(functions: functions, results: results,
+                dependencyOwner: { route in route.nearestAncestor(in: routes) ?? route },
+                didResolve: didResolve)
         }
 
         private func thinking(with runtime: Compute.FunctionRuntime) -> ComputeBrain.Thinking {
@@ -487,6 +551,7 @@ extension Compute {
             }
             await runtime.trackDependencies(for: route, state: state)
             let step = try await Self.evaluate(object, at: route, runtime: runtime, context: context)
+            try Task.checkCancellation()
             var nextState = state
             nextState[.route(route)] = .value(step.output)
             let nextDocument = try document(from: nextState)
@@ -665,9 +730,11 @@ extension Compute {
 
 extension Compute {
     actor FunctionRuntime {
+        typealias Resolved = @Sendable (Compute.Route, Compute.Dependency, Result<JSON, JSONError>) async -> Void
         private let functions: [String: any AnyReturnsKeyword]
         private let results: [Compute.Dependency: Result<JSON, JSONError>]
         private let dependencyOwner: @Sendable (Compute.Route) -> Compute.Route
+        private let didResolve: Resolved?
         private var dependencyState: [Compute.Lemma: Compute.Signal] = [:]
         private var resolved: [Compute.Dependency: Result<JSON, JSONError>] = [:]
         private var tracked: [Compute.Route: Set<Compute.Dependency>] = [:]
@@ -676,11 +743,13 @@ extension Compute {
         init(
             functions: [String: any AnyReturnsKeyword],
             results: [Compute.Dependency: Result<JSON, JSONError>],
-            dependencyOwner: @escaping @Sendable (Compute.Route) -> Compute.Route
+            dependencyOwner: @escaping @Sendable (Compute.Route) -> Compute.Route,
+            didResolve: Resolved? = nil
         ) {
             self.functions = functions
             self.results = results
             self.dependencyOwner = dependencyOwner
+            self.didResolve = didResolve
         }
 
         func compute(
@@ -692,6 +761,7 @@ extension Compute {
             recordThought: Bool = true,
             references: [(request: Compute.Keyword.From, context: Compute.Context)]
         ) async throws -> JSON? {
+            try Task.checkCancellation()
             guard let function = functions[keyword] else {
                 throw JSONError("Unregistered Compute keyword \(keyword)", path: route.path)
             }
@@ -796,20 +866,26 @@ extension Compute {
                     // this evaluation captured its cache. Read the same state
                     // that triggered this route, rather than consuming its
                     // change with an older cached input.
+                    let current: Result<JSON, JSONError>
                     if let signal = dependencyState[.dependency(dependency)] {
                         switch signal {
-                        case .value(let value): return value
-                        case .failure(let error): throw error
+                        case .value(let value): current = .success(value)
+                        case .failure(let error): current = .failure(error)
                         }
-                    }
-                    return try result.get()
+                    } else { current = result }
+                    await didResolve?(route, dependency, current)
+                    return try current.get()
                 }
                 do {
                     let value = try await function.compute(data: data, frame: frame)
-                    if let value { resolved[dependency] = .success(value) }
+                    if let value {
+                        resolved[dependency] = .success(value)
+                        await didResolve?(route, dependency, .success(value))
+                    }
                     return value
                 } catch {
                     resolved[dependency] = .failure(JSONError(error))
+                    await didResolve?(route, dependency, .failure(JSONError(error)))
                     throw error
                 }
             }

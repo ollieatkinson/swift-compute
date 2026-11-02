@@ -89,6 +89,7 @@ extension JSON {
         depth: Int,
         references: [(request: Compute.Keyword.From, context: Compute.Context)]
     ) async throws -> JSON {
+        try Task.checkCancellation()
         if let object {
             if let invocation = Compute.Invocation(object: object) {
                 guard depth < 20 else {
