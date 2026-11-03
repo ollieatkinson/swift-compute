@@ -74,7 +74,8 @@ extension JSON {
 
     func compute(in frame: Compute.Frame) async throws -> JSON {
         try await compute(context: frame.context, runtime: frame.runtime, route: frame.route,
-            depth: frame.depth, references: frame.references)
+                          depth: frame.depth, references: frame.references,
+                          captures: frame.captures)
     }
 
     private func compute(
@@ -82,7 +83,8 @@ extension JSON {
         runtime: Compute.FunctionRuntime,
         route: Compute.Route = .root,
         depth: Int,
-        references: [(request: Compute.Keyword.From, context: Compute.Context)]
+        references: [(request: Compute.Keyword.From, context: Compute.Context)],
+        captures: [UInt64]
     ) async throws -> JSON {
         try Task.checkCancellation()
         if let object {
@@ -99,7 +101,8 @@ extension JSON {
                         context: context,
                         route: functionRoute,
                         depth: depth,
-                        references: references
+                        references: references,
+                        captures: captures
                     ) {
                         return value
                     }
@@ -110,7 +113,8 @@ extension JSON {
                             runtime: runtime,
                             route: route["default"],
                             depth: depth,
-                            references: references
+                            references: references,
+                            captures: captures
                         )
                     }
                     throw error
@@ -121,7 +125,8 @@ extension JSON {
                         runtime: runtime,
                         route: route["default"],
                         depth: depth,
-                        references: references
+                        references: references,
+                        captures: captures
                     )
                 }
                 return .null
@@ -134,7 +139,8 @@ extension JSON {
                     runtime: runtime,
                     route: route[.key(key)],
                     depth: depth,
-                    references: references
+                    references: references,
+                    captures: captures
                 )
             }
             return .object(computed)
@@ -148,7 +154,8 @@ extension JSON {
                     runtime: runtime,
                     route: route[.index(index)],
                     depth: depth,
-                    references: references
+                    references: references,
+                    captures: captures
                 ))
             }
             return .array(computed)
@@ -162,14 +169,16 @@ extension JSON {
         runtime: Compute.FunctionRuntime,
         route: Compute.Route,
         depth: Int,
-        references: [(request: Compute.Keyword.From, context: Compute.Context)]
+        references: [(request: Compute.Keyword.From, context: Compute.Context)],
+        captures: [UInt64]
     ) async throws -> JSON {
         let output = try await compute(
             context: context,
             runtime: runtime,
             route: route,
             depth: depth,
-            references: references
+            references: references,
+            captures: captures
         )
         await runtime.record(Compute.Thought(
             route: route,
@@ -178,7 +187,7 @@ extension JSON {
             kind: .defaultValue,
             input: self,
             output: output
-        ))
+        ), captures: captures)
         return output
     }
 }
