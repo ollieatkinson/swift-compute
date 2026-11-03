@@ -15,6 +15,13 @@ public extension JSON {
                 self = .null
                 return
             }
+            // AnyDecoder already exposes the literal tree. Reuse the existing
+            // normalizer instead of rebuilding it through Codable containers.
+            // Other native atoms retain the container decoding path below.
+            if let literal = try? Self(jsonObject: value) {
+                self = literal
+                return
+            }
         }
 
         if let container = try? decoder.singleValueContainer() {

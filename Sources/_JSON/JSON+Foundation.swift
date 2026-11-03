@@ -37,10 +37,10 @@ public extension JSON {
             self.init(value as! Double)
         default:
             switch value {
-            case let value as NSNumber:
-                self = Self.number(value)
             case let value as String:
                 self.init(value)
+            case let value as NSNumber:
+                self = Self.number(value)
             case let value as JSON:
                 self = value
             case let values as Array:

@@ -3,6 +3,15 @@ import Foundation
 import Testing
 
 @Suite(.timeLimit(.minutes(1))) struct ComputedInputTests {
+    @Test(arguments: ["true", "false", "1", "1.25", "null", ""])
+    func literal_json_slots_preserve_strings_and_nested_values_without_scalar_coercion(
+        text: String
+    ) async throws {
+        let input: JSON = ["text": .string(text), "nested": [.string(text), true, 1, .null]]
+        try await expect(.returns("this", ["value": input]), equals: input)
+        try await expect(.returns("this", ["value": .string(text)]), equals: .string(text))
+    }
+
     @Test func required_and_optional_json_slots_preserve_native_data_and_null_semantics() async throws {
         let date = Date(timeIntervalSince1970: 1_704_067_200.25)
         let opaque = JSONError("Source data", path: ["opaque"])

@@ -3,6 +3,26 @@ import _JSON
 import Testing
 
 @Suite struct JSONEncodingTests {
+    @Test func foundation_strings_and_numbers_keep_literal_types_in_nested_containers() throws {
+        let native: [String: Any] = [
+            "strings": ["true", "false", "1", "8.0", "1e6", "Blue", "Oz"].map { $0 as NSString },
+            "values": [NSNumber(value: true), NSNumber(value: false), NSNumber(value: 1),
+                NSNumber(value: 8.0), NSNumber(value: 1.25), NSNull()],
+            "integer": NSNumber(value: Int64.max),
+            "empty": [String: Any](),
+        ]
+        let expected: JSON = [
+            "strings": ["true", "false", "1", "8.0", "1e6", "Blue", "Oz"],
+            "values": [true, false, 1, 8, 1.25, .null],
+            "integer": .int(Int.max),
+            "empty": [:],
+        ]
+        #expect(try JSON(jsonObject: native) == expected)
+        #expect(try JSON(data: JSONSerialization.data(withJSONObject: native)) == expected)
+        #expect(try JSON(jsonObject: .double(8) as JSON) == .double(8))
+        #expect(try JSON(jsonObject: Double(8)) == .double(8))
+    }
+
     @Test(arguments: [
             ("9007199254740993.0", 9_007_199_254_740_993),
             ("9.007199254740993e15", 9_007_199_254_740_993),
