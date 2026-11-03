@@ -1,5 +1,6 @@
 import _JSON
 import Algorithms
+import Foundation
 
 extension Compute.Keyword {
     public struct ArraySort: Codable, Equatable, Sendable {
@@ -50,6 +51,9 @@ extension Compute.Keyword.ArraySort.Predicate {
         let rhs = value(in: rhs)
         guard lhs != rhs else {
             return nil
+        }
+        if let left = lhs.rawValue as? Date, let right = rhs.rawValue as? Date {
+            return order == .ascending ? left < right : left > right
         }
         let ordered: Bool?
         switch (lhs.number, rhs.number) {

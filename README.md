@@ -143,6 +143,11 @@ The default computer includes these `{returns}` keywords:
 - text and network values: `text`, `http`
 - diagnostics and explanation: `error`, `explain`
 
+`array_sort` compares numbers, strings and native date values (including `date`
+keyword results). Equal keys preserve input order unless a later predicate
+distinguishes them. ISO strings remain strings; parse them before sorting to
+compare instants across different UTC offsets.
+
 `get` evaluates its `value`, then selects a literal `path` of string keys and integer indices (negative indices count from the end). An empty path returns the evaluated value. Missing paths, invalid containers and out-of-bounds indices fail; explicit nulls remain values. The selected output is not evaluated again, preserving deferred expressions returned by opaque keywords.
 
 ```swift

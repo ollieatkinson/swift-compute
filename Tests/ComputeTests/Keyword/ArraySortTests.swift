@@ -1,4 +1,5 @@
 import Compute
+import Foundation
 import Testing
 
 @Suite(.serialized)
@@ -26,6 +27,32 @@ struct ArraySortTests {
             ["name": "c", "rank": 2],
             ["name": "b", "rank": 2],
         ])
+    }
+
+    @Test(arguments: [Compute.Keyword.ArraySort.Order.ascending, .descending])
+    func sorts_native_dates_by_instant_and_keeps_equal_dates_stable(
+        order: Compute.Keyword.ArraySort.Order
+    ) async throws {
+        func date(_ iso: String) -> JSON {
+            ["{returns}": ["date": ["from": ["iso": .string(iso)]]]]
+        }
+        let late = date("1970-01-01T02:00:00Z")
+        let early = date("1970-01-01T02:00:00+01:00")
+        let same = date("1970-01-01T01:00:00Z")
+        let result = try await value(["{returns}": ["array_sort": [
+            "array": [["name": "late", "time": late],
+                      ["name": "early", "time": early],
+                      ["name": "same", "time": same]],
+            "predicates": [["key_path": ["time"], "order": .string(order.rawValue)]]
+        ]]])
+        #expect(result.array?.compactMap { $0.object?["name"]?.string } ==
+            (order == .ascending ? ["early", "same", "late"] : ["late", "early", "same"]))
+        let first = JSON(Date(timeIntervalSince1970: 3600))
+        let last = JSON(Date(timeIntervalSince1970: 7200))
+        try await expect(["{returns}": ["array_sort": [
+            "array": [late, early],
+            "predicates": [["order": .string(order.rawValue)]]
+        ]]], equals: .array(order == .ascending ? [first, last] : [last, first]))
     }
 
     @Test func returns_identity_without_predicates() async throws {
