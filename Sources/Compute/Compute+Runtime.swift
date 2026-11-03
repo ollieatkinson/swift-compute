@@ -101,6 +101,9 @@ extension Compute {
         private let functions: [String: any AnyReturnsKeyword]
         private let brain: ComputeBrain
         private var routeConcepts: Set<Compute.Route>
+        // The compiled graph can briefly differ from requested observations
+        // while a whole-document read or a newer live evaluation is in flight.
+        private var graphDemand: Set<Compute.Route>?
         private var routeDependencies: [Compute.Route: Set<Compute.Dependency>] = [:]
         private var latestThoughts: [Compute.Thought] = []
         private var results: [Compute.Dependency: Result<JSON, JSONError>] = [:]
@@ -155,7 +158,7 @@ extension Compute {
         }
 
         public func value() async throws -> JSON {
-            (try await settle(subscribe: false)).state
+            (try await settle(subscribe: false, reset: graphDemand != nil)).state
         }
 
         public func decode<Value: Decodable>(_ type: Value.Type = Value.self) async throws -> Value {
@@ -176,8 +179,30 @@ extension Compute {
         @discardableResult
         public func step(_ count: Int = 1) async throws -> Compute.Step {
             let version = beginEvaluation()
+            let graph: Graph?
+            if graphDemand != nil {
+                let full = Self.graph(
+                    document: document,
+                    functions: functions,
+                    routeDependencies: routeDependencies
+                )
+                graphDemand = nil
+                routeConcepts = full.routeConcepts
+                graph = full
+            } else { graph = nil }
             let runtime = functionRuntime()
-            let commit = try await brain.commit(thoughts: count, thinking: thinking(with: runtime))
+            let commit: BrainCommit<Compute.Lemma, Compute.Signal>
+            if let graph {
+                commit = try await brain.commit(
+                    resetTo: graph.state,
+                    concepts: graph.concepts,
+                    staging: graph.change,
+                    thoughts: count,
+                    thinking: thinking(with: runtime)
+                )
+            } else {
+                commit = try await brain.commit(thoughts: count, thinking: thinking(with: runtime))
+            }
             return try await finish(commit, runtime: runtime, subscribe: false, publishWhenSettled: true, version: version)
         }
 
@@ -217,34 +242,51 @@ extension Compute {
             guard !Task.isCancelled else { return }
             routeContinuations[route, default: [:]][id] = RouteContinuation(continuation: continuation)
             observedRoutes.insert(route)
+            let selected = route.resolvingIndices(in: document)
+            if route != .root, !document.conceptRoutes().contains(where: {
+                $0.isPrefix(of: selected) || selected.isPrefix(of: $0)
+            }) {
+                if let value = document.value(at: route.components) {
+                    yield(.success(value), to: route)
+                } else { yield(.failure(JSONError("Missing value", path: route.path)), to: route) }
+            }
             startLiveEvaluation(reset: true)
         }
 
         private func removeRouteContinuation(id: UUID, route: Compute.Route) {
             routeContinuations[route]?[id] = nil
-            if routeContinuations[route]?.isEmpty ?? false {
-                routeContinuations[route] = nil
-                observedRoutes.remove(route)
-            }
-            cancelSubscriptionsIfIdle()
+            guard routeContinuations[route]?.isEmpty == true else { return }
+            routeContinuations[route] = nil
+            observedRoutes.remove(route)
+            if observedRoutes.isEmpty { cancelSubscriptionsIfIdle() }
+            else { startLiveEvaluation(reset: true) }
         }
 
         @discardableResult
-        private func settle(subscribe: Bool, reset: Bool = false, version: UInt64? = nil) async throws -> Compute.Step {
+        private func settle(
+            subscribe: Bool,
+            reset: Bool = false,
+            version: UInt64? = nil,
+            observing demand: Set<Compute.Route>? = nil
+        ) async throws -> Compute
+            .Step {
             let version = version ?? beginEvaluation()
             let graph: Graph?
             if reset {
                 let resetGraph = Self.graph(
                     document: document,
                     functions: functions,
-                    routeDependencies: routeDependencies
+                    routeDependencies: routeDependencies,
+                    observing: demand
                 )
+                graphDemand = demand
                 routeConcepts = resetGraph.routeConcepts
                 graph = resetGraph
             } else {
                 graph = nil
             }
             let runtime = functionRuntime(liveVersion: subscribe ? version : nil)
+            let thinking = thinking(with: runtime, liveVersion: subscribe ? version : nil)
             let commit: BrainCommit<Compute.Lemma, Compute.Signal>
             do {
                 if let graph {
@@ -252,10 +294,10 @@ extension Compute {
                         resetTo: graph.state,
                         concepts: graph.concepts,
                         staging: graph.change,
-                        thinking: thinking(with: runtime)
+                        thinking: thinking
                     )
                 } else {
-                    commit = try await brain.settle(thinking: thinking(with: runtime))
+                    commit = try await brain.settle(thinking: thinking)
                 }
             } catch {
                 // An initial failed read still identifies a live dependency.
@@ -292,11 +334,11 @@ extension Compute {
             version: UInt64
         ) async throws -> Compute.Step {
             let thoughts = await runtime.takeThoughts()
-            // Execution errors propagate through the Brain. Recorded errors
-            // can describe failures already handled by explain or a fallback.
-            let state = try document(from: commit.state)
+            // Live route failures remain native signals until projection.
+            // Recorded errors can also describe handled explain/fallback work.
+            let snapshot = try materialize(commit.state)
             let step = Compute.Step(
-                state: state,
+                state: snapshot.value,
                 thoughts: thoughts,
                 remainingThoughts: commit.remainingThoughts
             )
@@ -306,8 +348,9 @@ extension Compute {
             finishedEvaluationVersion = version
             if !thoughts.isEmpty { latestThoughts = thoughts }
             if publishWhenSettled, !step.isThinking {
-                publish(step.state)
+                publish(step.state, failures: snapshot.failures)
             }
+            if !subscribe, let failure = snapshot.failures.first { throw failure.error }
             return step
         }
 
@@ -326,7 +369,13 @@ extension Compute {
             if changed { dependencyGraphNeedsUpdate = true }
             await updateDependencyGraph()
             if version > cancelledThroughVersion, !Task.isCancelled, subscribe || !observedRoutes.isEmpty {
-                resubscribe(to: Array(routeDependencies.values.flatMap { $0 }))
+                let active = routeDependencies.filter { owner, _ in
+                    observedRoutes.contains {
+                        let selected = $0.resolvingIndices(in: document)
+                        return selected.isPrefix(of: owner) || owner.isPrefix(of: selected)
+                    }
+                }
+                resubscribe(to: Array(active.values.flatMap { $0 }))
             }
         }
 
@@ -334,7 +383,7 @@ extension Compute {
             guard dependencyGraphNeedsUpdate else { return }
             dependencyGraphNeedsUpdate = false
             let graph = Self.graph(document: document, functions: functions,
-                routeDependencies: routeDependencies)
+                                   routeDependencies: routeDependencies, observing: graphDemand)
             routeConcepts = graph.routeConcepts
             dependencyGraphVersion &+= 1
             await brain.update(concepts: graph.concepts, version: dependencyGraphVersion)
@@ -515,8 +564,13 @@ extension Compute {
                 liveChanges.removeAll(keepingCapacity: true)
                 await brain.stage(changes)
                 try Task.checkCancellation()
-                let reset = liveReset
-                try await settle(subscribe: true, reset: reset, version: version)
+                let reset = liveReset || graphDemand != observedRoutes
+                try await settle(
+                    subscribe: true,
+                    reset: reset,
+                    version: version,
+                    observing: observedRoutes
+                )
                 if version == liveEvaluationVersion { liveReset = false }
             } catch {
                 if version == liveEvaluationVersion, version > cancelledThroughVersion,
@@ -563,15 +617,45 @@ extension Compute {
             await runningEvaluation?.value
         }
 
-        private func publish(_ state: JSON) {
+        private func publish(
+            _ state: JSON,
+            failures: [(route: Compute.Route, error: JSONError)]
+        ) {
             for route in Array(routeContinuations.keys) {
+                let selected = route.resolvingIndices(in: document)
                 let result: Result<JSON, JSONError>
-                if let value = state.value(at: route.components) {
+                if let failure = failures.first(where: {
+                    $0.route.isPrefix(of: selected) || selected.isPrefix(of: $0.route)
+                }) {
+                    result = .failure(failure.error)
+                } else if let value = state.value(at: route.components) {
                     result = .success(value)
                 } else {
                     result = .failure(JSONError("Missing value", path: route.path))
                 }
                 yield(result, to: route)
+            }
+        }
+
+        /// Only the completed computation and its descendants are ready here.
+        /// Aggregate/container observations wait for the atomic Brain commit.
+        private func publish(_ signal: Compute.Signal, at route: Compute.Route, version: UInt64) {
+            guard version == liveEvaluationVersion, version > cancelledThroughVersion,
+                  !Task.isCancelled else { return }
+            for observed in observedRoutes where observed != .root {
+                let selected = observed.resolvingIndices(in: document)
+                guard route.isPrefix(of: selected) else { continue }
+                switch signal {
+                case .pending: break
+                case .failure(let error): yield(.failure(error), to: observed)
+                case .value(let value):
+                    let path = Array(selected.components.dropFirst(route.components.count))
+                    if let selected = value.value(at: path) {
+                        yield(.success(selected), to: observed)
+                    } else {
+                        yield(.failure(JSONError("Missing value", path: observed.path)), to: observed)
+                    }
+                }
             }
         }
 
@@ -606,11 +690,30 @@ extension Compute {
                 didResolve: didResolve, referenceValue: referenceValue)
         }
 
-        private func thinking(with runtime: Compute.FunctionRuntime) -> ComputeBrain.Thinking {
+        private func thinking(
+            with runtime: Compute.FunctionRuntime,
+            liveVersion: UInt64? = nil
+        ) -> ComputeBrain.Thinking {
             let context = context ?? Compute.Context()
             return { lemma, state in
                 guard case .route(let route) = lemma else { return nil }
-                return try await self.evaluate(route, state: state, runtime: runtime, context: context)
+                let signal: Compute.Signal?
+                do {
+                    signal = try await self.evaluate(
+                        route,
+                        state: state,
+                        runtime: runtime,
+                        context: context
+                    )
+                } catch {
+                    try Task.checkCancellation()
+                    guard liveVersion != nil, !(error is CancellationError) else { throw error }
+                    signal = .failure(JSONError(error))
+                }
+                if let liveVersion, let signal {
+                    await self.publish(signal, at: route, version: liveVersion)
+                }
+                return signal
             }
         }
 
@@ -703,9 +806,14 @@ extension Compute {
         private static func graph(
             document: JSON,
             functions: [String: any AnyReturnsKeyword],
-            routeDependencies: [Compute.Route: Set<Compute.Dependency>]
+            routeDependencies: [Compute.Route: Set<Compute.Dependency>],
+            observing demand: Set<Compute.Route>? = nil
         ) -> Graph {
+            let demand = demand.map { Set($0.map { $0.resolvingIndices(in: document) }) }
             let routes = document.conceptRoutes()
+                .filter { route in
+                    demand?.contains { $0.isPrefix(of: route) || route.isPrefix(of: $0) } ?? true
+                }
                 .sortedForComputeEvaluation()
             let routeConcepts = Set(routes)
             var state: ComputeBrain.State = [:]
@@ -761,8 +869,6 @@ extension Compute {
         private static func remainingThoughtCount(in state: ComputeBrain.State) -> Int {
             state.reduce(0) { count, entry in
                 guard case .route = entry.key else { return count }
-                // Result syntax cannot identify unfinished work: opaque keywords
-                // may intentionally return an expression-shaped JSON value.
                 guard case .pending = entry.value else { return count }
                 return count + 1
             }
@@ -772,26 +878,41 @@ extension Compute {
             from state: ComputeBrain.State,
             excluding excluded: Compute.Route? = nil
         ) throws -> JSON {
+            try materialize(state, excluding: excluded).value
+        }
+
+        private func materialize(
+            _ state: ComputeBrain.State,
+            excluding excluded: Compute.Route? = nil
+        ) throws
+            -> (value: JSON, failures: [(route: Compute.Route, error: JSONError)]) {
             var output = document
+            var failures: [(route: Compute.Route, error: JSONError)] = []
             var finalAncestors: [Compute.Route] = []
-            let routeValues = state.compactMap { entry -> (Compute.Route, JSON, Bool)? in
+            let routeValues = state.compactMap { entry -> (Compute.Route, Compute.Signal)? in
                 guard case .route(let route) = entry.key else { return nil }
                 guard !route.isExcluded(from: excluded) else { return nil }
-                guard let value = entry.value.value else { return nil }
-                if case .pending = entry.value { return (route, value, false) }
-                return (route, value, true)
+                return (route, entry.value)
             }.sorted { lhs, rhs in
                 if lhs.0.components.count != rhs.0.components.count {
                     return lhs.0.components.count < rhs.0.components.count
                 }
                 return lhs.0.path.lexicographicallyPrecedes(rhs.0.path)
             }
-            for (route, value, complete) in routeValues {
+            for (route, signal) in routeValues {
                 guard !finalAncestors.contains(where: { $0.isPrefix(of: route) }) else { continue }
-                try output.set(value, at: route)
-                if complete { finalAncestors.append(route) }
+                switch signal {
+                case .pending(let value):
+                    try output.set(value, at: route)
+                case .value(let value):
+                    try output.set(value, at: route)
+                    finalAncestors.append(route)
+                case .failure(let error):
+                    failures.append((route, error))
+                    finalAncestors.append(route)
+                }
             }
-            return output
+            return (output, failures)
         }
     }
 }
@@ -817,6 +938,8 @@ extension Compute {
         private var resolved: [Compute.Dependency: Result<JSON, JSONError>] = [:]
         private var tracked: [Compute.Route: Set<Compute.Dependency>] = [:]
         private var thoughts: [Compute.Thought] = []
+        private var capturedThoughts: [UInt64: [Compute.Thought]] = [:]
+        private var nextCapture: UInt64 = 0
 
         init(
             functions: [String: any AnyReturnsKeyword],
@@ -839,14 +962,15 @@ extension Compute {
             route: Compute.Route,
             depth: Int,
             recordThought: Bool = true,
-            references: [(request: Compute.Keyword.From, context: Compute.Context)]
+            references: [(request: Compute.Keyword.From, context: Compute.Context)],
+            captures: [UInt64] = []
         ) async throws -> JSON? {
             try Task.checkCancellation()
             guard let function = functions[keyword] else {
                 throw JSONError("Unregistered Compute keyword \(keyword)", path: route.path)
             }
             let frame = Compute.Frame(context: context, runtime: self, route: route, depth: depth,
-                references: references)
+                                      references: references, captures: captures)
             var input: JSON
             if let function = function as? any Compute.ReturnsKeywordDefinition {
                 input = try await function.request(data: data.compute(in: frame), frame: frame)
@@ -891,12 +1015,13 @@ extension Compute {
                         runtime: self,
                         route: route.computeObjectRoute(for: keyword),
                         depth: depth + 1,
-                        references: outputReferences
+                        references: outputReferences,
+                        captures: captures
                     ))
             }
             if recordThought, let output {
                 let thoughtRoute = route.computeObjectRoute(for: keyword)
-                thoughts.append(
+                record(
                     Compute.Thought(
                         route: thoughtRoute,
                         depth: depth + 1,
@@ -904,21 +1029,30 @@ extension Compute {
                         kind: kind(for: keyword),
                         input: JSON.returns(keyword, data),
                         output: output
-                    ))
+                    ), captures: captures)
             }
             return output
         }
 
         func capture(
-            _ operation: @Sendable () async throws -> JSON
+            in frame: Compute.Frame,
+            _ operation: @Sendable (Compute.Frame) async throws -> JSON
         ) async -> (result: Result<JSON, JSONError>, thoughts: [Compute.Thought]) {
-            let start = thoughts.count
-            do {
-                let value = try await operation()
-                return (.success(value), Array(thoughts.dropFirst(start)))
-            } catch {
-                return (.failure(JSONError(error)), Array(thoughts.dropFirst(start)))
-            }
+            nextCapture &+= 1
+            let id = nextCapture
+            capturedThoughts[id] = []
+            let capturedFrame = Compute.Frame(
+                context: frame.context,
+                runtime: frame.runtime,
+                route: frame.route,
+                depth: frame.depth,
+                references: frame.references,
+                captures: frame.captures + [id]
+            )
+            let result: Result<JSON, JSONError>
+            do { result = .success(try await operation(capturedFrame)) }
+            catch { result = .failure(JSONError(error)) }
+            return (result, capturedThoughts.removeValue(forKey: id) ?? [])
         }
 
         /// A default one-shot subject replays the read already used to settle
@@ -1000,8 +1134,9 @@ extension Compute {
             (tracked, resolved)
         }
 
-        func record(_ thought: Compute.Thought) {
+        func record(_ thought: Compute.Thought, captures: [UInt64] = []) {
             thoughts.append(thought)
+            for id in captures { capturedThoughts[id]?.append(thought) }
         }
 
         func takeThoughts() -> [Compute.Thought] {
@@ -1017,6 +1152,30 @@ extension Compute.Route {
         guard components[components.count - 2] == .key("{returns}") else { return self }
         guard components[components.count - 1] == .key(keyword) else { return self }
         return Compute.Route(Array(components.dropLast(2)))
+    }
+
+    /// Resolve authored array indices while preserving indices inside computed
+    /// output, whose shape is known only when that ancestor finishes.
+    fileprivate func resolvingIndices(in document: JSON) -> Compute.Route {
+        var current = document
+        var resolved: [Component] = []
+        for (offset, component) in components.enumerated() {
+            if let object = current.object, Compute.Invocation(object: object) != nil {
+                return Compute.Route(resolved + components.dropFirst(offset))
+            }
+            switch component {
+            case .index(let index):
+                guard let array = current.array, let index = array.resolvedIndex(index) else {
+                    return Compute.Route(resolved + components.dropFirst(offset))
+                }
+                resolved.append(.index(index))
+                current = array[index]
+            case .key(let key):
+                resolved.append(component)
+                current = current.object?[key] ?? .null
+            }
+        }
+        return Compute.Route(resolved)
     }
 
     fileprivate func isPrefix(of route: Compute.Route) -> Bool {

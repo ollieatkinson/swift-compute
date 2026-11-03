@@ -7,6 +7,7 @@ extension Compute {
         public let depth: Int
         // Immutable branch ancestry; sibling evaluations never share a mutable stack.
         let references: [(request: Compute.Keyword.From, context: Compute.Context)]
+        let captures: [UInt64]
 
         /// Effective reference defaults at this branch. Explicit `from` context
         /// and canonical provider bindings may narrow them further.
@@ -17,7 +18,14 @@ extension Compute {
         public func scoped(to bindings: [String: JSON]) -> Frame {
             var context = context
             context.referenceContext = (scope ?? [:]).merging(bindings) { _, narrower in narrower }
-            return Frame(context: context, runtime: runtime, route: route, depth: depth, references: references)
+            return Frame(
+                context: context,
+                runtime: runtime,
+                route: route,
+                depth: depth,
+                references: references,
+                captures: captures
+            )
         }
 
         init(
@@ -25,13 +33,15 @@ extension Compute {
             runtime: Compute.FunctionRuntime,
             route: Compute.Route,
             depth: Int,
-            references: [(request: Compute.Keyword.From, context: Compute.Context)]
+            references: [(request: Compute.Keyword.From, context: Compute.Context)],
+            captures: [UInt64] = []
         ) {
             self.context = context
             self.runtime = runtime
             self.route = route
             self.depth = depth
             self.references = references
+            self.captures = captures
         }
 
         public func compute(_ data: JSON, at route: Compute.Route? = nil) async throws -> JSON {
@@ -41,7 +51,8 @@ extension Compute {
                     runtime: runtime,
                     route: route ?? self.route,
                     depth: depth,
-                    references: references
+                    references: references,
+                    captures: captures
                 )
             )
         }
@@ -52,7 +63,8 @@ extension Compute {
                 runtime: runtime,
                 route: self.route.appending(contentsOf: route),
                 depth: depth,
-                references: references
+                references: references,
+                captures: captures
             )
         }
 
@@ -61,7 +73,7 @@ extension Compute {
         /// A recorded error is diagnostic evidence; throw to fail execution.
         /// Use this frame's route/depth when describing work in this frame.
         public func record(_ thought: Compute.Thought) async {
-            await runtime.record(thought)
+            await runtime.record(thought, captures: captures)
         }
     }
 }

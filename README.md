@@ -220,6 +220,25 @@ Simultaneous uses of one canonical request share the initial subscription;
 pending reads cancel with their runtime. One-shot evaluation still calls
 `References.value(for:context:)`, and other streaming keywords retain their
 existing compute/subject contract.
+`runtime.run(at: ["profile", "name"])` observes the selected route without
+executing unrelated sibling routes in the authored document. Multiple route
+subscriptions share native input subscriptions, and removing a route releases
+inputs no remaining route uses. A field failure affects its selected subtree and
+ancestors; an independent field keeps its own value and can recover live. A
+whole-document subscription still reports any visible field failure. Whole
+`value()` reads and `step()` calls retain their full-document behaviour.
+A completed computation can notify observers at that route (or inside its
+output) while another computation is pending. Authored literal values are ready
+immediately. Aggregate containers and the whole document still wait for their
+atomic wave commit; they do not publish partially evaluated documents.
+Independent computations in a Brain wave receive the same immutable state and
+may execute concurrently. Thinking callbacks must be Sendable; the whole wave
+commits together or retains its inputs after cancellation/failure.
+Explanation captures belong to their frame branch, including awaited detached
+work that retains the frame, so overlapping explanations keep separate evidence.
+A computed ancestor must still execute its keyword before a descendant can be
+selected; route selection preserves that keyword's opaque/deferred output rules.
+
 Live evaluation observes each resolved input before evaluating the expression it
 returns. A definition can therefore replace a pending descendant during initial
 loading or a later update. New input cancels obsolete evaluation; cancellation is

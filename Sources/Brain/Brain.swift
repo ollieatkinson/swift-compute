@@ -49,6 +49,8 @@ private actor BrainGate {
 
 public actor Brain<Lemma, Signal>: Sendable where Lemma: Hashable & Sendable, Signal: Equatable & Sendable {
     public typealias State = [Lemma: Signal]
+    /// Independent concepts may run concurrently against one immutable wave snapshot.
+    /// Their outputs commit together after the whole wave completes.
     public typealias Thinking = @Sendable (_ lemma: Lemma, _ state: State) async throws -> Signal?
     public typealias ThoughtCounter = @Sendable (State) -> Int
 
@@ -134,7 +136,10 @@ public actor Brain<Lemma, Signal>: Sendable where Lemma: Hashable & Sendable, Si
     }
 
     @discardableResult
-    public func commit(thoughts count: Int = 1, thinking: Thinking) async throws -> BrainCommit<Lemma, Signal> {
+    public func commit(
+        thoughts count: Int = 1,
+        thinking: @escaping Thinking
+    ) async throws -> BrainCommit<Lemma, Signal> {
         await gate.lock()
         do {
             let commit = try await think(maxThoughts: max(count, 0), thinking: thinking)
@@ -152,7 +157,7 @@ public actor Brain<Lemma, Signal>: Sendable where Lemma: Hashable & Sendable, Si
         concepts: [Concept],
         staging changes: State = [:],
         thoughts count: Int = 1,
-        thinking: Thinking
+        thinking: @escaping Thinking
     ) async throws -> BrainCommit<Lemma, Signal> {
         await gate.lock()
         do {
@@ -172,7 +177,10 @@ public actor Brain<Lemma, Signal>: Sendable where Lemma: Hashable & Sendable, Si
     }
 
     @discardableResult
-    public func settle(limit: Int = 1_000, thinking: Thinking) async throws -> BrainCommit<Lemma, Signal> {
+    public func settle(
+        limit: Int = 1_000,
+        thinking: @escaping Thinking
+    ) async throws -> BrainCommit<Lemma, Signal> {
         await gate.lock()
         do {
             let commit = try await think(limit: limit, thinking: thinking)
@@ -190,7 +198,7 @@ public actor Brain<Lemma, Signal>: Sendable where Lemma: Hashable & Sendable, Si
         concepts: [Concept],
         staging changes: State = [:],
         limit: Int = 1_000,
-        thinking: Thinking
+        thinking: @escaping Thinking
     ) async throws -> BrainCommit<Lemma, Signal> {
         await gate.lock()
         do {
@@ -216,7 +224,7 @@ public actor Brain<Lemma, Signal>: Sendable where Lemma: Hashable & Sendable, Si
         staging stagedChanges: State = [:],
         maxThoughts: Int? = nil,
         limit: Int? = nil,
-        thinking: Thinking
+        thinking: @escaping Thinking
     ) async throws -> BrainCommit<Lemma, Signal> {
         // The caller may have been cancelled while waiting for the gate. Do
         // not consume staged changes or reset the graph for that evaluation.
@@ -248,13 +256,20 @@ public actor Brain<Lemma, Signal>: Sendable where Lemma: Hashable & Sendable, Si
 
             var thoughts: State = [:]
             do {
-                for lemma in affected {
-                    try Task.checkCancellation()
-                    let signal = try await thinking(lemma, state)
-                    try Task.checkCancellation()
-                    guard let signal else { continue }
-                    guard state[lemma] != signal else { continue }
-                    thoughts[lemma] = signal
+                let snapshot = state
+                try await withThrowingTaskGroup(of: (Lemma, Signal?).self) { group in
+                    for lemma in affected {
+                        group.addTask {
+                            try Task.checkCancellation()
+                            let signal = try await thinking(lemma, snapshot)
+                            try Task.checkCancellation()
+                            return (lemma, signal)
+                        }
+                    }
+                    for try await (lemma, signal) in group {
+                        guard let signal, snapshot[lemma] != signal else { continue }
+                        thoughts[lemma] = signal
+                    }
                 }
             } catch {
                 // The interrupted wave has not committed its outputs. Retain
