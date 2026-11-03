@@ -49,8 +49,13 @@ let users: [JSON] = [
 ]
 
 actor TestReferences: Compute.AsyncReferences {
+    private let initiallyPending: Bool
     private var results: [String: Result<JSON, JSONError>] = [:]
     private var continuations: [String: [UUID: AsyncStream<Result<JSON, JSONError>>.Continuation]] = [:]
+
+    init(initiallyPending: Bool = false) {
+        self.initiallyPending = initiallyPending
+    }
 
     func subscriptionCount(for reference: String) -> Int {
         continuations[reference]?.count ?? 0
@@ -117,6 +122,10 @@ actor TestReferences: Compute.AsyncReferences {
         continuations[key, default: [:]][id] = continuation
         if let result = results[key] {
             continuation.yield(result)
+        } else if !initiallyPending {
+            // A loaded store knows an absent key is missing. Pending-provider
+            // tests explicitly delay their first snapshot instead.
+            continuation.yield(.failure(JSONError(Compute.Error.unresolvedReference(.string(key)))))
         }
     }
 

@@ -5,7 +5,7 @@ import Testing
 struct ComputeRuntimePendingTests {
     @Test(arguments: [false, true])
     func a_parent_can_replace_a_returned_expression_while_its_input_is_pending(initiallyLoaded: Bool) async throws {
-        let references = TestReferences()
+        let references = TestReferences(initiallyPending: true)
         let pending = JSON.returns("from", ["reference": "pending"])
         await references.set("definition", to: initiallyLoaded ? "Initial" : pending)
         let runtime = try runtime(.returns("from", ["reference": "definition"]),
@@ -27,7 +27,7 @@ struct ComputeRuntimePendingTests {
 
     @Test
     func cancelling_a_pending_run_releases_its_read_and_allows_a_fresh_run() async throws {
-        let references = TestReferences()
+        let references = TestReferences(initiallyPending: true)
         await references.set("definition", to: .returns("from", ["reference": "pending"]))
         let runtime = try runtime(.returns("from", ["reference": "definition"]),
             references: WaitingReferences(base: references))
@@ -44,7 +44,7 @@ struct ComputeRuntimePendingTests {
 
     @Test
     func nested_definition_changes_and_independent_branches_survive_interrupted_waves() async throws {
-        let references = TestReferences()
+        let references = TestReferences(initiallyPending: true)
         await references.set("left", to: .returns("from", ["reference": "definition"]))
         await references.set("definition", to: .returns("from", ["reference": "pending"]))
         await references.set("right", to: "R0")

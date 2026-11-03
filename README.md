@@ -212,6 +212,14 @@ failure instead of executing the request again during read-to-observe setup.
 Starting HTTP observation therefore no longer repeats the initial request;
 changing its input starts new work. Custom streaming subjects still establish
 their live source observation.
+Live `from` expressions consume the initial snapshot from that same observation,
+then keep it for changes. `AsyncReferences.values(for:context:)` must supply a
+current value or failure before later updates; an empty finished stream reports
+an error. This avoids opening a separate one-shot source before its live stream.
+Simultaneous uses of one canonical request share the initial subscription;
+pending reads cancel with their runtime. One-shot evaluation still calls
+`References.value(for:context:)`, and other streaming keywords retain their
+existing compute/subject contract.
 Live evaluation observes each resolved input before evaluating the expression it
 returns. A definition can therefore replace a pending descendant during initial
 loading or a later update. New input cancels obsolete evaluation; cancellation is
