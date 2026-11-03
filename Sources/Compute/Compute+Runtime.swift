@@ -105,6 +105,7 @@ extension Compute {
         private var latestThoughts: [Compute.Thought] = []
         private var results: [Compute.Dependency: Result<JSON, JSONError>] = [:]
         private var subscriptions: [Compute.Dependency: Task<Void, Never>] = [:]
+        private var referenceWaiters: [Compute.Dependency: [UUID: AsyncStream<Result<JSON, JSONError>>.Continuation]] = [:]
         private var observedRoutes: Set<Compute.Route> = []
         private var routeContinuations: [Compute.Route: [UUID: RouteContinuation]] = [:]
         private var evaluationVersion: UInt64 = 0
@@ -347,14 +348,61 @@ extension Compute {
             route: Compute.Route,
             version: UInt64
         ) {
-            guard version == liveEvaluationVersion, version > cancelledThroughVersion,
-                version >= dependencyVersions[route, default: 0], !Task.isCancelled else { return }
-            dependencyVersions[route] = version
+            guard track(dependency, at: route, version: version) else { return }
             if results[dependency] == nil { results[dependency] = result }
+            subscribe(to: dependency)
+        }
+
+        private func track(
+            _ dependency: Compute.Dependency,
+            at route: Compute.Route,
+            version: UInt64
+        ) -> Bool {
+            guard version == liveEvaluationVersion, version > cancelledThroughVersion,
+                version >= dependencyVersions[route, default: 0], !Task.isCancelled else { return false }
+            dependencyVersions[route] = version
             if routeDependencies[route, default: []].insert(dependency).inserted {
                 dependencyGraphNeedsUpdate = true
             }
+            return true
+        }
+
+        /// A live From uses the same subscription for its initial value and all
+        /// later changes. A separate snapshot would release and reopen providers
+        /// with zero grace, and could miss a change during that handoff.
+        private func referenceValue(
+            for dependency: Compute.Dependency,
+            at route: Compute.Route,
+            version: UInt64
+        ) async throws -> JSON {
+            guard track(dependency, at: route, version: version) else { throw CancellationError() }
+            if let result = results[dependency] { return try result.get() }
+            let (values, continuation) = AsyncStream.makeStream(of: Result<JSON, JSONError>.self)
+            let id = UUID()
+            referenceWaiters[dependency, default: [:]][id] = continuation
+            continuation.onTermination = { @Sendable [weak self] _ in
+                Task { await self?.removeReferenceWaiter(id, for: dependency) }
+            }
             subscribe(to: dependency)
+            var iterator = values.makeAsyncIterator()
+            guard let result = await iterator.next() else {
+                try Task.checkCancellation()
+                throw JSONError("Reference source finished without a value")
+            }
+            try Task.checkCancellation()
+            return try result.get()
+        }
+
+        private func removeReferenceWaiter(_ id: UUID, for dependency: Compute.Dependency) {
+            referenceWaiters[dependency]?[id] = nil
+            if referenceWaiters[dependency]?.isEmpty == true { referenceWaiters[dependency] = nil }
+        }
+
+        private func finishReferenceWaiters(for dependency: Compute.Dependency) {
+            guard let waiters = referenceWaiters.removeValue(forKey: dependency) else { return }
+            for continuation in waiters.values {
+                continuation.finish()
+            }
         }
 
         private func merge(_ tracked: [Compute.Route: Set<Compute.Dependency>], version: UInt64) -> Bool {
@@ -379,6 +427,7 @@ extension Compute {
                 task.cancel()
                 subscriptions[dependency] = nil
                 results[dependency] = nil
+                finishReferenceWaiters(for: dependency)
             }
             for dependency in next where subscriptions[dependency] == nil {
                 subscribe(to: dependency)
@@ -401,6 +450,7 @@ extension Compute {
                     guard let self else { return }
                     await self.apply(result, to: dependency)
                 }
+                if !Task.isCancelled { await self?.finishReferenceWaiters(for: dependency) }
             }
         }
 
@@ -413,6 +463,7 @@ extension Compute {
             for (dependency, subscription) in subscriptions {
                 subscription.cancel()
                 results[dependency] = nil
+                finishReferenceWaiters(for: dependency)
             }
             subscriptions.removeAll()
         }
@@ -420,8 +471,19 @@ extension Compute {
         private func apply(_ result: Result<JSON, JSONError>, to dependency: Compute.Dependency) async {
             // Cancellation can occur between the source's check and this actor hop.
             guard !Task.isCancelled, subscriptions[dependency] != nil else { return }
+            let initial = results[dependency] == nil
+            let waiters = referenceWaiters.removeValue(forKey: dependency)
+            if let waiters {
+                for continuation in waiters.values {
+                    continuation.yield(result)
+                    continuation.finish()
+                }
+            }
             guard results[dependency] != result else { return }
             results[dependency] = result
+            // Complete the wave already waiting for this first snapshot. A later
+            // emission replaces that wave even when a descendant is still pending.
+            if initial, waiters?.isEmpty == false { return }
             let signal: Compute.Signal
             switch result {
             case .success(let value):
@@ -484,6 +546,7 @@ extension Compute {
             for subscription in subscriptions.values {
                 subscription.cancel()
             }
+            for dependency in Array(referenceWaiters.keys) { finishReferenceWaiters(for: dependency) }
             subscriptions.removeAll()
             results.removeAll()
             observedRoutes.removeAll()
@@ -525,14 +588,22 @@ extension Compute {
         private func functionRuntime(liveVersion: UInt64? = nil) -> Compute.FunctionRuntime {
             let routes = routeConcepts
             let didResolve: Compute.FunctionRuntime.Resolved?
+            let referenceValue: Compute.FunctionRuntime.ReferenceValue?
             if let version = liveVersion {
                 didResolve = { [weak self] route, dependency, result in
                     await self?.resolved(result, dependency: dependency, route: route, version: version)
                 }
-            } else { didResolve = nil }
+                referenceValue = { [weak self] route, dependency in
+                    guard let self else { throw CancellationError() }
+                    return try await self.referenceValue(for: dependency, at: route, version: version)
+                }
+            } else {
+                didResolve = nil
+                referenceValue = nil
+            }
             return Compute.FunctionRuntime(functions: functions, results: results,
                 dependencyOwner: { route in route.nearestAncestor(in: routes) ?? route },
-                didResolve: didResolve)
+                didResolve: didResolve, referenceValue: referenceValue)
         }
 
         private func thinking(with runtime: Compute.FunctionRuntime) -> ComputeBrain.Thinking {
@@ -736,10 +807,12 @@ extension Compute {
 extension Compute {
     actor FunctionRuntime {
         typealias Resolved = @Sendable (Compute.Route, Compute.Dependency, Result<JSON, JSONError>) async -> Void
+        typealias ReferenceValue = @Sendable (Compute.Route, Compute.Dependency) async throws -> JSON
         private let functions: [String: any AnyReturnsKeyword]
         private let results: [Compute.Dependency: Result<JSON, JSONError>]
         private let dependencyOwner: @Sendable (Compute.Route) -> Compute.Route
         private let didResolve: Resolved?
+        private let referenceValue: ReferenceValue?
         private var dependencyState: [Compute.Lemma: Compute.Signal] = [:]
         private var resolved: [Compute.Dependency: Result<JSON, JSONError>] = [:]
         private var tracked: [Compute.Route: Set<Compute.Dependency>] = [:]
@@ -749,12 +822,14 @@ extension Compute {
             functions: [String: any AnyReturnsKeyword],
             results: [Compute.Dependency: Result<JSON, JSONError>],
             dependencyOwner: @escaping @Sendable (Compute.Route) -> Compute.Route,
-            didResolve: Resolved? = nil
+            didResolve: Resolved? = nil,
+            referenceValue: ReferenceValue? = nil
         ) {
             self.functions = functions
             self.results = results
             self.dependencyOwner = dependencyOwner
             self.didResolve = didResolve
+            self.referenceValue = referenceValue
         }
 
         func compute(
@@ -882,7 +957,12 @@ extension Compute {
                     return try current.get()
                 }
                 do {
-                    let value = try await function.compute(data: data, frame: frame)
+                    let value: JSON?
+                    if function is any ReferenceKeyword, let referenceValue {
+                        value = try await referenceValue(route, dependency)
+                    } else {
+                        value = try await function.compute(data: data, frame: frame)
+                    }
                     if let value {
                         resolved[dependency] = .success(value)
                         await didResolve?(route, dependency, .success(value))

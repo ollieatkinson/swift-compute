@@ -22,6 +22,9 @@ extension Compute {
     }
 
     public protocol AsyncReferences: References {
+        /// Each stream supplies its current value (or failure), then changes.
+        /// Live runtimes keep this subscription from the first snapshot onward;
+        /// one-shot evaluations continue to use value(for:context:).
         func values(for reference: JSON, context: [String: JSON]?) -> AsyncStream<Result<JSON, JSONError>>
     }
 }
