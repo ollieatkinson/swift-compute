@@ -23,8 +23,8 @@ extension Compute.Keyword {
 extension Compute.Keyword.Explain: Compute.KeywordDefinition, Compute.OpaqueOutputKeywordDefinition {
 
     public func compute(in frame: Compute.Frame) async throws -> JSON? {
-        let capture = await frame.runtime.capture {
-            try await $value.compute(in: frame)
+        let capture = await frame.runtime.capture(in: frame) { captured in
+            try await $value.compute(in: captured)
         }
 
         let thoughts = JSON.array(capture.thoughts.map(\.explanationJSON))
