@@ -212,6 +212,11 @@ failure instead of executing the request again during read-to-observe setup.
 Starting HTTP observation therefore no longer repeats the initial request;
 changing its input starts new work. Custom streaming subjects still establish
 their live source observation.
+Live evaluation observes each resolved input before evaluating the expression it
+returns. A definition can therefore replace a pending descendant during initial
+loading or a later update. New input cancels obsolete evaluation; cancellation is
+not published as a failure. Interrupted waves retain their inputs, and completed
+evaluation releases dependencies no longer used by the current expression.
 Live cycles keep their upstream observations and can recover when a source changes;
 an authored `default` can also handle the diagnostic. The existing recursion limit
 still bounds long returned-compute chains and arbitrary generated compute loops.

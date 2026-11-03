@@ -52,6 +52,10 @@ actor TestReferences: Compute.AsyncReferences {
     private var results: [String: Result<JSON, JSONError>] = [:]
     private var continuations: [String: [UUID: AsyncStream<Result<JSON, JSONError>>.Continuation]] = [:]
 
+    func subscriptionCount(for reference: String) -> Int {
+        continuations[reference]?.count ?? 0
+    }
+
     func set(_ reference: String, to value: JSON) {
         results[reference] = .success(value)
         publish(.success(value), for: reference)
@@ -237,7 +241,7 @@ func runtime(
 func runtime(
     _ json: JSON,
     in context: Compute.Context = Compute.Context(),
-    references: TestReferences
+    references: some Compute.AsyncReferences
 ) throws -> Compute.Runtime {
     try runtime(json, in: context, functions: [Compute.Keyword.From.Function(references: references)])
 }

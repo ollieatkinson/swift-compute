@@ -247,10 +247,20 @@ public actor Brain<Lemma, Signal>: Sendable where Lemma: Hashable & Sendable, Si
             remainingLimit -= 1
 
             var thoughts: State = [:]
-            for lemma in affected {
-                guard let signal = try await thinking(lemma, state) else { continue }
-                guard state[lemma] != signal else { continue }
-                thoughts[lemma] = signal
+            do {
+                for lemma in affected {
+                    try Task.checkCancellation()
+                    let signal = try await thinking(lemma, state)
+                    try Task.checkCancellation()
+                    guard let signal else { continue }
+                    guard state[lemma] != signal else { continue }
+                    thoughts[lemma] = signal
+                }
+            } catch {
+                // The interrupted wave has not committed its outputs. Retain
+                // its inputs so the next evaluation can finish that work.
+                change.merge(writes) { current, _ in current }
+                throw error
             }
             guard !thoughts.isEmpty else { break }
 
