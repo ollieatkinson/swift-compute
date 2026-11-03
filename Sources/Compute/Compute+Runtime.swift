@@ -66,12 +66,16 @@ extension Compute {
     }
 
     enum Signal: Equatable, Sendable {
+        /// Authored route input; evaluated values are complete regardless of shape.
+        case pending(JSON)
         case value(JSON)
         case failure(JSONError)
 
         var value: JSON? {
-            guard case .value(let value) = self else { return nil }
-            return value
+            switch self {
+            case .pending(let value), .value(let value): value
+            case .failure: nil
+            }
         }
     }
 }
@@ -639,7 +643,7 @@ extension Compute {
 
             for route in routes {
                 guard let value = document.value(at: route.components) else { continue }
-                state[.route(route)] = .value(value)
+                state[.route(route)] = .pending(value)
                 state[.source(route)] = .value(value)
                 change[.source(route)] = .value(value)
                 concepts.append(
@@ -686,8 +690,10 @@ extension Compute {
         private static func remainingThoughtCount(in state: ComputeBrain.State) -> Int {
             state.reduce(0) { count, entry in
                 guard case .route = entry.key else { return count }
-                guard case .value(let value) = entry.value else { return count }
-                return count + (value.isComputeInvocation ? 1 : 0)
+                // Result syntax cannot identify unfinished work: opaque keywords
+                // may intentionally return an expression-shaped JSON value.
+                guard case .pending = entry.value else { return count }
+                return count + 1
             }
         }
 
@@ -697,23 +703,22 @@ extension Compute {
         ) throws -> JSON {
             var output = document
             var finalAncestors: [Compute.Route] = []
-            let routeValues = state.compactMap { entry -> (Compute.Route, JSON)? in
+            let routeValues = state.compactMap { entry -> (Compute.Route, JSON, Bool)? in
                 guard case .route(let route) = entry.key else { return nil }
                 guard !route.isExcluded(from: excluded) else { return nil }
-                guard case .value(let value) = entry.value else { return nil }
-                return (route, value)
+                guard let value = entry.value.value else { return nil }
+                if case .pending = entry.value { return (route, value, false) }
+                return (route, value, true)
             }.sorted { lhs, rhs in
                 if lhs.0.components.count != rhs.0.components.count {
                     return lhs.0.components.count < rhs.0.components.count
                 }
                 return lhs.0.path.lexicographicallyPrecedes(rhs.0.path)
             }
-            for (route, value) in routeValues {
+            for (route, value, complete) in routeValues {
                 guard !finalAncestors.contains(where: { $0.isPrefix(of: route) }) else { continue }
                 try output.set(value, at: route)
-                if !value.isComputeInvocation {
-                    finalAncestors.append(route)
-                }
+                if complete { finalAncestors.append(route) }
             }
             return output
         }
@@ -846,7 +851,7 @@ extension Compute {
         func result(for dependency: Compute.Dependency) -> Result<JSON, JSONError>? {
             if let signal = dependencyState[.dependency(dependency)] {
                 switch signal {
-                case .value(let value): return .success(value)
+                case .pending(let value), .value(let value): return .success(value)
                 case .failure(let error): return .failure(error)
                 }
             }
@@ -869,7 +874,7 @@ extension Compute {
                     let current: Result<JSON, JSONError>
                     if let signal = dependencyState[.dependency(dependency)] {
                         switch signal {
-                        case .value(let value): current = .success(value)
+                        case .pending(let value), .value(let value): current = .success(value)
                         case .failure(let error): current = .failure(error)
                         }
                     } else { current = result }
