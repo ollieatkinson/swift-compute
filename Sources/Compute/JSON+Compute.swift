@@ -12,11 +12,6 @@ extension JSON {
         return .object(object)
     }
 
-    var isComputeInvocation: Bool {
-        guard let object else { return false }
-        return Compute.Invocation(object: object) != nil
-    }
-
     func conceptRoutes(from route: Compute.Route = .root) -> [Compute.Route] {
         if let object {
             // Syntax identifies an invocation; execution validates capability.
