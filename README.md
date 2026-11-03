@@ -224,6 +224,16 @@ still bounds long returned-compute chains and arbitrary generated compute loops.
 Custom keywords can be added by conforming to `Compute.KeywordDefinition` or `AnyReturnsKeyword`, declaring a `name`, and passing them into `Compute.Runtime`.
 
 `contains` checks whether a string contains a substring, or whether an array contains a value.
+String matching is case-sensitive by default. Supply `"case_sensitive": false` for
+literal, Unicode case-insensitive substring matching. An empty substring matches;
+diacritics remain significant. Both the substring and mode can be computed/live.
+The option applies only to strings: arrays retain ordinary JSON value equality
+and reject a supplied string-matching mode.
+
+```json
+{"{returns}": {"contains": {"lhs": "Sky Atlantic", "rhs": "sky", "case_sensitive": false}}}
+```
+
 
 `map` and `array_map` can copy paths directly, preserving missing fields and explicit `null`:
 
