@@ -4,6 +4,7 @@ import Testing
 
 @Suite struct JSONIdentityTests {
     private struct Atom: Codable, Hashable, Sendable { let name: String }
+    private struct Container: Decodable { let value: JSON }
     private static let samples: [JSON] = [
         .null, false, 1, .double(1), "1", [], [:],
         JSON(Date(timeIntervalSince1970: 1_704_067_200.25)),
@@ -22,5 +23,16 @@ import Testing
         #expect(instance == input.decode(JSON.self) && staticValue == JSON.decoded(JSON.self, from: input))
         #expect(Swift.type(of: instance.rawValue) == Swift.type(of: input.rawValue))
         #expect(Swift.type(of: staticValue.rawValue) == Swift.type(of: input.rawValue))
+    }
+
+    @Test
+    func nested_json_decoding_preserves_literal_types_and_native_dates() throws {
+        let date = Date(timeIntervalSince1970: 1_704_067_200.25)
+        let nested: JSON = ["dates": [JSON(date), .null], "text": "false"]
+        for input in Array(Self.samples.prefix(8)) + [nested] {
+            let decoded = try JSON.object(["value": input]).decode(Container.self).value
+            #expect(decoded == input)
+            #expect(Swift.type(of: decoded.rawValue) == Swift.type(of: input.rawValue))
+        }
     }
 }
