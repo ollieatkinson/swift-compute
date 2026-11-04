@@ -310,6 +310,7 @@ extension Compute {
                 // An initial failed read still identifies a live dependency.
                 // Keep observing it so a later value can recover this runtime.
                 await synchronizeDependencies(runtime: runtime, subscribe: subscribe, version: version)
+                if error is CancellationError { throw error }
                 if case BrainError.thoughtLimitExceeded = error {
                     throw Compute.Error.recursionLimitExceeded
                 }
@@ -580,7 +581,14 @@ extension Compute {
                 )
                 if version == liveEvaluationVersion { liveReset = false }
             } catch {
-                if version == liveEvaluationVersion, version > cancelledThroughVersion,
+                if error is CancellationError, version == liveEvaluationVersion,
+                    version < evaluationVersion, !Task.isCancelled, !observedRoutes.isEmpty {
+                    // A newer one-shot read can acquire the Brain gate before
+                    // this queued live wave and supersede its dependency owner.
+                    // Resume with that owner's inputs instead of publishing the
+                    // internal cancellation as a field failure.
+                    startLiveEvaluation(reset: true)
+                } else if version == liveEvaluationVersion, version > cancelledThroughVersion,
                     version >= finishedEvaluationVersion, !Task.isCancelled {
                     finishedEvaluationVersion = version
                     publishFailure(JSONError(error))

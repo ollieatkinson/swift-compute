@@ -141,7 +141,7 @@ extension JSON {
             }
             var computed: [String: JSON] = [:]
             for (key, value) in entries {
-                computed[key] = try await value.compute(in: frame[.key(key)])
+                computed[key] = try await value.evaluate(in: frame[.key(key)], projecting: nil)
             }
             return .object(computed)
         }
@@ -158,8 +158,9 @@ extension JSON {
                 return .array(computed)
             }
             var computed: [JSON] = []
-            for (index, value) in values
-                .indexed() { computed.append(try await value.compute(in: frame[.index(index)])) }
+            for (index, value) in values.indexed() {
+                computed.append(try await value.evaluate(in: frame[.index(index)], projecting: nil))
+            }
             return .array(computed)
         }
         return self
@@ -203,7 +204,7 @@ extension JSON {
     }
 
     private func defaultValue(in frame: Compute.Frame) async throws -> JSON {
-        let output = try await compute(in: frame)
+        let output = try await evaluate(in: frame, projecting: nil)
         await frame.record(Compute.Thought(
             route: frame.route,
             depth: frame.depth,

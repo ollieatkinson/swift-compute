@@ -246,6 +246,39 @@ struct ComputeRuntimeRouteTests {
         #expect(await names.next() == nil)
     }
 
+    @Test
+    func overlapping_whole_reads_and_route_setup_do_not_publish_internal_cancellation(
+    ) async throws {
+        // Overlap ordinary reads and route registration to exercise both gate
+        // orders, including a one-shot read overtaking a queued live wave.
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for _ in 0 ..< 32 {
+                group.addTask {
+                    let references = TestReferences()
+                    await references.set("minimum", to: 36)
+                    let runtime = Compute.Runtime(
+                        document: ["profile": [
+                            "adult": .returns("comparison", ["greater_or_equal": [
+                                "lhs": .returns("item", ["age"]),
+                                "rhs": .returns("from", ["reference": "minimum"])
+                            ]]),
+                            "name": .returns("item", ["name"])
+                        ]],
+                        context: Compute.Context(item: users[2]),
+                        functions: [Compute.Keyword.From.Function(references: references)]
+                    )
+                    defer { await runtime.cancel() }
+                    var adults = runtime.run(at: ["profile", "adult"]).makeAsyncIterator()
+                    try #require(try await runtime.value(at: ["profile", "name"]) == "Ste")
+                    try #require(await adults.next() == .success(true))
+                    await references.set("minimum", to: 40)
+                    try #require(await adults.next() == .success(false))
+                }
+            }
+            try await group.waitForAll()
+        }
+    }
+
     private func wait(_ condition: @Sendable () async -> Bool) async throws {
         while !(await condition()) {
             try Task.checkCancellation()
