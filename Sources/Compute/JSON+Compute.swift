@@ -2,7 +2,11 @@ import _JSON
 import Algorithms
 
 extension JSON {
-    public static func returns(_ keyword: String, _ data: JSON, default fallback: JSON? = nil) -> JSON {
+    public static func returns(
+        _ keyword: String,
+        _ data: JSON,
+        default fallback: JSON? = nil
+    ) -> JSON {
         var object: Object = [
             "{returns}": .object([keyword: data]),
         ]
@@ -72,122 +76,143 @@ extension JSON {
         }
     }
 
-    func compute(in frame: Compute.Frame) async throws -> JSON {
-        try await compute(context: frame.context, runtime: frame.runtime, route: frame.route,
-                          depth: frame.depth, references: frame.references,
-                          captures: frame.captures)
+    func compute(
+        in frame: Compute.Frame,
+        projecting output: Compute.Route? = nil
+    ) async throws -> JSON {
+        guard let output else { return try await evaluate(in: frame, projecting: nil) }
+        do {
+            // Only containers with a requested descendant need independent
+            // child progress. Other branches retain ordinary atomic evaluation.
+            let descendants = await frame.runtime.projectsDescendants(of: output)
+            let value = try await evaluate(in: frame, projecting: descendants ? output : nil)
+            await frame.runtime.project(.success(value), at: output)
+            return value
+        } catch {
+            if !(error is CancellationError) {
+                await frame.runtime.project(.failure(JSONError(error)), at: output)
+            }
+            throw error
+        }
     }
 
-    private func compute(
-        context: Compute.Context,
-        runtime: Compute.FunctionRuntime,
-        route: Compute.Route = .root,
-        depth: Int,
-        references: [(request: Compute.Keyword.From, context: Compute.Context)],
-        captures: [UInt64]
+    private func evaluate(
+        in frame: Compute.Frame,
+        projecting output: Compute.Route?
     ) async throws -> JSON {
         try Task.checkCancellation()
         if let object {
             if let invocation = Compute.Invocation(object: object) {
-                guard depth < 20 else {
-                    throw Compute.Error.recursionLimitExceeded
-                }
-
-                let functionRoute = route["{returns}", .key(invocation.keyword)]
+                guard frame.depth < 20 else { throw Compute.Error.recursionLimitExceeded }
                 do {
-                    if let value = try await runtime.compute(
+                    if let value = try await frame.runtime.compute(
                         keyword: invocation.keyword,
                         data: invocation.data,
-                        context: context,
-                        route: functionRoute,
-                        depth: depth,
-                        references: references,
-                        captures: captures
-                    ) {
-                        return value
-                    }
+                        context: frame.context,
+                        route: frame.route["{returns}", .key(invocation.keyword)],
+                        depth: frame.depth,
+                        references: frame.references,
+                        captures: frame.captures,
+                        projecting: invocation.default == nil ? output : nil
+                    ) { return value }
                 } catch {
                     if let fallback = invocation.default {
-                        return try await fallback.defaultValue(
-                            context: context,
-                            runtime: runtime,
-                            route: route["default"],
-                            depth: depth,
-                            references: references,
-                            captures: captures
-                        )
+                        return try await fallback.defaultValue(in: frame["default"])
                     }
                     throw error
                 }
                 if let fallback = invocation.default {
-                    return try await fallback.defaultValue(
-                        context: context,
-                        runtime: runtime,
-                        route: route["default"],
-                        depth: depth,
-                        references: references,
-                        captures: captures
-                    )
+                    return try await fallback.defaultValue(in: frame["default"])
                 }
                 return .null
             }
-
-            var computed: [String: JSON] = [:]
-            for (key, value) in object.sortedEntries {
-                computed[key] = try await value.compute(
-                    context: context,
-                    runtime: runtime,
-                    route: route[.key(key)],
-                    depth: depth,
-                    references: references,
-                    captures: captures
+            let entries = object.sortedEntries
+            if let output {
+                await frame.runtime.prepareProjection(self, at: output)
+                let values = try await Self.compute(
+                    entries.map { (.key($0.key), $0.value) },
+                    in: frame,
+                    projecting: output
                 )
+                return .object(Dictionary(uniqueKeysWithValues: values.map { (
+                    entries[$0.key].key,
+                    $0.value
+                ) }))
+            }
+            var computed: [String: JSON] = [:]
+            for (key, value) in entries {
+                computed[key] = try await value.evaluate(in: frame[.key(key)], projecting: nil)
             }
             return .object(computed)
         }
-
         if let values = array {
+            if let output {
+                await frame.runtime.prepareProjection(self, at: output)
+                let results = try await Self.compute(
+                    values.enumerated().map { (.index($0.offset), $0.element) },
+                    in: frame,
+                    projecting: output
+                )
+                var computed = values
+                for (index, value) in results { computed[index] = value }
+                return .array(computed)
+            }
             var computed: [JSON] = []
             for (index, value) in values.indexed() {
-                computed.append(try await value.compute(
-                    context: context,
-                    runtime: runtime,
-                    route: route[.index(index)],
-                    depth: depth,
-                    references: references,
-                    captures: captures
-                ))
+                computed.append(try await value.evaluate(in: frame[.index(index)], projecting: nil))
             }
             return .array(computed)
         }
-
         return self
     }
 
-    private func defaultValue(
-        context: Compute.Context,
-        runtime: Compute.FunctionRuntime,
-        route: Compute.Route,
-        depth: Int,
-        references: [(request: Compute.Keyword.From, context: Compute.Context)],
-        captures: [UInt64]
-    ) async throws -> JSON {
-        let output = try await compute(
-            context: context,
-            runtime: runtime,
-            route: route,
-            depth: depth,
-            references: references,
-            captures: captures
-        )
-        await runtime.record(Compute.Thought(
-            route: route,
-            depth: depth,
+    private static func compute(
+        _ children: [(Compute.Route.Component, JSON)],
+        in frame: Compute.Frame,
+        projecting output: Compute.Route
+    ) async throws -> [Int: JSON] {
+        try await withThrowingTaskGroup(of: (Int, Result<JSON, JSONError>).self) { group in
+            for (index, entry) in children.enumerated() {
+                let selected = output.appending(entry.0)
+                guard await frame.runtime.includesProjection(selected) else { continue }
+                group.addTask {
+                    do {
+                        return (
+                            index,
+                            .success(try await entry.1.compute(
+                                in: frame[entry.0],
+                                projecting: selected
+                            ))
+                        )
+                    } catch {
+                        try Task.checkCancellation()
+                        return (index, .failure(JSONError(error)))
+                    }
+                }
+            }
+            var values: [Int: JSON] = [:]
+            var errors: [Int: JSONError] = [:]
+            for try await (index, result) in group {
+                switch result {
+                case .success(let value): values[index] = value
+                case .failure(let error): errors[index] = error
+                }
+            }
+            if let index = errors.keys.min(), let error = errors[index] { throw error }
+            return values
+        }
+    }
+
+    private func defaultValue(in frame: Compute.Frame) async throws -> JSON {
+        let output = try await evaluate(in: frame, projecting: nil)
+        await frame.record(Compute.Thought(
+            route: frame.route,
+            depth: frame.depth,
             keyword: "default",
             kind: .defaultValue,
             input: self,
             output: output
-        ), captures: captures)
+        ))
         return output
     }
 }

@@ -226,9 +226,11 @@ pending reads cancel with their runtime. One-shot evaluation still calls
 `References.value(for:context:)`, and other streaming keywords retain their
 existing compute/subject contract.
 `runtime.run(at: ["profile", "name"])` observes the selected route without
-executing unrelated sibling routes in the authored document. Multiple route
-subscriptions share native input subscriptions, and removing a route releases
-inputs no remaining route uses. A field failure affects its selected subtree and
+executing unrelated sibling routes in the authored document or in a program
+returned by a keyword such as `from`. A returned field can make progress while
+an unrequested sibling stays inert, or while a sibling requested by another
+observer is pending or failed. Multiple route subscriptions share native input
+subscriptions, and removing a route releases inputs no remaining route uses. A field failure affects its selected subtree and
 ancestors; an independent field keeps its own value and can recover live. A
 whole-document subscription still reports any visible field failure. Whole
 `value()` reads and `step()` calls retain their full-document behaviour.
@@ -243,6 +245,12 @@ Explanation captures belong to their frame branch, including awaited detached
 work that retains the frame, so overlapping explanations keep separate evidence.
 A computed ancestor must still execute its keyword before a descendant can be
 selected; route selection preserves that keyword's opaque/deferred output rules.
+An invocation's `default` is chosen atomically: selection cannot expose a partial
+primary result before the containing invocation has either succeeded or fallen
+back. Changing a returned program replaces its field dependencies, including at
+the same depth; negative indices follow the new array shape. Field outcomes are
+committed with their source's graph signal, so an independent route update cannot
+replace a successful field with an aggregate sibling failure.
 
 Live evaluation observes each resolved input before evaluating the expression it
 returns. A definition can therefore replace a pending descendant during initial
