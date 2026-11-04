@@ -252,6 +252,25 @@ the same depth; negative indices follow the new array shape. Field outcomes are
 committed with their source's graph signal, so an independent route update cannot
 replace a successful field with an aggregate sibling failure.
 
+`run(at:tracing:)` pairs a result with immutable thoughts from its contributing
+output scope, including explicit `frame.record` evidence. It shares the graph and
+input subscriptions with ordinary observers:
+
+```swift
+for await (result, thoughts) in runtime.run(at: ["profile", "name"], tracing: true) {
+    print(result, thoughts)
+}
+```
+
+A ready field can report its completed work while a sibling is pending or failed.
+Explicit diagnostic routes and detached work retain their containing output owner.
+Unchanged source signals retain their evidence across later independent waves;
+results never borrow the runtime's later mutable `thoughts`. A trace-only change
+can notify traced observers without repeating an equal value to ordinary ones.
+`tracing: false` returns the same tuple with an empty thought list. This does not
+change the atomic `explain` keyword or prune work inside an opaque operation;
+unfinished ancestor operations do not yet have completed computation records.
+
 Live evaluation observes each resolved input before evaluating the expression it
 returns. A definition can therefore replace a pending descendant during initial
 loading or a later update. New input cancels obsolete evaluation; cancellation is

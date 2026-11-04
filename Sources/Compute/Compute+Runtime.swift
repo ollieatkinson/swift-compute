@@ -68,10 +68,10 @@ extension Compute {
     enum Signal: Equatable, Sendable {
         /// Authored route input; evaluation settles the current observation demand.
         case pending(JSON)
-        case value(JSON, projections: [Route: Result<JSON, JSONError>] = [:])
-        case failure(JSONError, projections: [Route: Result<JSON, JSONError>] = [:])
+        case value(JSON, projections: [Route: Outcome] = [:])
+        case failure(JSONError, projections: [Route: Outcome] = [:])
 
-        var projections: [Route: Result<JSON, JSONError>] {
+        var projections: [Route: Outcome] {
             switch self {
             case .pending: [:]
             case .value(_, let projections), .failure(_, let projections): projections
@@ -87,9 +87,11 @@ extension Compute {
     }
 }
 
-private struct RouteContinuation {
-    var continuation: AsyncStream<Result<JSON, JSONError>>.Continuation
-    var last: Result<JSON, JSONError>?
+private struct RouteContinuation: Sendable {
+    let tracing: Bool
+    let receive: @Sendable (Compute.Outcome) -> Void
+    let finish: @Sendable () -> Void
+    var last: Compute.Outcome?
 }
 
 extension Compute {
@@ -213,12 +215,30 @@ extension Compute {
             return try await finish(commit, runtime: runtime, subscribe: false, publishWhenSettled: true, version: version)
         }
 
-        public nonisolated func run(at route: Compute.Route = .root) -> AsyncStream<
-            Result<JSON, JSONError>
-        > {
+        public nonisolated func run(at route: Compute.Route = .root) -> AsyncStream<Result<JSON, JSONError>> {
+            stream(at: route, tracing: false) { $0.result }
+        }
+
+        /// Captures each selected result with its own immutable runtime evidence.
+        /// Untraced and traced observers share the same graph and subscriptions.
+        public nonisolated func run(
+            at route: Compute.Route = .root,
+            tracing: Bool
+        ) -> AsyncStream<(result: Result<JSON, JSONError>, thoughts: [Compute.Thought])> {
+            stream(at: route, tracing: tracing) { ($0.result, $0.thoughts) }
+        }
+
+        private nonisolated func stream<Value: Sendable>(
+            at route: Compute.Route,
+            tracing: Bool,
+            project: @escaping @Sendable (Compute.Outcome) -> Value
+        ) -> AsyncStream<Value> {
             AsyncStream { continuation in
                 let id = UUID()
-                let task = Task { await addRouteContinuation(continuation, id: id, route: route) }
+                let sink = RouteContinuation(tracing: tracing,
+                    receive: { continuation.yield(project($0)) },
+                    finish: { continuation.finish() })
+                let task = Task { await addRouteContinuation(sink, id: id, route: route) }
                 continuation.onTermination = { @Sendable [weak self] _ in
                     task.cancel()
                     Task { [weak self] in
@@ -242,12 +262,12 @@ extension Compute {
         }
 
         private func addRouteContinuation(
-            _ continuation: AsyncStream<Result<JSON, JSONError>>.Continuation,
+            _ continuation: RouteContinuation,
             id: UUID,
             route: Compute.Route
         ) async {
             guard !Task.isCancelled else { return }
-            routeContinuations[route, default: [:]][id] = RouteContinuation(continuation: continuation)
+            routeContinuations[route, default: [:]][id] = continuation
             observedRoutes.insert(route)
             let selected = route.resolvingIndices(in: document)
             if route != .root, !document.conceptRoutes().contains(where: {
@@ -621,7 +641,7 @@ extension Compute {
             observedRoutes.removeAll()
             for continuations in routeContinuations.values {
                 for routeContinuation in continuations.values {
-                    routeContinuation.continuation.finish()
+                    routeContinuation.finish()
                 }
             }
             routeContinuations.removeAll()
@@ -635,14 +655,16 @@ extension Compute {
         private func publish(
             _ state: JSON,
             failures: [(route: Compute.Route, error: JSONError)],
-            projections: [Compute.Route: Result<JSON, JSONError>]
+            projections: [Compute.Route: Compute.Outcome]
         ) {
             for route in Array(routeContinuations.keys) {
                 let selected = route.resolvingIndices(in: document)
-                let result: Result<JSON, JSONError>
                 if let projected = projections[route] {
-                    result = projected
-                } else if let failure = failures.first(where: {
+                    yield(projected, to: route)
+                    continue
+                }
+                let result: Result<JSON, JSONError>
+                if let failure = failures.first(where: {
                     $0.route.isPrefix(of: selected) || selected.isPrefix(of: $0.route)
                 }) {
                     result = .failure(failure.error)
@@ -651,7 +673,12 @@ extension Compute {
                 } else {
                     result = .failure(JSONError("Missing value", path: route.path))
                 }
-                yield(result, to: route)
+                let thoughts = projections.filter { entry in
+                    routeConcepts.contains(entry.key)
+                        && (entry.key.isPrefix(of: selected) || selected.isPrefix(of: entry.key))
+                }.sorted { $0.key.path.lexicographicallyPrecedes($1.key.path) }
+                    .flatMap { $0.value.thoughts }
+                yield(Compute.Outcome(result: result, thoughts: thoughts), to: route)
             }
         }
 
@@ -669,30 +696,35 @@ extension Compute {
                 }
                 switch signal {
                 case .pending: break
-                case .failure(let error, _): yield(.failure(error), to: observed)
+                case .failure(let error, _): yield(.failure(error), to: observed, thoughts: signal.projections[route]?.thoughts ?? [])
                 case .value(let value, _):
                     let path = Array(selected.components.dropFirst(route.components.count))
                     if let selected = value.value(at: path) {
-                        yield(.success(selected), to: observed)
+                        yield(.success(selected), to: observed, thoughts: signal.projections[route]?.thoughts ?? [])
                     } else {
-                        yield(.failure(JSONError("Missing value", path: observed.path)), to: observed)
+                        yield(.failure(JSONError("Missing value", path: observed.path)), to: observed, thoughts: signal.projections[route]?.thoughts ?? [])
                     }
                 }
             }
         }
 
-        private func publishProjection(_ result: Result<JSON, JSONError>, to route: Compute.Route, version: UInt64) {
+        private func publishProjection(_ result: Compute.Outcome, to route: Compute.Route, version: UInt64) {
             guard version == liveEvaluationVersion, version > cancelledThroughVersion,
                   !Task.isCancelled, route != .root, observedRoutes.contains(route) else { return }
             yield(result, to: route)
         }
 
-        private func yield(_ result: Result<JSON, JSONError>, to route: Compute.Route) {
+        private func yield(_ result: Result<JSON, JSONError>, to route: Compute.Route, thoughts: [Compute.Thought] = []) {
+            yield(Compute.Outcome(result: result, thoughts: thoughts), to: route)
+        }
+
+        private func yield(_ outcome: Compute.Outcome, to route: Compute.Route) {
             guard var continuations = routeContinuations[route] else { return }
             for id in continuations.keys {
-                guard continuations[id]?.last != result else { continue }
-                continuations[id]?.last = result
-                continuations[id]?.continuation.yield(result)
+                let output = continuations[id]?.tracing == true ? outcome : Compute.Outcome(result: outcome.result)
+                guard continuations[id]?.last != output else { continue }
+                continuations[id]?.last = output
+                continuations[id]?.receive(output)
             }
             routeContinuations[route] = continuations
         }
@@ -729,7 +761,8 @@ extension Compute {
             return Compute.FunctionRuntime(functions: functions, results: results,
                 dependencyOwner: { route in route.nearestAncestor(in: routes) ?? route },
                 didResolve: didResolve, referenceValue: referenceValue,
-                projection: projection, didProject: didProject)
+                projection: projection, didProject: didProject,
+                tracing: routeContinuations.values.contains { $0.values.contains { $0.tracing } })
         }
 
         private func thinking(
@@ -750,7 +783,7 @@ extension Compute {
                 } catch {
                     try Task.checkCancellation()
                     guard liveVersion != nil, !(error is CancellationError) else { throw error }
-                    signal = .failure(JSONError(error), projections: await runtime.projectionResults(at: route))
+                    signal = .failure(JSONError(error), projections: await runtime.projectionResults(at: route, result: .failure(JSONError(error))))
                 }
                 if let liveVersion, let signal {
                     await self.publish(signal, at: route, version: liveVersion)
@@ -784,8 +817,8 @@ extension Compute {
                     input: step.input,
                     output: step.output,
                     state: nextDocument
-                ))
-            return .value(step.output, projections: await runtime.projectionResults(at: route))
+                ), output: route)
+            return .value(step.output, projections: await runtime.projectionResults(at: route, result: .success(step.output)))
         }
 
         private static func evaluate(
@@ -800,11 +833,9 @@ extension Compute {
                     if let output = try await runtime.compute(
                         keyword: invocation.keyword,
                         data: invocation.data,
-                        context: context,
-                        route: functionRoute,
-                        depth: 0,
+                        in: Compute.Frame(context: context, runtime: runtime,
+                            route: functionRoute, depth: 0, references: [], output: route),
                         recordThought: false,
-                        references: [],
                         projecting: invocation.default == nil ? route : nil
                     ) {
                         return (
@@ -841,7 +872,8 @@ extension Compute {
                     runtime: runtime,
                     route: route["default"],
                     depth: 0,
-                    references: []
+                    references: [],
+                    output: route
                 ))
             return ("default", .defaultValue, fallback, output)
         }
@@ -929,10 +961,10 @@ extension Compute {
             excluding excluded: Compute.Route? = nil
         ) throws
             -> (value: JSON, failures: [(route: Compute.Route, error: JSONError)],
-                projections: [Compute.Route: Result<JSON, JSONError>]) {
+                projections: [Compute.Route: Compute.Outcome]) {
             var output = document
             var failures: [(route: Compute.Route, error: JSONError)] = []
-            var projections: [Compute.Route: Result<JSON, JSONError>] = [:]
+            var projections: [Compute.Route: Compute.Outcome] = [:]
             var finalAncestors: [Compute.Route] = []
             let routeValues = state.compactMap { entry -> (Compute.Route, Compute.Signal)? in
                 guard case .route(let route) = entry.key else { return nil }
@@ -975,7 +1007,7 @@ extension Compute {
     actor FunctionRuntime {
         typealias Resolved = @Sendable (Compute.Route, Compute.Dependency, Result<JSON, JSONError>) async -> Void
         typealias ReferenceValue = @Sendable (Compute.Route, Compute.Dependency) async throws -> JSON
-        typealias Projected = @Sendable (Compute.Route, Result<JSON, JSONError>) async -> Void
+        typealias Projected = @Sendable (Compute.Route, Compute.Outcome) async -> Void
         private let functions: [String: any AnyReturnsKeyword]
         private let results: [Compute.Dependency: Result<JSON, JSONError>]
         private let dependencyOwner: @Sendable (Compute.Route) -> Compute.Route
@@ -983,6 +1015,8 @@ extension Compute {
         private let referenceValue: ReferenceValue?
         private var projection: Compute.Projection?
         private let didProject: Projected?
+        private let tracing: Bool
+        private var recordedOutputs: [(output: Compute.Route, thought: Compute.Thought)] = []
         private var dependencyState: [Compute.Lemma: Compute.Signal] = [:]
         private var resolved: [Compute.Dependency: Result<JSON, JSONError>] = [:]
         private var tracked: [Compute.Route: Set<Compute.Dependency>] = [:]
@@ -997,7 +1031,8 @@ extension Compute {
             didResolve: Resolved? = nil,
             referenceValue: ReferenceValue? = nil,
             projection: Compute.Projection? = nil,
-            didProject: Projected? = nil
+            didProject: Projected? = nil,
+            tracing: Bool = false
         ) {
             self.functions = functions
             self.results = results
@@ -1006,25 +1041,25 @@ extension Compute {
             self.referenceValue = referenceValue
             self.projection = projection
             self.didProject = didProject
+            self.tracing = tracing
         }
 
         func compute(
             keyword: String,
             data: JSON,
-            context: Compute.Context,
-            route: Compute.Route,
-            depth: Int,
+            in frame: Compute.Frame,
             recordThought: Bool = true,
-            references: [(request: Compute.Keyword.From, context: Compute.Context)],
-            captures: [UInt64] = [],
             projecting: Compute.Route? = nil
         ) async throws -> JSON? {
             try Task.checkCancellation()
+            let context = frame.context
+            let route = frame.route
+            let depth = frame.depth
+            let references = frame.references
+            let captures = frame.captures
             guard let function = functions[keyword] else {
                 throw JSONError("Unregistered Compute keyword \(keyword)", path: route.path)
             }
-            let frame = Compute.Frame(context: context, runtime: self, route: route, depth: depth,
-                                      references: references, captures: captures)
             var input: JSON
             if let function = function as? any Compute.ReturnsKeywordDefinition {
                 input = try await function.request(data: data.compute(in: frame), frame: frame)
@@ -1070,10 +1105,11 @@ extension Compute {
                         route: route.computeObjectRoute(for: keyword),
                         depth: depth + 1,
                         references: outputReferences,
-                        captures: captures
+                        captures: captures,
+                        output: frame.output
                     ), projecting: projecting.flatMap { route in
                         projection?.includesDescendants(of: route) == true ? route : nil
-                    })
+                    }, publishing: false)
             }
             if recordThought, let output {
                 let thoughtRoute = route.computeObjectRoute(for: keyword)
@@ -1085,7 +1121,7 @@ extension Compute {
                         kind: kind(for: keyword),
                         input: JSON.returns(keyword, data),
                         output: output
-                    ), captures: captures)
+                    ), captures: captures, output: frame.output)
             }
             return output
         }
@@ -1103,7 +1139,8 @@ extension Compute {
                 route: frame.route,
                 depth: frame.depth,
                 references: frame.references,
-                captures: frame.captures + [id]
+                captures: frame.captures + [id],
+                output: frame.output
             )
             let result: Result<JSON, JSONError>
             do { result = .success(try await operation(capturedFrame)) }
@@ -1176,19 +1213,41 @@ extension Compute {
         }
 
         func prepareProjection(_ value: JSON, at route: Compute.Route) async {
-            for (observed, result) in projection?.prepare(value, at: route) ?? [] {
+            let records = recordedOutputs
+            for (observed, result) in projection?.prepare(value, at: route, thoughts: {
+                Self.thoughts(in: $0, records: records)
+            }) ?? [] {
                 await didProject?(observed, result)
             }
         }
 
         func project(_ result: Result<JSON, JSONError>, at route: Compute.Route) async {
-            for (observed, selected) in projection?.resolve(result, at: route) ?? [] {
+            let records = recordedOutputs
+            for (observed, selected) in projection?.resolve(result, at: route, thoughts: {
+                Self.thoughts(in: $0, records: records)
+            }) ?? [] {
                 await didProject?(observed, selected)
             }
         }
 
-        func projectionResults(at route: Compute.Route) -> [Compute.Route: Result<JSON, JSONError>] {
-            projection?.results(in: route) ?? [:]
+        func projectionResults(
+            at route: Compute.Route,
+            result: Result<JSON, JSONError>
+        ) -> [Compute.Route: Compute.Outcome] {
+            var outcomes = projection?.results(in: route) ?? [:]
+            if tracing {
+                outcomes[route] = Compute.Outcome(result: result,
+                    thoughts: Self.thoughts(in: route, records: recordedOutputs))
+            }
+            return outcomes
+        }
+
+        private static func thoughts(
+            in route: Compute.Route,
+            records: [(output: Compute.Route, thought: Compute.Thought)]
+        ) -> [Compute.Thought] {
+            records.filter { $0.output.isPrefix(of: route) || route.isPrefix(of: $0.output) }
+                .map(\.thought).sortedByRoute()
         }
 
         func trackDependencies(for route: Compute.Route, state: [Compute.Lemma: Compute.Signal]) {
@@ -1214,8 +1273,13 @@ extension Compute {
             (tracked, resolved)
         }
 
-        func record(_ thought: Compute.Thought, captures: [UInt64] = []) {
+        func record(
+            _ thought: Compute.Thought,
+            captures: [UInt64] = [],
+            output: Compute.Route? = nil
+        ) {
             thoughts.append(thought)
+            if tracing, let output { recordedOutputs.append((output, thought)) }
             for id in captures { capturedThoughts[id]?.append(thought) }
         }
 

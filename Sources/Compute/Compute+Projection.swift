@@ -6,7 +6,7 @@ extension Compute {
     /// outcomes in the existing graph signal, alongside its value or error.
     struct Projection: Sendable {
         private var targets: [Route: Route]
-        private var outputs: [Route: (source: Route, result: Result<JSON, JSONError>)] = [:]
+        private var outputs: [Route: (source: Route, result: Outcome)] = [:]
 
         init(observing: Set<Route>, document: JSON) {
             targets = Dictionary(uniqueKeysWithValues: observing.map {
@@ -24,10 +24,11 @@ extension Compute {
 
         mutating func prepare(
             _ value: JSON,
-            at route: Route
-        ) -> [(Route, Result<JSON, JSONError>)] {
+            at route: Route,
+            thoughts: (Route) -> [Thought]
+        ) -> [(Route, Outcome)] {
             normalize(value, at: route)
-            var updates: [(Route, Result<JSON, JSONError>)] = []
+            var updates: [(Route, Outcome)] = []
             for (original, target) in targets where route.isPrefix(of: target) {
                 guard let head = target.components.dropFirst(route.components.count).first
                 else { continue }
@@ -38,7 +39,10 @@ extension Compute {
                 }
                 if missing {
                     updates += store(
-                        .failure(JSONError("Missing value", path: original.path)),
+                        Outcome(
+                            result: .failure(JSONError("Missing value", path: original.path)),
+                            thoughts: thoughts(target)
+                        ),
                         for: original,
                         source: route.appending(head)
                     )
@@ -49,22 +53,27 @@ extension Compute {
 
         mutating func resolve(
             _ result: Result<JSON, JSONError>,
-            at route: Route
-        ) -> [(Route, Result<JSON, JSONError>)] {
+            at route: Route,
+            thoughts: (Route) -> [Thought]
+        ) -> [(Route, Outcome)] {
             if case .success(let value) = result { normalize(value, at: route) }
-            var updates: [(Route, Result<JSON, JSONError>)] = []
+            var updates: [(Route, Outcome)] = []
             for (original, target) in targets where route.isPrefix(of: target) {
                 let selected = result.flatMap { value in
                     let suffix = Array(target.components.dropFirst(route.components.count))
                     return value.value(at: suffix).map(Result.success)
                         ?? .failure(JSONError("Missing value", path: original.path))
                 }
-                updates += store(selected, for: original, source: route)
+                updates += store(
+                    Outcome(result: selected, thoughts: thoughts(target)),
+                    for: original,
+                    source: route
+                )
             }
             return updates
         }
 
-        func results(in route: Route) -> [Route: Result<JSON, JSONError>] {
+        func results(in route: Route) -> [Route: Outcome] {
             outputs.filter { route.isPrefix(of: $0.value.source) }.mapValues(\.result)
         }
 
@@ -77,10 +86,10 @@ extension Compute {
         }
 
         private mutating func store(
-            _ result: Result<JSON, JSONError>,
+            _ result: Outcome,
             for observed: Route,
             source: Route
-        ) -> [(Route, Result<JSON, JSONError>)] {
+        ) -> [(Route, Outcome)] {
             guard outputs[observed]
                 .map({ $0.source.components.count <= source.components.count }) ?? true
             else { return [] }

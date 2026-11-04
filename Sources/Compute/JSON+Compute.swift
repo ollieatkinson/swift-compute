@@ -78,18 +78,20 @@ extension JSON {
 
     func compute(
         in frame: Compute.Frame,
-        projecting output: Compute.Route? = nil
+        projecting output: Compute.Route? = nil,
+        publishing: Bool = true
     ) async throws -> JSON {
         guard let output else { return try await evaluate(in: frame, projecting: nil) }
+        let frame = frame.recording(at: output)
         do {
             // Only containers with a requested descendant need independent
             // child progress. Other branches retain ordinary atomic evaluation.
             let descendants = await frame.runtime.projectsDescendants(of: output)
             let value = try await evaluate(in: frame, projecting: descendants ? output : nil)
-            await frame.runtime.project(.success(value), at: output)
+            if publishing { await frame.runtime.project(.success(value), at: output) }
             return value
         } catch {
-            if !(error is CancellationError) {
+            if publishing, !(error is CancellationError) {
                 await frame.runtime.project(.failure(JSONError(error)), at: output)
             }
             throw error
@@ -108,11 +110,7 @@ extension JSON {
                     if let value = try await frame.runtime.compute(
                         keyword: invocation.keyword,
                         data: invocation.data,
-                        context: frame.context,
-                        route: frame.route["{returns}", .key(invocation.keyword)],
-                        depth: frame.depth,
-                        references: frame.references,
-                        captures: frame.captures,
+                        in: frame["{returns}", .key(invocation.keyword)],
                         projecting: invocation.default == nil ? output : nil
                     ) { return value }
                 } catch {
