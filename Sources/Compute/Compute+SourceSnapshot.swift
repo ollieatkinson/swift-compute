@@ -2,9 +2,9 @@ import _JSON
 
 extension Compute {
     /// A provider snapshot whose provenance is not part of its executable JSON.
-    /// Embed with JSON(snapshot); only a reference read unwraps this native value.
-    /// Ordinary JSON objects, including encoded lookalikes, remain ordinary data.
-    public enum ReferenceSnapshot: Codable, Hashable, Sendable {
+    /// Embed with JSON(snapshot); transparent keyword outputs unwrap this native value.
+    /// Ordinary JSON objects and opaque outputs remain ordinary data.
+    public enum SourceSnapshot: Codable, Hashable, Sendable {
         case value(JSON, thoughts: [Thought] = [])
         case failure(JSONError, thoughts: [Thought] = [])
 

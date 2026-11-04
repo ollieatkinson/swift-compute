@@ -252,14 +252,14 @@ the same depth; negative indices follow the new array shape. Field outcomes are
 committed with their source's graph signal, so an independent route update cannot
 replace a successful field with an aggregate sibling failure.
 
-Reference providers can return `JSON(Compute.ReferenceSnapshot.value(program,
-thoughts: evidence))`, or `.failure(error, thoughts: evidence)`. Native `from`
-records the supplied thoughts before evaluating the program in its existing
+Source providers can return `JSON(Compute.SourceSnapshot.value(program,
+thoughts: evidence))`, or `.failure(error, thoughts: evidence)`. The transparent
+keyword boundary (including native `from`) records the supplied thoughts before evaluating the program in its existing
 frame. Provenance does not consume program depth or turn lazy returned fields
 into an atomic wrapper operation. Missing values remain the provider's ordinary
 error/value contract; this packet does not invent a missing-data convention.
-Only native packets returned by reference reads are unwrapped. Ordinary JSON
-objects and outputs from opaque operations retain their existing meaning.
+Only native packets returned by transparent operations are unwrapped. Ordinary
+JSON objects and outputs from opaque operations retain their existing meaning.
 
 `run(at:tracing:)` pairs a result with immutable thoughts from its contributing
 output scope, including explicit `frame.record` evidence. It shares the graph and

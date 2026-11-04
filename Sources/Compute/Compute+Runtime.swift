@@ -1096,8 +1096,8 @@ extension Compute {
             }
             // Provider evidence belongs to this read, before its returned
             // program executes. It is neither another operation nor user data.
-            if function is any ReferenceKeyword {
-                while let snapshot = rawOutput?.rawValue as? Compute.ReferenceSnapshot {
+            if !(function is any Compute.OpaqueOutputKeyword) {
+                while let snapshot = rawOutput?.rawValue as? Compute.SourceSnapshot {
                     try Task.checkCancellation()
                     for thought in snapshot.thoughts {
                         record(thought, captures: captures, output: frame.output)
