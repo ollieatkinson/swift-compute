@@ -35,6 +35,18 @@ public extension JSON {
             self.init(Double(value as! Float))
         case is Double.Type:
             self.init(value as! Double)
+        case is String.Type:
+            self.init(value as! String)
+        case is JSON.Type:
+            self = value as! JSON
+        case is Array.Type:
+            self.init(value as! Array)
+        case is Object.Type:
+            self.init(value as! Object)
+        case is [Any].Type:
+            self.init(try (value as! [Any]).map(JSON.init(jsonObject:)))
+        case is [String: Any].Type:
+            self.init(try (value as! [String: Any]).mapValues(JSON.init(jsonObject:)))
         default:
             switch value {
             case let value as String:
