@@ -3,8 +3,8 @@ import Brain
 import Foundation
 
 extension Compute {
-    public struct Thought: Codable, Equatable, Sendable {
-        public enum Kind: String, Codable, Equatable, Sendable {
+    public struct Thought: Codable, Hashable, Sendable {
+        public enum Kind: String, Codable, Hashable, Sendable {
             case compute
             case returns
             case defaultValue
@@ -1088,11 +1088,22 @@ extension Compute {
                 }
                 outputReferences.append(entry)
             }
-            let rawOutput: JSON?
+            var rawOutput: JSON?
             if function is any Compute.ReturnsKeywordDefinition {
                 rawOutput = try await value(keyword: keyword, data: input, frame: frame)
             } else {
                 rawOutput = try await function.compute(data: input, frame: frame)
+            }
+            // Provider evidence belongs to this read, before its returned
+            // program executes. It is neither another operation nor user data.
+            if !(function is any Compute.OpaqueOutputKeyword) {
+                while let snapshot = rawOutput?.rawValue as? Compute.SourceSnapshot {
+                    try Task.checkCancellation()
+                    for thought in snapshot.thoughts {
+                        record(thought, captures: captures, output: frame.output)
+                    }
+                    rawOutput = try snapshot.result.get()
+                }
             }
             let output: JSON?
             if function is any Compute.OpaqueOutputKeyword {
