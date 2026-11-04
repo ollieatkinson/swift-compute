@@ -66,14 +66,21 @@ extension Compute {
     }
 
     enum Signal: Equatable, Sendable {
-        /// Authored route input; evaluated values are complete regardless of shape.
+        /// Authored route input; evaluation settles the current observation demand.
         case pending(JSON)
-        case value(JSON)
-        case failure(JSONError)
+        case value(JSON, projections: [Route: Result<JSON, JSONError>] = [:])
+        case failure(JSONError, projections: [Route: Result<JSON, JSONError>] = [:])
+
+        var projections: [Route: Result<JSON, JSONError>] {
+            switch self {
+            case .pending: [:]
+            case .value(_, let projections), .failure(_, let projections): projections
+            }
+        }
 
         var value: JSON? {
             switch self {
-            case .pending(let value), .value(let value): value
+            case .pending(let value), .value(let value, _): value
             case .failure: nil
             }
         }
@@ -348,7 +355,7 @@ extension Compute {
             finishedEvaluationVersion = version
             if !thoughts.isEmpty { latestThoughts = thoughts }
             if publishWhenSettled, !step.isThinking {
-                publish(step.state, failures: snapshot.failures)
+                publish(step.state, failures: snapshot.failures, projections: snapshot.projections)
             }
             if !subscribe, let failure = snapshot.failures.first { throw failure.error }
             return step
@@ -619,12 +626,15 @@ extension Compute {
 
         private func publish(
             _ state: JSON,
-            failures: [(route: Compute.Route, error: JSONError)]
+            failures: [(route: Compute.Route, error: JSONError)],
+            projections: [Compute.Route: Result<JSON, JSONError>]
         ) {
             for route in Array(routeContinuations.keys) {
                 let selected = route.resolvingIndices(in: document)
                 let result: Result<JSON, JSONError>
-                if let failure = failures.first(where: {
+                if let projected = projections[route] {
+                    result = projected
+                } else if let failure = failures.first(where: {
                     $0.route.isPrefix(of: selected) || selected.isPrefix(of: $0.route)
                 }) {
                     result = .failure(failure.error)
@@ -645,10 +655,14 @@ extension Compute {
             for observed in observedRoutes where observed != .root {
                 let selected = observed.resolvingIndices(in: document)
                 guard route.isPrefix(of: selected) else { continue }
+                if let projected = signal.projections[observed] {
+                    yield(projected, to: observed)
+                    continue
+                }
                 switch signal {
                 case .pending: break
-                case .failure(let error): yield(.failure(error), to: observed)
-                case .value(let value):
+                case .failure(let error, _): yield(.failure(error), to: observed)
+                case .value(let value, _):
                     let path = Array(selected.components.dropFirst(route.components.count))
                     if let selected = value.value(at: path) {
                         yield(.success(selected), to: observed)
@@ -657,6 +671,12 @@ extension Compute {
                     }
                 }
             }
+        }
+
+        private func publishProjection(_ result: Result<JSON, JSONError>, to route: Compute.Route, version: UInt64) {
+            guard version == liveEvaluationVersion, version > cancelledThroughVersion,
+                  !Task.isCancelled, route != .root, observedRoutes.contains(route) else { return }
+            yield(result, to: route)
         }
 
         private func yield(_ result: Result<JSON, JSONError>, to route: Compute.Route) {
@@ -685,9 +705,23 @@ extension Compute {
                 didResolve = nil
                 referenceValue = nil
             }
+            let didProject: Compute.FunctionRuntime.Projected?
+            if let version = liveVersion {
+                didProject = { [weak self] route, result in
+                    await self?.publishProjection(result, to: route, version: version)
+                }
+            } else {
+                didProject = nil
+            }
+            // A one-shot read still evaluates the whole document while retaining
+            // the field outcomes needed by observers already following this graph.
+            let observing = liveVersion == nil ? observedRoutes.union([.root]) : observedRoutes
+            let projection = observedRoutes.isEmpty ? nil
+                : Compute.Projection(observing: observing, document: document)
             return Compute.FunctionRuntime(functions: functions, results: results,
                 dependencyOwner: { route in route.nearestAncestor(in: routes) ?? route },
-                didResolve: didResolve, referenceValue: referenceValue)
+                didResolve: didResolve, referenceValue: referenceValue,
+                projection: projection, didProject: didProject)
         }
 
         private func thinking(
@@ -708,7 +742,7 @@ extension Compute {
                 } catch {
                     try Task.checkCancellation()
                     guard liveVersion != nil, !(error is CancellationError) else { throw error }
-                    signal = .failure(JSONError(error))
+                    signal = .failure(JSONError(error), projections: await runtime.projectionResults(at: route))
                 }
                 if let liveVersion, let signal {
                     await self.publish(signal, at: route, version: liveVersion)
@@ -743,7 +777,7 @@ extension Compute {
                     output: step.output,
                     state: nextDocument
                 ))
-            return .value(step.output)
+            return .value(step.output, projections: await runtime.projectionResults(at: route))
         }
 
         private static func evaluate(
@@ -762,7 +796,8 @@ extension Compute {
                         route: functionRoute,
                         depth: 0,
                         recordThought: false,
-                        references: []
+                        references: [],
+                        projecting: invocation.default == nil ? route : nil
                     ) {
                         return (
                             invocation.keyword, await runtime.kind(for: invocation.keyword),
@@ -885,9 +920,11 @@ extension Compute {
             _ state: ComputeBrain.State,
             excluding excluded: Compute.Route? = nil
         ) throws
-            -> (value: JSON, failures: [(route: Compute.Route, error: JSONError)]) {
+            -> (value: JSON, failures: [(route: Compute.Route, error: JSONError)],
+                projections: [Compute.Route: Result<JSON, JSONError>]) {
             var output = document
             var failures: [(route: Compute.Route, error: JSONError)] = []
+            var projections: [Compute.Route: Result<JSON, JSONError>] = [:]
             var finalAncestors: [Compute.Route] = []
             let routeValues = state.compactMap { entry -> (Compute.Route, Compute.Signal)? in
                 guard case .route(let route) = entry.key else { return nil }
@@ -901,18 +938,19 @@ extension Compute {
             }
             for (route, signal) in routeValues {
                 guard !finalAncestors.contains(where: { $0.isPrefix(of: route) }) else { continue }
+                projections.merge(signal.projections) { _, current in current }
                 switch signal {
                 case .pending(let value):
                     try output.set(value, at: route)
-                case .value(let value):
+                case .value(let value, _):
                     try output.set(value, at: route)
                     finalAncestors.append(route)
-                case .failure(let error):
+                case .failure(let error, _):
                     failures.append((route, error))
                     finalAncestors.append(route)
                 }
             }
-            return (output, failures)
+            return (output, failures, projections)
         }
     }
 }
@@ -929,11 +967,14 @@ extension Compute {
     actor FunctionRuntime {
         typealias Resolved = @Sendable (Compute.Route, Compute.Dependency, Result<JSON, JSONError>) async -> Void
         typealias ReferenceValue = @Sendable (Compute.Route, Compute.Dependency) async throws -> JSON
+        typealias Projected = @Sendable (Compute.Route, Result<JSON, JSONError>) async -> Void
         private let functions: [String: any AnyReturnsKeyword]
         private let results: [Compute.Dependency: Result<JSON, JSONError>]
         private let dependencyOwner: @Sendable (Compute.Route) -> Compute.Route
         private let didResolve: Resolved?
         private let referenceValue: ReferenceValue?
+        private var projection: Compute.Projection?
+        private let didProject: Projected?
         private var dependencyState: [Compute.Lemma: Compute.Signal] = [:]
         private var resolved: [Compute.Dependency: Result<JSON, JSONError>] = [:]
         private var tracked: [Compute.Route: Set<Compute.Dependency>] = [:]
@@ -946,13 +987,17 @@ extension Compute {
             results: [Compute.Dependency: Result<JSON, JSONError>],
             dependencyOwner: @escaping @Sendable (Compute.Route) -> Compute.Route,
             didResolve: Resolved? = nil,
-            referenceValue: ReferenceValue? = nil
+            referenceValue: ReferenceValue? = nil,
+            projection: Compute.Projection? = nil,
+            didProject: Projected? = nil
         ) {
             self.functions = functions
             self.results = results
             self.dependencyOwner = dependencyOwner
             self.didResolve = didResolve
             self.referenceValue = referenceValue
+            self.projection = projection
+            self.didProject = didProject
         }
 
         func compute(
@@ -963,7 +1008,8 @@ extension Compute {
             depth: Int,
             recordThought: Bool = true,
             references: [(request: Compute.Keyword.From, context: Compute.Context)],
-            captures: [UInt64] = []
+            captures: [UInt64] = [],
+            projecting: Compute.Route? = nil
         ) async throws -> JSON? {
             try Task.checkCancellation()
             guard let function = functions[keyword] else {
@@ -1017,7 +1063,9 @@ extension Compute {
                         depth: depth + 1,
                         references: outputReferences,
                         captures: captures
-                    ))
+                    ), projecting: projecting.flatMap { route in
+                        projection?.includesDescendants(of: route) == true ? route : nil
+                    })
             }
             if recordThought, let output {
                 let thoughtRoute = route.computeObjectRoute(for: keyword)
@@ -1060,8 +1108,8 @@ extension Compute {
         func result(for dependency: Compute.Dependency) -> Result<JSON, JSONError>? {
             if let signal = dependencyState[.dependency(dependency)] {
                 switch signal {
-                case .pending(let value), .value(let value): return .success(value)
-                case .failure(let error): return .failure(error)
+                case .pending(let value), .value(let value, _): return .success(value)
+                case .failure(let error, _): return .failure(error)
                 }
             }
             return results[dependency] ?? resolved[dependency]
@@ -1083,8 +1131,8 @@ extension Compute {
                     let current: Result<JSON, JSONError>
                     if let signal = dependencyState[.dependency(dependency)] {
                         switch signal {
-                        case .pending(let value), .value(let value): current = .success(value)
-                        case .failure(let error): current = .failure(error)
+                        case .pending(let value), .value(let value, _): current = .success(value)
+                        case .failure(let error, _): current = .failure(error)
                         }
                     } else { current = result }
                     await didResolve?(route, dependency, current)
@@ -1109,6 +1157,30 @@ extension Compute {
                 }
             }
             return try await function.compute(data: data, frame: frame)
+        }
+
+        func includesProjection(_ route: Compute.Route) -> Bool {
+            projection?.includes(route) ?? true
+        }
+
+        func projectsDescendants(of route: Compute.Route) -> Bool {
+            projection?.includesDescendants(of: route) ?? false
+        }
+
+        func prepareProjection(_ value: JSON, at route: Compute.Route) async {
+            for (observed, result) in projection?.prepare(value, at: route) ?? [] {
+                await didProject?(observed, result)
+            }
+        }
+
+        func project(_ result: Result<JSON, JSONError>, at route: Compute.Route) async {
+            for (observed, selected) in projection?.resolve(result, at: route) ?? [] {
+                await didProject?(observed, selected)
+            }
+        }
+
+        func projectionResults(at route: Compute.Route) -> [Compute.Route: Result<JSON, JSONError>] {
+            projection?.results(in: route) ?? [:]
         }
 
         func trackDependencies(for route: Compute.Route, state: [Compute.Lemma: Compute.Signal]) {
@@ -1156,7 +1228,7 @@ extension Compute.Route {
 
     /// Resolve authored array indices while preserving indices inside computed
     /// output, whose shape is known only when that ancestor finishes.
-    fileprivate func resolvingIndices(in document: JSON) -> Compute.Route {
+    func resolvingIndices(in document: JSON) -> Compute.Route {
         var current = document
         var resolved: [Component] = []
         for (offset, component) in components.enumerated() {
@@ -1178,7 +1250,7 @@ extension Compute.Route {
         return Compute.Route(resolved)
     }
 
-    fileprivate func isPrefix(of route: Compute.Route) -> Bool {
+    func isPrefix(of route: Compute.Route) -> Bool {
         guard components.count <= route.components.count else { return false }
         return zip(components, route.components).allSatisfy(==)
     }
