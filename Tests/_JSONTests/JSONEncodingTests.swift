@@ -71,6 +71,33 @@ import Testing
         #expect(throws: Failure.authored) { try JSON.encoded(Broken?.some(Broken())) }
     }
 
+    @Test func foundation_optionals_keep_nested_literals_native_json_and_rejection_rules() throws {
+        let date = Date(timeIntervalSince1970: 0)
+        let native: [String: Any] = [
+            "string": String??.some(.some("true")) as Any,
+            "missing": String??.some(.none) as Any,
+            "boolean": Bool?.some(false) as Any,
+            "integer": Int64?.some(Int64.max) as Any,
+            "number": NSNumber?.some(NSNumber(value: 1.5)) as Any,
+            "null": NSNull?.some(NSNull()) as Any,
+            "array": [Int?]?.some([1, nil, 3]) as Any,
+            "object": [String: String?]?.some(["present": "Blue", "absent": nil]) as Any,
+            "native": JSON?.some(JSON(date)) as Any,
+        ]
+        let value = try JSON(jsonObject: native)
+        #expect(value == [
+            "string": "true", "missing": .null, "boolean": false,
+            "integer": .int(Int.max), "number": 1.5, "null": .null,
+            "array": [1, .null, 3], "object": ["present": "Blue", "absent": .null],
+            "native": JSON(date),
+        ])
+        #expect(try JSON(jsonObject: Double?.some(8) as Any).rawValue is Double)
+        #expect(try JSON(jsonObject: JSON??.some(.some(.null)) as Any).isNull)
+        for input: Any in [date, Date?.some(date) as Any, ["date": Date?.some(date) as Any]] {
+            #expect(throws: JSONError.self) { try JSON(jsonObject: input) }
+        }
+    }
+
     @Test func encoding_uses_codable_containers_once_and_keeps_epoch_dates_urls_and_bytes() throws {
         final class Counter { var calls = 0 }
         struct Value: Encodable {

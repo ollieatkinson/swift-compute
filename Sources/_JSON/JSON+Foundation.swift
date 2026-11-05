@@ -3,7 +3,7 @@ import Foundation
 
 public extension JSON {
     init(jsonObject value: Any?) throws {
-        guard let value = Self.unwrapped(value), !(value is NSNull), !(value is Null) else {
+        guard let value, !(value is NSNull), !(value is Null) else {
             self = .null
             return
         }
@@ -39,8 +39,13 @@ public extension JSON {
             switch value {
             case let value as String:
                 self.init(value)
-            case let value as NSNumber:
-                self = Self.number(value)
+            case let number as NSNumber:
+                // Bridging an optional Swift number can lose its native type.
+                if let optional = value as? _AnyOptional {
+                    try self.init(jsonObject: optional.jsonFlattened)
+                } else {
+                    self = Self.number(number)
+                }
             case let value as JSON:
                 self = value
             case let values as Array:
@@ -52,6 +57,10 @@ public extension JSON {
             case let values as [String: Any]:
                 self.init(try values.mapValues(JSON.init(jsonObject:)))
             default:
+                if let optional = value as? _AnyOptional {
+                    try self.init(jsonObject: optional.jsonFlattened)
+                    return
+                }
                 throw JSONError("Unsupported JSON value \(String(describing: value))")
             }
         }
