@@ -1176,7 +1176,14 @@ extension Compute {
                 throw JSONError("Unregistered Compute keyword \(keyword)", path: frame.route.path)
             }
             if function is any Compute.ReturnsKeywordDefinition {
-                let dependency = Compute.Dependency(keyword: keyword, data: data, depth: frame.depth)
+                // Canonical reference input is independent of execution depth.
+                // Its returned program still runs in each caller's own frame.
+                let dependencyDepth = function is any ReferenceKeyword ? 0 : frame.depth
+                let dependency = Compute.Dependency(
+                    keyword: keyword,
+                    data: data,
+                    depth: dependencyDepth
+                )
                 let route = dependencyOwner(frame.route.computeObjectRoute(for: keyword))
                 tracked[route, default: []].insert(dependency)
                 if let result = results[dependency] {

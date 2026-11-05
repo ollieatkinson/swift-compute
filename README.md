@@ -221,8 +221,11 @@ Live `from` expressions consume the initial snapshot from that same observation,
 then keep it for changes. `AsyncReferences.values(for:context:)` must supply a
 current value or failure before later updates; an empty finished stream reports
 an error. This avoids opening a separate one-shot source before its live stream.
-Simultaneous uses of one canonical request share the initial subscription;
-pending reads cancel with their runtime. One-shot evaluation still calls
+Simultaneous uses of one canonical request share the initial subscription even
+at different execution depths or through normalized aliases. Only the source
+input is shared: returned programs keep each caller's local item, bindings,
+depth and reference ancestry. Other streaming keywords retain depth-dependent
+identity. Pending reads cancel with their runtime. One-shot evaluation still calls
 `References.value(for:context:)`, and other streaming keywords retain their
 existing compute/subject contract.
 `runtime.run(at: ["profile", "name"])` observes the selected route without

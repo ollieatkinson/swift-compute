@@ -3,6 +3,54 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct ComputeRuntimeReferenceLifetimeTests {
+    @Test(arguments: [false, true], [false, true])
+    func different_depths_share_the_reference_input_but_keep_their_local_items(
+        tracing: Bool,
+        useAlias: Bool
+    ) async throws {
+        let references = StreamReferences()
+        let template = JSON.returns("from", ["reference": "template"])
+        let shallow = useAlias ? JSON.returns("from", ["reference": "template_alias"]) : template
+        let localName = JSON.returns("item", ["name"])
+        await references.base.set("template", to: localName)
+        await references.base.set("wrapper", to: .returns("map", [
+            "src": ["name": "Far"],
+            "dst": template,
+        ]))
+        let runtime = try runtime([
+            "shallow": .returns("map", ["src": ["name": "Near"], "dst": shallow]),
+            "deep": .returns("from", ["reference": "wrapper"]),
+        ], references: references)
+        defer {
+            await runtime.cancel()
+            await references.base.finish()
+        }
+        var values = runtime.run(tracing: tracing).makeAsyncIterator()
+        #expect(await values.next()?.result == .success(["shallow": "Near", "deep": "Far"]))
+        #expect(await references.base.subscriptionCount(for: "template") == 1)
+        #expect(await references.openings == 2)
+
+        await references.base.set("template", to: ["name": localName, "updated": true])
+        #expect(await values.next()?.result == .success([
+            "shallow": ["name": "Near", "updated": true],
+            "deep": ["name": "Far", "updated": true],
+        ]))
+        #expect(await references.base.subscriptionCount(for: "template") == 1)
+
+        // Retiring one use must not release the input still used by its sibling.
+        await references.base.set("wrapper", to: "Finished")
+        #expect(await values.next()?.result == .success([
+            "shallow": ["name": "Near", "updated": true],
+            "deep": "Finished",
+        ]))
+        await references.base.set("template", to: localName)
+        #expect(await values.next()?.result == .success(["shallow": "Near", "deep": "Finished"]))
+        #expect(await references.openings == 2)
+        await runtime.cancel()
+        try await wait { await references.base.subscriptionCount(for: "template") == 0 }
+        try await wait { await references.base.subscriptionCount(for: "wrapper") == 0 }
+    }
+
     @Test(arguments: [false, true])
     func a_live_reference_keeps_its_initial_stream_through_updates_and_cancellation(
         initiallyFailed: Bool
@@ -123,6 +171,13 @@ private actor StreamReferences: Compute.AsyncReferences {
 
     init(initiallyPending: Bool = false) {
         base = TestReferences(initiallyPending: initiallyPending)
+    }
+
+    func request(
+        for reference: JSON,
+        context: [String: JSON]?
+    ) async throws -> Compute.Keyword.From {
+        .init(reference: reference == "template_alias" ? "template" : reference, context: context)
     }
 
     func value(for reference: JSON, context: [String: JSON]?) async throws -> JSON {
