@@ -201,6 +201,9 @@ request. Normalization runs before dependency sharing, cycle detection and neste
 scope propagation; it should deterministically describe identity without fetching
 the value or opening a subscription. Compute does not prescribe a reference schema.
 Different request contexts, changing local items, and repeated reads in sibling branches remain independent.
+Even with identical items and bindings, two caller paths through the same cyclic
+templates can select different cycle defaults. Source sharing does not memoize
+those interpreted values by reference alone.
 Custom keywords can project independent rows with `frame.scoped(to: bindings)`.
 This copies the branch's effective reference defaults while retaining its item,
 route, depth and reference ancestry. `frame.scope` exposes those defaults to other

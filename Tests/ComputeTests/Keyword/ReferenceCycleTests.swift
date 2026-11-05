@@ -2,6 +2,43 @@ import Compute
 import Testing
 
 @Suite(.timeLimit(.minutes(1))) struct ReferenceCycleTests {
+    @Test(arguments: [false, true])
+    func cycle_defaults_belong_to_each_callers_resolution_path(live: Bool) async throws {
+        let first = JSON.returns("from", ["reference": "first"])
+        let second = JSON.returns("from", ["reference": "second"])
+        let definitions: [String: JSON] = [
+            "first": .returns("from", ["reference": "second"], default: "First fallback"),
+            "second": .returns("from", ["reference": "first"], default: "Second fallback"),
+        ]
+        let references = TestReferences()
+        for (name, definition) in definitions { await references.set(name, to: definition) }
+        let function: any AnyReturnsKeyword
+        if live { function = Compute.Keyword.From.Function(references: references) }
+        else {
+            function = Compute.Keyword.From
+                .Function(references: FixedReferences(values: definitions))
+        }
+        let runtime = Compute.Runtime(
+            document: ["left": first, "right": second],
+            functions: [function]
+        )
+        defer {
+            await runtime.cancel()
+            await references.finish()
+        }
+        let expected: JSON = ["left": "Second fallback", "right": "First fallback"]
+        if live {
+            var values = runtime.run().makeAsyncIterator()
+            await expectNext(&values, equals: .success(expected))
+            #expect(await references.subscriptionCount(for: "first") == 1)
+            #expect(await references.subscriptionCount(for: "second") == 1)
+            await references.set("second", to: "Recovered")
+            await expectNext(&values, equals: .success(["left": "Recovered", "right": "Recovered"]))
+        } else {
+            #expect(try await runtime.value() == expected)
+        }
+    }
+
     @Test(arguments: [false, true], [false, true])
     func recursive_templates_can_advance_through_local_items(live: Bool, withDefault: Bool) async throws {
         let walk: JSON = .returns("from", ["reference": "walk"],
