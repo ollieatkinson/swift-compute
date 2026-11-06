@@ -3,6 +3,22 @@ import _JSON
 import Testing
 
 @Suite struct JSONEncodingTests {
+    @Test func native_and_foundation_containers_preserve_json_atoms_and_validate_untyped_values() throws {
+        let atom = JSON(Date(timeIntervalSince1970: 0))
+        let array: JSON.Array = [atom, .double(8), .null]
+        let object: JSON.Object = ["values": .array(array), "empty": .object([:])]
+        for input: Any in [object, object as NSDictionary, ["values": array, "empty": [:]] as [String: Any]] {
+            #expect(try JSON(jsonObject: input) == .object(object))
+        }
+        for input: Any in [array, array as NSArray, array.map { $0 as Any }] {
+            #expect(try JSON(jsonObject: input) == .array(array))
+        }
+        for input: Any in [NSDictionary(object: "value", forKey: NSNumber(value: 1)),
+                          NSArray(object: Date(timeIntervalSince1970: 0))] {
+            #expect(throws: JSONError.self) { try JSON(jsonObject: input) }
+        }
+    }
+
     @Test func foundation_strings_and_numbers_keep_literal_types_in_nested_containers() throws {
         let native: [String: Any] = [
             "strings": ["true", "false", "1", "8.0", "1e6", "Blue", "Oz"].map { $0 as NSString },

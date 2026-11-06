@@ -13,6 +13,25 @@ public extension JSON {
             self.init(value as! Bool)
         case is Int.Type:
             self.init(value as! Int)
+        case is Double.Type:
+            self.init(value as! Double)
+        case is String.Type, is NSString.Type:
+            self.init(value as! String)
+        case is JSON.Type:
+            self = value as! JSON
+        case is Array.Type:
+            self.init(value as! Array)
+        case is Object.Type:
+            self.init(value as! Object)
+        case is NSNumber.Type:
+            self = Self.number(value as! NSNumber)
+        case is [Any].Type, is NSArray.Type:
+            self.init(try (value as! [Any]).map(JSON.init(jsonObject:)))
+        case is [String: Any].Type, is NSDictionary.Type:
+            guard let values = value as? [String: Any] else {
+                throw JSONError("Unsupported JSON value \(String(describing: value))")
+            }
+            self.init(try values.mapValues(JSON.init(jsonObject:)))
         case is Int8.Type:
             self.init(Int(value as! Int8))
         case is Int16.Type:
@@ -33,8 +52,6 @@ public extension JSON {
             self = Self.unsignedInteger(value as! UInt64)
         case is Float.Type:
             self.init(Double(value as! Float))
-        case is Double.Type:
-            self.init(value as! Double)
         default:
             switch value {
             case let value as String:
