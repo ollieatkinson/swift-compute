@@ -127,11 +127,50 @@ public extension JSON {
         // Generic overload resolution cannot select the concrete JSON identity
         // overload. The exact type check makes this cast an identity operation.
         if Value.self == JSON.self { return self as! Value }
-        return try AnyDecoder().decode(Value.self, from: any)
+        return try ValueDecoder().decode(Value.self, from: isNull ? NSNull() : rawValue)
     }
 
     func decode(_ type: JSON.Type = JSON.self) -> JSON {
         self
+    }
+}
+
+/// Retains boxed JSON fields until requested. Numeric conversions check bounds;
+/// other destinations keep AnyCoding's existing native-value conversions.
+private final class ValueDecoder: AnyDecoder {
+    override func convert<Value>(_ value: Any, to type: Value.Type) throws -> Any? {
+        if let literal = value as? JSON, let decodable = type as? any Decodable.Type {
+            return try decode(decodable, from: literal.isNull ? NSNull() : literal.rawValue)
+        }
+        let decoded: Any?
+        if let integer = type as? any FixedWidthInteger.Type {
+            if let number = value as? any BinaryInteger {
+                decoded = integer.init(exactly: number)
+            } else if let number = value as? any BinaryFloatingPoint {
+                decoded = integer.init(exactly: number)
+            } else {
+                decoded = nil
+            }
+        } else if let floating = type as? any BinaryFloatingPoint.Type {
+            if let input = value as? any BinaryInteger {
+                let number = floating.init(input)
+                decoded = number.isFinite ? number : nil
+            } else if let input = value as? any BinaryFloatingPoint {
+                let number = floating.init(input)
+                decoded = !input.isFinite || number.isFinite ? number : nil
+            } else {
+                decoded = nil
+            }
+        } else {
+            return try super.convert(value, to: type)
+        }
+        guard let decoded else {
+            throw DecodingError.typeMismatch(type, .init(
+                codingPath: codingPath,
+                debugDescription: "Expected \(type), found \(Swift.type(of: value))"
+            ))
+        }
+        return decoded
     }
 }
 

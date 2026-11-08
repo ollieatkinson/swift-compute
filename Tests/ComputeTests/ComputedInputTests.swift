@@ -114,4 +114,36 @@ import Testing
         await references.set("enabled", to: false)
         #expect(try await values.next()?.get() == "Disabled")
     }
+
+    @Test
+    func optional_numeric_inputs_report_coercions_at_the_field_and_recover_without_using_defaults(
+    ) async throws {
+        let references = TestReferences()
+        await references.set("offset", to: 0)
+        let runtime = try runtime(.returns("date", [
+            "since": ["epoch": 0],
+            "offset": .returns("from", ["reference": "offset"])
+        ]), references: references)
+        defer { await runtime.cancel()
+            await references.finish()
+        }
+        var values = runtime.run().makeAsyncIterator()
+        #expect(try await values.next()?.get().rawValue as? Date == Date(timeIntervalSince1970: 0))
+        for input: JSON in [true, "2"] {
+            await references.set("offset", to: input)
+            if case .failure(let error) = await values.next() {
+                #expect(error.path == ["{returns}", "date", "offset"])
+            } else {
+                Issue
+                    .record(
+                        "A malformed present offset must fail instead of coercing or defaulting"
+                    )
+            }
+        }
+        await references.set("offset", to: 1.5)
+        #expect(try await values.next()?.get()
+            .rawValue as? Date == Date(timeIntervalSince1970: 1.5))
+        await references.set("offset", to: .null)
+        #expect(try await values.next()?.get().rawValue as? Date == Date(timeIntervalSince1970: 0))
+    }
 }

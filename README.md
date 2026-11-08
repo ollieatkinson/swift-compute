@@ -387,7 +387,19 @@ before converting to `Int`, avoiding NSNumber's clamping or unsigned wrapping.
 Decoding an existing `JSON` as `JSON` is an identity operation, including through
 generic `decode`/`decoded` calls and computed JSON slots. It preserves native
 atoms and opaque data without a Foundation conversion or another decoder pass.
-Other destination types continue through their existing Codable decoder.
+Other destination types reuse the existing in-memory Codable containers. Typed
+numeric fields reject boolean/string coercions, and integer conversions reject
+fractions and out-of-range values. Floating-point
+conversion accepts integer inputs and rejects newly introduced overflow. These
+checks also apply inside typed arrays and synthesized fields. Native-value and
+URL conversions retain their existing path. String conversions, including regex
+match operands, keep their existing behaviour. Boxed JSON fields retain their
+native atoms until requested; no Foundation-container or JSON text round trip is added.
+
+A computed `Double?` slot can be absent/null, but a malformed present value reports
+its field route and remains recoverable. `true` is not a numeric default. Existing
+AnyCoding policies for optional container fields are unchanged. Use explicit
+expressions when numeric conversion is intended.
 
 ## Development
 
