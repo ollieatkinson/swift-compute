@@ -142,6 +142,11 @@ private final class ValueDecoder: AnyDecoder {
         if let literal = value as? JSON, let decodable = type as? any Decodable.Type {
             return try decode(decodable, from: literal.isNull ? NSNull() : literal.rawValue)
         }
+        if type == String.self {
+            // Preserve existing container descriptions when conversion to text
+            // is requested, without flattening other typed/JSON destinations.
+            return try super.convert(JSON.foundationValue(value), to: type)
+        }
         let decoded: Any?
         if let integer = type as? any FixedWidthInteger.Type {
             if let number = value as? any BinaryInteger {
@@ -182,8 +187,8 @@ extension JSON {
     }
 }
 
-private extension JSON {
-    static func foundationValue(_ value: JSONValue) -> Any {
+fileprivate extension JSON {
+    static func foundationValue(_ value: Any) -> Any {
         switch value {
         case is Null:
             return NSNull()

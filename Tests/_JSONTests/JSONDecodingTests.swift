@@ -17,6 +17,17 @@ struct JSONDecodingTests {
             #expect(throws: (any Error).self) { try input.decode(Int.self) }
         }
         #expect(try JSON.int(1).decode(String.self) == "1")
+        for input: JSON in [
+            .null,
+            [],
+            [:],
+            [1, true, "1"],
+            ["value": [1, true]],
+            JSON(UInt64.max),
+            JSON([UInt64.max])
+        ] {
+            #expect(try input.decode(String.self) == String(describing: input.any))
+        }
         #expect(throws: (any Error).self) { try JSON.double(1.5).decode(Int.self) }
         #expect(throws: (any Error).self) { try JSON.int(-1).decode(UInt.self) }
         #expect(throws: (any Error).self) { try JSON.int(128).decode(Int8.self) }

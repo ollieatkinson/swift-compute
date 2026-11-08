@@ -394,7 +394,8 @@ conversion accepts integer inputs and rejects newly introduced overflow. These
 checks also apply inside typed arrays and synthesized fields. Native-value and
 URL conversions retain their existing path. String conversions, including regex
 match operands, keep their existing behaviour. Boxed JSON fields retain their
-native atoms until requested; no Foundation-container or JSON text round trip is added.
+native atoms until requested. Only coercing string reads keep their existing
+Foundation-container conversion; no JSON text round trip is added.
 
 A computed `Double?` slot can be absent/null, but a malformed present value reports
 its field route and remains recoverable. `true` is not a numeric default. Existing
