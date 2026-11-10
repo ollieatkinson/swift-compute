@@ -347,6 +347,26 @@ before applying `date.offset`; callers do not need to rewrite a timestamp string
 Parsing uses Foundation's value-based ISO format style where available, retaining
 the package's existing deployment range with a local formatter fallback.
 
+`calendar` enumerates Foundation calendar intervals touching a half-open range
+`[from, to)`. Supply computed dates and a `unit` (`hour`, `day`, `week`, `month`
+or `year`). The result contains `intervals` with `start`/`end` in Unix seconds,
+plus the resolved range, time zone, identifier and week policy. Boundary intervals
+retain their complete bounds, allowing a caller to label partial coverage.
+Equal endpoints return no intervals; reversed or nonfinite ranges fail.
+
+The default identifier is `iso8601` (Monday, four days in the first week).
+`gregorian` defaults to Sunday and one day. Optional `first_weekday` and
+`minimum_days_in_first_week` override those defaults with values from 1 to 7.
+Omitting or nulling `time_zone` uses the current device zone; an explicit zone
+must be a valid Foundation time-zone identifier. Unknown units, calendars and
+zones fail. The resolved policy is included in the output for display and reuse.
+
+For example, a `week` query from `2026-10-24T12:00:00Z` to
+`2026-10-26T00:00:00Z` in `Europe/London` returns the calendar week starting
+19 October. That week has 169 hours. Use `date` to construct the input dates,
+then ordinary array, date and text recipes to project the interval records.
+`date.offset` continues to express elapsed seconds.
+
 `array_reduce` evaluates `next` once per element. During each iteration, the local `item` context contains `item`, `index`, and `accumulator`.
 
 `explain` evaluates a value and returns an object containing `ok`, `value`, `summary`, and displayable `thoughts`. Set `mode` to `"foundation_model"` to add a natural-language `explanation` using Apple's on-device Foundation Models framework when it is available on iOS or macOS. `context` is optional user-facing context that helps the model explain what the computed value affects. On unsupported platforms, unavailable models, or generation failure, `explain` falls back to the trace-only payload. If the explained value fails, `explain` returns `ok: false` with an `error` string instead of throwing.

@@ -15,6 +15,7 @@ public struct Computer: Sendable {
         Compute.Keyword.HTTP.Function(),
         Compute.Keyword.Text.function,
         Compute.Keyword.Date.function,
+        Compute.Keyword.Calendar.function,
         Compute.Keyword.Seconds.function,
         Compute.Keyword.Item.function,
         Compute.Keyword.Get.function,
