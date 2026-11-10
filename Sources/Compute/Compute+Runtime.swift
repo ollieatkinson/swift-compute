@@ -1391,7 +1391,9 @@ extension Array where Element == Compute.Route {
             if lhs.components.count != rhs.components.count {
                 return lhs.components.count > rhs.components.count
             }
-            return lhs.path.lexicographicallyPrecedes(rhs.path)
+            return lhs.components.lexicographicallyPrecedes(rhs.components) {
+                $0.stringValue < $1.stringValue
+            }
         }
     }
 }
@@ -1402,7 +1404,9 @@ extension Array where Element == Compute.Thought {
             if lhs.route.components.count != rhs.route.components.count {
                 return lhs.route.components.count > rhs.route.components.count
             }
-            return lhs.route.path.lexicographicallyPrecedes(rhs.route.path)
+            return lhs.route.components.lexicographicallyPrecedes(rhs.route.components) {
+                $0.stringValue < $1.stringValue
+            }
         }
     }
 }

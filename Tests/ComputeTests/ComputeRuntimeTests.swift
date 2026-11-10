@@ -3,6 +3,33 @@ import Testing
 
 @Suite(.serialized)
 struct ComputeRuntimeTests {
+    @Test func runtime_thoughts_keep_deepest_first_then_lexical_route_order() async throws {
+        let items = JSON.array((0 ..< 12).map { _ in
+            .returns("literal", ["value": "item"])
+        })
+        let runtime = try runtime([
+            "2": .returns("literal", ["value": "two"]),
+            "10": .returns("literal", ["value": "ten"]),
+            "items": items,
+            "nested": ["deep": ["leaf": .returns("literal", ["value": "deepest"])]],
+        ])
+        defer { await runtime.cancel() }
+        let step = try await runtime.step()
+        #expect(step.thoughts.map(\.route) == [
+            ["nested", "deep", "leaf"],
+            ["items", 0], ["items", 1], ["items", 10], ["items", 11],
+            ["items", 2], ["items", 3], ["items", 4], ["items", 5],
+            ["items", 6], ["items", 7], ["items", 8], ["items", 9],
+            ["10"], ["2"],
+        ])
+        #expect(step.state == [
+            "2": "two", "10": "ten",
+            "items": .array(Array(repeating: "item", count: 12)),
+            "nested": ["deep": ["leaf": "deepest"]],
+        ])
+        #expect(!step.isThinking)
+    }
+
     @Test func runtime_steps_through_leaf_computes_before_replacing_the_root() async throws {
         let references = TestReferences()
         await references.set("minimum_age", to: 36)
