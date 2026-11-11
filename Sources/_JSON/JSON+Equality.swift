@@ -4,7 +4,20 @@ public extension JSON {
     }
 
     func isEqual(to other: JSON) -> Bool {
-        rawValue._isEqual(to: other.rawValue)
+        if let equal = rawValue._isEqual(to: other.rawValue) { return equal }
+
+        // Foundation collection subclasses can bridge to literal containers
+        // when the other value cannot cast back to that native subclass.
+        switch rawValue {
+        case let object as Object:
+            return object.isEqual(to: other.rawValue)
+        case let array as Array:
+            return array.isEqual(to: other.rawValue)
+        case is Null:
+            return other.isNull
+        default:
+            return false
+        }
     }
 
     func hash(into hasher: inout Hasher) {
@@ -39,8 +52,9 @@ public extension JSON {
 }
 
 private extension Equatable {
-    func _isEqual(to other: JSONValue) -> Bool {
-        self == other as? Self
+    func _isEqual(to other: JSONValue) -> Bool? {
+        guard let other = other as? Self else { return nil }
+        return self == other
     }
 }
 
