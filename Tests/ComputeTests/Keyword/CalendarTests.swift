@@ -21,7 +21,7 @@ struct CalendarTests {
         ])
         let output = try await value(labels)
         #expect(output.array?.first?.object?["label"]?.string == "19 Oct")
-        #expect(output.array?.first?.object?["duration"]?.double == 169 * 3600)
+        #expect(output.array?.first?.object?["duration"]?.double == 169.0 * 3600)
     }
 
     @Test(arguments: [
