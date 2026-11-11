@@ -2,6 +2,16 @@ import _JSON
 import Algorithms
 
 extension JSON {
+    /// Whether this value contains executable syntax. Plain values can be
+    /// delivered by a binding without opening an evaluation runtime.
+    public var requiresEvaluation: Bool {
+        if let object {
+            if Compute.Invocation(object: object) != nil { return true }
+            return object.values.contains { $0.requiresEvaluation }
+        }
+        return array?.contains { $0.requiresEvaluation } ?? false
+    }
+
     public static func returns(
         _ keyword: String,
         _ data: JSON,

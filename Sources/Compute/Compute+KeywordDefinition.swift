@@ -47,6 +47,10 @@ extension Compute {
         func request(data: JSON, frame: Compute.Frame) async throws -> JSON
         func subject(data: JSON, frame: Compute.Frame, bufferingPolicy: BufferingPolicy) -> AsyncStream<Result<JSON, JSONError>>
     }
+
+    /// The stream supplies its current result before later changes. Live
+    /// evaluation owns that subscription from the initial read onward.
+    public protocol StreamingKeywordDefinition: ReturnsKeywordDefinition {}
 }
 
 extension Compute.ReturnsKeywordDefinition {

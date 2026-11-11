@@ -107,6 +107,7 @@ extension Compute {
 
         private let document: JSON
         private let context: Compute.Context?
+        private let initialDepth: Int
         private let functions: [String: any AnyReturnsKeyword]
         private let brain: ComputeBrain
         private var routeConcepts: Set<Compute.Route>
@@ -136,6 +137,7 @@ extension Compute {
         public init(
             document: JSON,
             context: Compute.Context? = nil,
+            depth: Int = 0,
             functions: [any AnyReturnsKeyword] = [],
             computer: Computer = .default
         ) {
@@ -147,6 +149,7 @@ extension Compute {
             )
             self.document = document
             self.context = context
+            self.initialDepth = max(0, depth)
             self.functions = computer.functions
             self.routeConcepts = graph.routeConcepts
             self.brain = ComputeBrain(
@@ -803,7 +806,8 @@ extension Compute {
                 return nil
             }
             await runtime.trackDependencies(for: route, state: state)
-            let step = try await Self.evaluate(object, at: route, runtime: runtime, context: context)
+            let step = try await Self.evaluate(object, at: route, runtime: runtime, context: context,
+                depth: initialDepth)
             try Task.checkCancellation()
             var nextState = state
             nextState[.route(route)] = .value(step.output)
@@ -811,7 +815,7 @@ extension Compute {
             await runtime.record(
                 Compute.Thought(
                     route: route,
-                    depth: 0,
+                    depth: initialDepth,
                     keyword: step.keyword,
                     kind: step.kind,
                     input: step.input,
@@ -825,16 +829,18 @@ extension Compute {
             _ object: [String: JSON],
             at route: Compute.Route,
             runtime: Compute.FunctionRuntime,
-            context: Compute.Context
+            context: Compute.Context,
+            depth: Int
         ) async throws -> (keyword: String, kind: Compute.Thought.Kind, input: JSON, output: JSON) {
             if let invocation = Compute.Invocation(object: object) {
+                guard depth < 20 else { throw Compute.Error.recursionLimitExceeded }
                 let functionRoute = route["{returns}", .key(invocation.keyword)]
                 do {
                     if let output = try await runtime.compute(
                         keyword: invocation.keyword,
                         data: invocation.data,
                         in: Compute.Frame(context: context, runtime: runtime,
-                            route: functionRoute, depth: 0, references: [], output: route),
+                            route: functionRoute, depth: depth, references: [], output: route),
                         recordThought: false,
                         projecting: invocation.default == nil ? route : nil
                     ) {
@@ -849,12 +855,12 @@ extension Compute {
                             invocation.json, .null
                         )
                     }
-                    return try await defaultValue(fallback, at: route, runtime: runtime, context: context)
+                    return try await defaultValue(fallback, at: route, runtime: runtime, context: context, depth: depth)
                 } catch {
                     guard let fallback = invocation.default else {
                         throw error
                     }
-                    return try await defaultValue(fallback, at: route, runtime: runtime, context: context)
+                    return try await defaultValue(fallback, at: route, runtime: runtime, context: context, depth: depth)
                 }
             }
             throw JSONError("Unsupported compute object", path: route.path)
@@ -864,14 +870,15 @@ extension Compute {
             _ fallback: JSON,
             at route: Compute.Route,
             runtime: Compute.FunctionRuntime,
-            context: Compute.Context
+            context: Compute.Context,
+            depth: Int
         ) async throws -> (keyword: String, kind: Compute.Thought.Kind, input: JSON, output: JSON) {
             let output = try await fallback.compute(
                 in: Compute.Frame(
                     context: context,
                     runtime: runtime,
                     route: route["default"],
-                    depth: 0,
+                    depth: depth,
                     references: [],
                     output: route
                 ))
@@ -1089,6 +1096,7 @@ extension Compute {
                 outputReferences.append(entry)
             }
             var rawOutput: JSON?
+            var evaluated = false
             if function is any Compute.ReturnsKeywordDefinition {
                 rawOutput = try await value(keyword: keyword, data: input, frame: frame)
             } else {
@@ -1103,10 +1111,14 @@ extension Compute {
                         record(thought, captures: captures, output: frame.output)
                     }
                     rawOutput = try snapshot.result.get()
+                    if case .evaluated = snapshot {
+                        evaluated = true
+                        break
+                    }
                 }
             }
             let output: JSON?
-            if function is any Compute.OpaqueOutputKeyword {
+            if function is any Compute.OpaqueOutputKeyword || evaluated {
                 output = rawOutput
             } else {
                 output = try await rawOutput?.compute(
@@ -1203,7 +1215,8 @@ extension Compute {
                 }
                 do {
                     let value: JSON?
-                    if function is any ReferenceKeyword, let referenceValue {
+                    if function is any ReferenceKeyword || function is any Compute.StreamingKeywordDefinition,
+                       let referenceValue {
                         value = try await referenceValue(route, dependency)
                     } else {
                         value = try await function.compute(data: data, frame: frame)

@@ -267,6 +267,19 @@ error/value contract; this packet does not invent a missing-data convention.
 Only native packets returned by transparent operations are unwrapped. Ordinary
 JSON objects and outputs from opaque operations retain their existing meaning.
 
+A binding that already evaluated its result can return
+`JSON(Compute.SourceSnapshot.evaluated(value, thoughts: evidence))`. The caller
+records that evidence and keeps the result as data, including any program-looking
+JSON it contains. `Runtime(document:context:depth:)` lets a retained binding stage
+inherit its enclosing depth budget; `Context(item:scope:)` supplies its reference
+defaults. `JSON.requiresEvaluation` uses the invocation parser to distinguish
+plain values from executable syntax, including unknown keywords.
+
+Custom `StreamingKeywordDefinition` implementations supply the current snapshot
+before later changes. Live evaluation uses that subscription for the initial
+read as well, avoiding a separate compute/subscribe handoff. Ordinary streaming
+keyword and one-shot behavior remain unchanged.
+
 `run(at:tracing:)` pairs a result with immutable thoughts from its contributing
 output scope, including explicit `frame.record` evidence. It shares the graph and
 input subscriptions with ordinary observers:

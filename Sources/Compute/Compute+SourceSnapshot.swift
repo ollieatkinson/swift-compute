@@ -6,18 +6,21 @@ extension Compute {
     /// Ordinary JSON objects and opaque outputs remain ordinary data.
     public enum SourceSnapshot: Codable, Hashable, Sendable {
         case value(JSON, thoughts: [Thought] = [])
+        /// A binding has already evaluated this value. Its evidence still belongs
+        /// to the caller, but its JSON markers are now data.
+        case evaluated(JSON, thoughts: [Thought] = [])
         case failure(JSONError, thoughts: [Thought] = [])
 
         var result: Result<JSON, JSONError> {
             switch self {
-            case .value(let value, _): .success(value)
+            case .value(let value, _), .evaluated(let value, _): .success(value)
             case .failure(let error, _): .failure(error)
             }
         }
 
         var thoughts: [Thought] {
             switch self {
-            case .value(_, let thoughts), .failure(_, let thoughts): thoughts
+            case .value(_, let thoughts), .evaluated(_, let thoughts), .failure(_, let thoughts): thoughts
             }
         }
     }
