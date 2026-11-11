@@ -4,7 +4,7 @@ public extension JSON {
     }
 
     func isEqual(to other: JSON) -> Bool {
-        Self.isEqual(rawValue, to: other.rawValue)
+        rawValue._isEqual(to: other.rawValue)
     }
 
     func hash(into hasher: inout Hasher) {
@@ -28,10 +28,7 @@ public extension JSON {
             hasher.combine(values)
         case let object as Object:
             hasher.combine(6)
-            for (key, value) in object.sortedEntries {
-                hasher.combine(key)
-                hasher.combine(value)
-            }
+            hasher.combine(object)
         default:
             hasher.combine(7)
             hasher.combine(String(reflecting: Swift.type(of: rawValue)))
@@ -39,31 +36,11 @@ public extension JSON {
         }
     }
 
-    private static func isEqual(_ value: JSONValue, to other: JSONValue) -> Bool {
-        if (value as any Equatable)._isSameType(as: other) {
-            return (value as any Equatable)._isEqual(to: other)
-        }
-
-        switch value {
-        case let object as JSON.Object:
-            return object.isEqual(to: other)
-        case let array as JSON.Array:
-            return array.isEqual(to: other)
-        case is JSON.Null:
-            return other is JSON.Null
-        default:
-            return (value as any Equatable)._isEqual(to: other)
-        }
-    }
 }
 
 private extension Equatable {
     func _isEqual(to other: JSONValue) -> Bool {
         self == other as? Self
-    }
-
-    func _isSameType(as other: JSONValue) -> Bool {
-        (other as? Self) != nil
     }
 }
 
