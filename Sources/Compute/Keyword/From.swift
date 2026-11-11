@@ -91,7 +91,8 @@ extension Compute.Keyword.From {
             context: inherited.merging(context ?? [:]) { _, explicit in explicit })
     }
 
-    var diagnosticName: String {
+    /// Canonical diagnostic spelling, including effective context bindings.
+    public var diagnosticName: String {
         let name = reference.string ?? reference.diagnosticJSON
         guard let context else { return name }
         return "\(name) \(JSON.object(context).diagnosticJSON)"

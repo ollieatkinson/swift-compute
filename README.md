@@ -274,6 +274,9 @@ JSON it contains. `Runtime(document:context:depth:)` lets a retained binding sta
 inherit its enclosing depth budget; `Context(item:scope:)` supplies its reference
 defaults. `JSON.requiresEvaluation` uses the invocation parser to distinguish
 plain values from executable syntax, including unknown keywords.
+`Frame.isCapturing` identifies an explicit capture such as `explain`, so external
+stages can include their nested evidence. `Keyword.From.diagnosticName` keeps the
+canonical contextual spelling available for diagnostics across stage boundaries.
 
 Custom `StreamingKeywordDefinition` implementations supply the current snapshot
 before later changes. Live evaluation uses that subscription for the initial

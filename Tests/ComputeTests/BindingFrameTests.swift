@@ -3,6 +3,25 @@ import Testing
 
 @Suite(.timeLimit(.minutes(1)))
 struct BindingFrameTests {
+    @Test func an_external_stage_can_identify_an_explicit_capture() async throws {
+        let runtime = Compute.Runtime(document: [
+            "plain": .returns("capture_probe", [:]),
+            "captured": .returns("explain", ["value": .returns("capture_probe", [:])])
+        ], functions: [CaptureProbe()])
+        defer { await runtime.cancel() }
+        var values = runtime.run(tracing: true).makeAsyncIterator()
+        let value = try #require(try await values.next()?.result.get())
+        #expect(value["plain"] == false)
+        #expect(try value["captured", "value"] == true)
+    }
+
+    @Test func reference_diagnostics_keep_context_and_stable_key_order() {
+        let request = Compute.Keyword.From(reference: "programme.title",
+            context: ["user": "Dorothy", "programme": "p1"])
+        #expect(request.diagnosticName == "programme.title {\"programme\":\"p1\",\"user\":\"Dorothy\"}")
+        #expect(Compute.Keyword.From(reference: "programme.title").diagnosticName == "programme.title")
+    }
+
     @Test func plain_values_do_not_need_an_evaluation_stage() {
         let plain: JSON = ["title": "Coffee", "ratings": [1, 2, 3]]
         let nested: JSON = ["nested": [.returns("literal", ["value": 42])]]
@@ -62,6 +81,11 @@ struct BindingFrameTests {
         #expect(value.thoughts.contains { $0.keyword == "binding_source" && $0.output == data })
         #expect(value.thoughts.contains { $0.keyword == "bound" && $0.depth == 19 })
     }
+}
+
+private struct CaptureProbe: Compute.OpaqueOutputKeyword {
+    var name: String { "capture_probe" }
+    func compute(data: JSON, frame: Compute.Frame) async throws -> JSON? { .bool(frame.isCapturing) }
 }
 
 private struct StreamValue: Compute.StreamingKeywordDefinition {

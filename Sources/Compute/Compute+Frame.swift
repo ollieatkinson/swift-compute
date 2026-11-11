@@ -18,6 +18,10 @@ extension Compute {
             context.referenceContext ?? references.last?.request.context
         }
 
+        /// An explicit capture, such as `explain`, is active in this branch.
+        /// An external evaluation stage can carry evidence back into that capture.
+        public var isCapturing: Bool { !captures.isEmpty }
+
         /// An immutable branch scope. Siblings retain their original bindings,
         /// item, route, depth, reference ancestry and dependency owner.
         public func scoped(to bindings: [String: JSON]) -> Frame {
