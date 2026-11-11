@@ -818,7 +818,10 @@ extension Compute {
                     depth: initialDepth,
                     keyword: step.keyword,
                     kind: step.kind,
-                    input: step.input,
+                    // A retained nested stage is still an invocation in its
+                    // caller's trace. Top-level graph steps keep their fragment.
+                    input: initialDepth > 0 && step.kind != .defaultValue
+                        ? .object(["{returns}": step.input]) : step.input,
                     output: step.output,
                     state: nextDocument
                 ), output: route)

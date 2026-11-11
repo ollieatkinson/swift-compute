@@ -277,6 +277,8 @@ plain values from executable syntax, including unknown keywords.
 `Frame.isCapturing` identifies an explicit capture such as `explain`, so external
 stages can include their nested evidence. `Keyword.From.diagnosticName` keeps the
 canonical contextual spelling available for diagnostics across stage boundaries.
+Nested stages (`depth > 0`) record full invocation inputs for enclosing traces;
+top-level graph fragments and default-value evidence retain their existing form.
 
 Custom `StreamingKeywordDefinition` implementations supply the current snapshot
 before later changes. Live evaluation uses that subscription for the initial

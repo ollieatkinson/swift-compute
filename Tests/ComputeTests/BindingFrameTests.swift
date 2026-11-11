@@ -80,6 +80,16 @@ struct BindingFrameTests {
         #expect(value.result == .success(data))
         #expect(value.thoughts.contains { $0.keyword == "binding_source" && $0.output == data })
         #expect(value.thoughts.contains { $0.keyword == "bound" && $0.depth == 19 })
+        #expect(value.thoughts.contains { $0.keyword == "bound" && $0.input == JSON.returns("bound", [:]) })
+    }
+
+    @Test func a_nested_stage_keeps_default_evidence_as_the_fallback_value() async throws {
+        let runtime = Compute.Runtime(document: .returns("error", ["message": "Expected"], default: "Fallback"), depth: 1)
+        defer { await runtime.cancel() }
+        var values = runtime.run(tracing: true).makeAsyncIterator()
+        let value = try #require(await values.next())
+        #expect(value.result == .success("Fallback"))
+        #expect(value.thoughts.contains { $0.kind == .defaultValue && $0.input == "Fallback" })
     }
 }
 
