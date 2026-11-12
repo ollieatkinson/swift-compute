@@ -984,7 +984,9 @@ extension Compute {
                 if lhs.0.components.count != rhs.0.components.count {
                     return lhs.0.components.count < rhs.0.components.count
                 }
-                return lhs.0.path.lexicographicallyPrecedes(rhs.0.path)
+                return lhs.0.components.lexicographicallyPrecedes(rhs.0.components) {
+                    $0.stringValue < $1.stringValue
+                }
             }
             for (route, signal) in routeValues {
                 guard !finalAncestors.contains(where: { $0.isPrefix(of: route) }) else { continue }
