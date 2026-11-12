@@ -3,6 +3,33 @@ import Testing
 
 @Suite(.serialized)
 struct ComputeRuntimeTests {
+    @Test func nested_inputs_keep_array_and_numeric_key_values_and_full_thought_snapshots() async throws {
+        let literal: (JSON) -> JSON = { .returns("literal", ["value": $0]) }
+        let runtime = try runtime([
+            "marker": "Unchanged",
+            "0": ["1": literal(7)],
+            "groups": [["value": .returns("map", ["src": [
+                "part": literal("nested"),
+                "items": [literal("left"), literal("right")],
+            ]])]],
+            "kept": literal("also unchanged"),
+        ])
+        defer { await runtime.cancel() }
+        let step = try await runtime.step()
+        #expect(step.state == [
+            "marker": "Unchanged",
+            "0": ["1": 7],
+            "groups": [["value": ["part": "nested", "items": ["left", "right"]]]],
+            "kept": "also unchanged",
+        ])
+        let snapshots = step.thoughts.filter { $0.state != nil }
+        try #require(!snapshots.isEmpty)
+        for thought in snapshots {
+            #expect(thought.state?.value(at: ["marker"]) == "Unchanged")
+            #expect(thought.state?.value(at: thought.route.components) == thought.output)
+        }
+    }
+
     @Test func runtime_thoughts_keep_deepest_first_then_lexical_route_order() async throws {
         let items = JSON.array((0 ..< 12).map { _ in
             .returns("literal", ["value": "item"])

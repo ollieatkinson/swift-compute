@@ -801,8 +801,8 @@ extension Compute {
             runtime: Compute.FunctionRuntime,
             context: Compute.Context
         ) async throws -> Compute.Signal? {
-            let current = try document(from: state, excluding: route)
-            guard let object = current.value(at: route.components)?.object else {
+            let current = try document(from: state, excluding: route, at: route)
+            guard let object = current.object else {
                 return nil
             }
             await runtime.trackDependencies(for: route, state: state)
@@ -961,23 +961,28 @@ extension Compute {
 
         private func document(
             from state: ComputeBrain.State,
-            excluding excluded: Compute.Route? = nil
+            excluding excluded: Compute.Route? = nil,
+            at root: Compute.Route = .root
         ) throws -> JSON {
-            try materialize(state, excluding: excluded).value
+            try materialize(state, excluding: excluded, at: root).value
         }
 
         private func materialize(
             _ state: ComputeBrain.State,
-            excluding excluded: Compute.Route? = nil
+            excluding excluded: Compute.Route? = nil,
+            at root: Compute.Route = .root
         ) throws
             -> (value: JSON, failures: [(route: Compute.Route, error: JSONError)],
                 projections: [Compute.Route: Compute.Outcome]) {
-            var output = document
+            // An operation consumes only its own input branch. Final values and
+            // diagnostic snapshots still request the entire document.
+            var output = root == .root ? document : document.value(at: root.components) ?? .null
             var failures: [(route: Compute.Route, error: JSONError)] = []
             var projections: [Compute.Route: Compute.Outcome] = [:]
             var finalAncestors: [Compute.Route] = []
             let routeValues = state.compactMap { entry -> (Compute.Route, Compute.Signal)? in
                 guard case .route(let route) = entry.key else { return nil }
+                guard root.isPrefix(of: route) else { return nil }
                 guard !route.isExcluded(from: excluded) else { return nil }
                 return (route, entry.value)
             }.sorted { lhs, rhs in
@@ -991,11 +996,13 @@ extension Compute {
             for (route, signal) in routeValues {
                 guard !finalAncestors.contains(where: { $0.isPrefix(of: route) }) else { continue }
                 projections.merge(signal.projections) { _, current in current }
+                let destination = root == .root ? route
+                    : Compute.Route(Array(route.components.dropFirst(root.components.count)))
                 switch signal {
                 case .pending(let value):
-                    try output.set(value, at: route)
+                    try output.set(value, at: destination)
                 case .value(let value, _):
-                    try output.set(value, at: route)
+                    try output.set(value, at: destination)
                     finalAncestors.append(route)
                 case .failure(let error, _):
                     failures.append((route, error))
