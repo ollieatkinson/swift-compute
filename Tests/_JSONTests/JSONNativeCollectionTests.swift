@@ -15,6 +15,25 @@ import Testing
         #expect(native.hashValue == literal.hashValue)
         #expect(Set([native, literal]).count == 1)
     }
+
+    @Test
+    func nested_native_collections_remain_interchangeable_dictionary_keys() {
+        let date = JSON(Date(timeIntervalSince1970: 42))
+        let inner: JSON.Array = [date, true, 42, .double(-0.0), .null]
+        let values: JSON.Array = [
+            ["name": "Coffee", "samples": JSON(NativeArray(inner))],
+            JSON([Int]()), JSON([String: Int]())
+        ]
+        let native: JSON = ["records": JSON(NativeArray(values))]
+        let literal: JSON = ["records": .array([
+            ["name": "Coffee", "samples": .array(inner)], [], [:]
+        ])]
+        #expect(native == literal && literal == native)
+        #expect(native.hashValue == literal.hashValue)
+        #expect(Set([native, literal]).count == 1)
+        #expect([native: "found"][literal] == "found")
+        #expect([literal: "found"][native] == "found")
+    }
 }
 
 // NSArray's inherited Objective-C storage is unused. The fixture's only storage

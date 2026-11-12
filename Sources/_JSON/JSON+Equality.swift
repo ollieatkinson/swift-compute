@@ -21,6 +21,24 @@ public extension JSON {
     }
 
     func hash(into hasher: inout Hasher) {
+        // Exact Swift literals already provide the required Hashable witness.
+        // Inspect metadata instead of trying value casts at every nested node.
+        let type = Swift.type(of: rawValue)
+        let discriminator: Int? = if type == Null.self { 0 }
+        else if type == Bool.self { 1 }
+        else if type == Int.self { 2 }
+        else if type == Double.self { 3 }
+        else if type == String.self { 4 }
+        else if type == Array.self { 5 }
+        else if type == Object.self { 6 }
+        else { nil }
+        if let discriminator {
+            hasher.combine(discriminator)
+            if discriminator != 0 { rawValue.hash(into: &hasher) }
+            return
+        }
+
+        // Keep bridge normalization and arbitrary native atoms unchanged.
         switch rawValue {
         case is Null:
             hasher.combine(0)

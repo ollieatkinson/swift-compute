@@ -52,6 +52,10 @@ import Testing
         #expect(JSON.array(entries.map(\.1)) != JSON.array(entries.reversed().map(\.1)))
         #expect(JSON([Int]()) == JSON.array([]))
         #expect(JSON([String: Int]()) == JSON.object([:]))
+        #expect(JSON([Int]()).hashValue == JSON.array([]).hashValue)
+        #expect(JSON([String: Int]()).hashValue == JSON.object([:]).hashValue)
+        #expect(Set([JSON([Int]()), .array([])]).count == 1)
+        #expect(Set([JSON([String: Int]()), .object([:])]).count == 1)
     }
 
     @Test
