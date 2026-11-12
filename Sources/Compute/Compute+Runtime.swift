@@ -1078,25 +1078,21 @@ extension Compute {
             }
             var outputReferences = references
             var outputContext = context
-            if let function = function as? any ReferenceKeyword {
-                let authored = try JSON.decoded(Compute.Keyword.From.self, from: input)
-                    .scoped(to: frame.scope)
-                let request = try await function.request(for: authored.reference, context: authored.context)
+            if function is any ReferenceKeyword {
+                let entered = try await following(
+                    JSON.decoded(Compute.Keyword.From.self, from: input),
+                    keyword: keyword,
+                    in: frame,
+                    item: context.item
+                )
+                let request = entered.references.last!.request
                 // Effective bindings are also part of the subscription key.
                 // Sibling uses of one template can address different entities.
                 var effective: JSON.Object = ["reference": request.reference]
                 if let context = request.context { effective["context"] = .object(context) }
                 input = .object(effective)
-                if context.referenceContext != nil { outputContext.referenceContext = request.context }
-                let entry = (request: request, context: outputContext)
-                let repeated = references.contains {
-                    $0.request == request && $0.context == outputContext
-                }
-                guard !repeated else {
-                    let chain = (references + [entry]).map { $0.request.diagnosticName }.joined(separator: " -> ")
-                    throw JSONError("Reference cycle: \(chain)", path: route.path)
-                }
-                outputReferences.append(entry)
+                outputContext = entered.context
+                outputReferences = entered.references
             }
             var rawOutput: JSON?
             var evaluated = false
@@ -1150,6 +1146,32 @@ extension Compute {
                     ), captures: captures, output: frame.output)
             }
             return output
+        }
+
+        func following(
+            _ authored: Compute.Keyword.From,
+            keyword: String,
+            in frame: Compute.Frame,
+            item: JSON?
+        ) async throws -> Compute.Frame {
+            guard let function = functions[keyword] as? any ReferenceKeyword else {
+                throw JSONError("Not a reference provider: " + keyword, path: frame.route.path)
+            }
+            let authored = authored.scoped(to: frame.scope)
+            let request = try await function.request(for: authored.reference, context: authored.context)
+            var context = frame.context
+            context.item = item
+            if context.referenceContext != nil { context.referenceContext = request.context }
+            let entry = (keyword: keyword, request: request, context: context)
+            guard !frame.references.contains(where: {
+                $0.keyword == keyword && $0.request == request && $0.context == context
+            }) else {
+                let chain = (frame.references + [entry]).map { $0.request.diagnosticName }.joined(separator: " -> ")
+                throw JSONError("Reference cycle: " + chain, path: frame.route.path)
+            }
+            return Compute.Frame(context: context, runtime: self, route: frame.route,
+                depth: frame.depth + 1, references: frame.references + [entry],
+                captures: frame.captures, output: frame.output)
         }
 
         func capture(

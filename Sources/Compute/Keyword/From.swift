@@ -38,11 +38,14 @@ public extension Compute.References {
 
 extension Compute.Keyword.From {
     public struct Function<References>: AnyReturnsKeyword where References: Compute.References {
-        public let name = Compute.Keyword.From.name
+        public let name: String
         private let references: References
 
-        public init(references: References) {
+        /// Register another reference provider without losing canonical source
+        /// sharing, inherited context or cycle checks. Names separate providers.
+        public init(references: References, name: String = Compute.Keyword.From.name) {
             self.references = references
+            self.name = name
         }
 
         public func compute(data input: JSON, frame: Compute.Frame) async throws -> JSON? {

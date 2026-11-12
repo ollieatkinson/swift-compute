@@ -6,7 +6,7 @@ extension Compute {
         public let route: Compute.Route
         public let depth: Int
         // Immutable branch ancestry; sibling evaluations never share a mutable stack.
-        let references: [(request: Compute.Keyword.From, context: Compute.Context)]
+        let references: [(keyword: String, request: Compute.Keyword.From, context: Compute.Context)]
         let captures: [UInt64]
         // Logical output ownership is distinct from diagnostic/code routes.
         // Explicit routes and detached work keep their containing output scope.
@@ -38,12 +38,22 @@ extension Compute {
             )
         }
 
+        /// Interpret a separately loaded program with its reference ancestry
+        /// and parameters. Quoting a source must not erase cycle/depth checks.
+        public func following(
+            _ reference: Compute.Keyword.From,
+            using keyword: String = Compute.Keyword.From.name,
+            item: JSON?
+        ) async throws -> Frame {
+            try await runtime.following(reference, keyword: keyword, in: self, item: item)
+        }
+
         init(
             context: Compute.Context,
             runtime: Compute.FunctionRuntime,
             route: Compute.Route,
             depth: Int,
-            references: [(request: Compute.Keyword.From, context: Compute.Context)],
+            references: [(keyword: String, request: Compute.Keyword.From, context: Compute.Context)],
             captures: [UInt64] = [],
             output: Compute.Route? = nil
         ) {
