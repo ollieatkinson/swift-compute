@@ -62,7 +62,7 @@ extension Compute {
     enum Lemma: Hashable, Sendable {
         case source(Compute.Route)
         case route(Compute.Route)
-        case dependency(Compute.Dependency)
+        case dependency(Compute.RequestKey)
     }
 
     enum Signal: Equatable, Sendable {
@@ -114,11 +114,11 @@ extension Compute {
         // The compiled graph can briefly differ from requested observations
         // while a whole-document read or a newer live evaluation is in flight.
         private var graphDemand: Set<Compute.Route>?
-        private var routeDependencies: [Compute.Route: Set<Compute.Dependency>] = [:]
+        private var routeDependencies: [Compute.Route: Set<Compute.RequestKey>] = [:]
         private var latestThoughts: [Compute.Thought] = []
-        private var results: [Compute.Dependency: Result<JSON, JSONError>] = [:]
-        private var subscriptions: [Compute.Dependency: Task<Void, Never>] = [:]
-        private var referenceWaiters: [Compute.Dependency: [UUID: AsyncStream<Result<JSON, JSONError>>.Continuation]] = [:]
+        private var results: [Compute.RequestKey: Result<JSON, JSONError>] = [:]
+        private var subscriptions: [Compute.RequestKey: Task<Void, Never>] = [:]
+        private var referenceWaiters: [Compute.RequestKey: [UUID: AsyncStream<Result<JSON, JSONError>>.Continuation]] = [:]
         private var observedRoutes: Set<Compute.Route> = []
         private var routeContinuations: [Compute.Route: [UUID: RouteContinuation]] = [:]
         private var evaluationVersion: UInt64 = 0
@@ -424,7 +424,7 @@ extension Compute {
         /// Otherwise a pending descendant prevents its parent from ever going live.
         private func resolved(
             _ result: Result<JSON, JSONError>,
-            dependency: Compute.Dependency,
+            dependency: Compute.RequestKey,
             route: Compute.Route,
             version: UInt64
         ) {
@@ -434,7 +434,7 @@ extension Compute {
         }
 
         private func track(
-            _ dependency: Compute.Dependency,
+            _ dependency: Compute.RequestKey,
             at route: Compute.Route,
             version: UInt64
         ) -> Bool {
@@ -451,7 +451,7 @@ extension Compute {
         /// later changes. A separate snapshot would release and reopen providers
         /// with zero grace, and could miss a change during that handoff.
         private func referenceValue(
-            for dependency: Compute.Dependency,
+            for dependency: Compute.RequestKey,
             at route: Compute.Route,
             version: UInt64
         ) async throws -> JSON {
@@ -473,19 +473,19 @@ extension Compute {
             return try result.get()
         }
 
-        private func removeReferenceWaiter(_ id: UUID, for dependency: Compute.Dependency) {
+        private func removeReferenceWaiter(_ id: UUID, for dependency: Compute.RequestKey) {
             referenceWaiters[dependency]?[id] = nil
             if referenceWaiters[dependency]?.isEmpty == true { referenceWaiters[dependency] = nil }
         }
 
-        private func finishReferenceWaiters(for dependency: Compute.Dependency) {
+        private func finishReferenceWaiters(for dependency: Compute.RequestKey) {
             guard let waiters = referenceWaiters.removeValue(forKey: dependency) else { return }
             for continuation in waiters.values {
                 continuation.finish()
             }
         }
 
-        private func merge(_ tracked: [Compute.Route: Set<Compute.Dependency>], version: UInt64) -> Bool {
+        private func merge(_ tracked: [Compute.Route: Set<Compute.RequestKey>], version: UInt64) -> Bool {
             var changed = false
             for (route, dependencies) in tracked {
                 // Independent routes may finish in either order. Only a newer
@@ -501,7 +501,7 @@ extension Compute {
             return changed
         }
 
-        private func resubscribe(to dependencies: [Compute.Dependency]) {
+        private func resubscribe(to dependencies: [Compute.RequestKey]) {
             let next = Set(dependencies)
             for (dependency, task) in subscriptions where !next.contains(dependency) {
                 task.cancel()
@@ -514,7 +514,7 @@ extension Compute {
             }
         }
 
-        private func subscribe(to dependency: Compute.Dependency) {
+        private func subscribe(to dependency: Compute.RequestKey) {
             guard subscriptions[dependency] == nil,
                 let function = functions[dependency.keyword] as? any Compute.ReturnsKeywordDefinition else { return }
             let frame = Compute.Frame(
@@ -548,7 +548,7 @@ extension Compute {
             subscriptions.removeAll()
         }
 
-        private func apply(_ result: Result<JSON, JSONError>, to dependency: Compute.Dependency) async {
+        private func apply(_ result: Result<JSON, JSONError>, to dependency: Compute.RequestKey) async {
             // Cancellation can occur between the source's check and this actor hop.
             guard !Task.isCancelled, subscriptions[dependency] != nil else { return }
             let initial = results[dependency] == nil
@@ -891,7 +891,7 @@ extension Compute {
         private static func graph(
             document: JSON,
             functions: [String: any AnyReturnsKeyword],
-            routeDependencies: [Compute.Route: Set<Compute.Dependency>],
+            routeDependencies: [Compute.Route: Set<Compute.RequestKey>],
             observing demand: Set<Compute.Route>? = nil
         ) -> Graph {
             let demand = demand.map { Set($0.map { $0.resolvingIndices(in: document) }) }
@@ -930,7 +930,7 @@ extension Compute {
             value: JSON,
             functions: [String: any AnyReturnsKeyword],
             routeConcepts: Set<Compute.Route>,
-            routeDependencies: [Compute.Route: Set<Compute.Dependency>]
+            routeDependencies: [Compute.Route: Set<Compute.RequestKey>]
         ) -> Set<Compute.Lemma> {
             var inputs: Set<Compute.Lemma> = []
             if let object = value.object, let invocation = Compute.Invocation(object: object) {
@@ -1020,15 +1020,37 @@ extension Compute {
         public let data: JSON
         public let depth: Int
     }
+
+    /// Only the runtime's tracked request lifetime owns this cached hash.
+    /// Public dependencies retain their native value semantics outside it.
+    struct RequestKey: Sendable, Hashable {
+        let dependency: Dependency
+        private let cachedHash: Int
+        var keyword: String { dependency.keyword }
+        var data: JSON { dependency.data }
+        var depth: Int { dependency.depth }
+
+        init(_ dependency: Dependency) {
+            self.dependency = dependency
+            cachedHash = dependency.hashValue
+        }
+
+        init(keyword: String, data: JSON, depth: Int) {
+            self.init(Dependency(keyword: keyword, data: data, depth: depth))
+        }
+
+        static func == (lhs: Self, rhs: Self) -> Bool { lhs.dependency == rhs.dependency }
+        func hash(into hasher: inout Hasher) { hasher.combine(cachedHash) }
+    }
 }
 
 extension Compute {
     actor FunctionRuntime {
-        typealias Resolved = @Sendable (Compute.Route, Compute.Dependency, Result<JSON, JSONError>) async -> Void
-        typealias ReferenceValue = @Sendable (Compute.Route, Compute.Dependency) async throws -> JSON
+        typealias Resolved = @Sendable (Compute.Route, Compute.RequestKey, Result<JSON, JSONError>) async -> Void
+        typealias ReferenceValue = @Sendable (Compute.Route, Compute.RequestKey) async throws -> JSON
         typealias Projected = @Sendable (Compute.Route, Compute.Outcome) async -> Void
         private let functions: [String: any AnyReturnsKeyword]
-        private let results: [Compute.Dependency: Result<JSON, JSONError>]
+        private let results: [Compute.RequestKey: Result<JSON, JSONError>]
         private let dependencyOwner: @Sendable (Compute.Route) -> Compute.Route
         private let didResolve: Resolved?
         private let referenceValue: ReferenceValue?
@@ -1037,15 +1059,15 @@ extension Compute {
         private let tracing: Bool
         private var recordedOutputs: [(output: Compute.Route, thought: Compute.Thought)] = []
         private var dependencyState: [Compute.Lemma: Compute.Signal] = [:]
-        private var resolved: [Compute.Dependency: Result<JSON, JSONError>] = [:]
-        private var tracked: [Compute.Route: Set<Compute.Dependency>] = [:]
+        private var resolved: [Compute.RequestKey: Result<JSON, JSONError>] = [:]
+        private var tracked: [Compute.Route: Set<Compute.RequestKey>] = [:]
         private var thoughts: [Compute.Thought] = []
         private var capturedThoughts: [UInt64: [Compute.Thought]] = [:]
         private var nextCapture: UInt64 = 0
 
         init(
             functions: [String: any AnyReturnsKeyword],
-            results: [Compute.Dependency: Result<JSON, JSONError>],
+            results: [Compute.RequestKey: Result<JSON, JSONError>],
             dependencyOwner: @escaping @Sendable (Compute.Route) -> Compute.Route,
             didResolve: Resolved? = nil,
             referenceValue: ReferenceValue? = nil,
@@ -1207,7 +1229,8 @@ extension Compute {
 
         /// A default one-shot subject replays the read already used to settle
         /// this dependency. Custom streaming subjects still open their source.
-        func result(for dependency: Compute.Dependency) -> Result<JSON, JSONError>? {
+        func result(for input: Compute.Dependency) -> Result<JSON, JSONError>? {
+            let dependency = Compute.RequestKey(input)
             if let signal = dependencyState[.dependency(dependency)] {
                 switch signal {
                 case .pending(let value), .value(let value, _): return .success(value)
@@ -1225,7 +1248,7 @@ extension Compute {
                 // Canonical reference input is independent of execution depth.
                 // Its returned program still runs in each caller's own frame.
                 let dependencyDepth = function is any ReferenceKeyword ? 0 : frame.depth
-                let dependency = Compute.Dependency(
+                let dependency = Compute.RequestKey(
                     keyword: keyword,
                     data: data,
                     depth: dependencyDepth
@@ -1332,8 +1355,8 @@ extension Compute {
         }
 
         func dependencySnapshot() -> (
-            tracked: [Compute.Route: Set<Compute.Dependency>],
-            resolved: [Compute.Dependency: Result<JSON, JSONError>]
+            tracked: [Compute.Route: Set<Compute.RequestKey>],
+            resolved: [Compute.RequestKey: Result<JSON, JSONError>]
         ) {
             (tracked, resolved)
         }
